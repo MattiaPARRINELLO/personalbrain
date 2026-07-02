@@ -64,6 +64,7 @@ export function ChatView() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTools, setActiveTools] = useState<Record<string, ToolCall>>({});
+  const [thinkingText, setThinkingText] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -74,7 +75,7 @@ export function ChatView() {
       top: scrollRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages, loading, activeTools]);
+  }, [messages, loading, activeTools, thinkingText]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -105,6 +106,7 @@ export function ChatView() {
 
       const assistantId = crypto.randomUUID();
       let buffer = "";
+      let hasStarted = false;
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -113,7 +115,12 @@ export function ChatView() {
         await api.chat.stream(
           apiMessages,
           (event: ChatStreamEvent) => {
-            if (event.type === "delta") {
+            if (event.type === "reasoning") {
+              hasStarted = true;
+              setThinkingText((prev) => prev + event.content);
+            } else if (event.type === "delta") {
+              hasStarted = true;
+              setThinkingText("");
               buffer += event.content;
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
@@ -123,6 +130,8 @@ export function ChatView() {
                 return [...prev, { id: assistantId, role: "assistant", content: buffer }];
               });
             } else if (event.type === "tool_start") {
+              hasStarted = true;
+              setThinkingText("");
               setActiveTools((prev) => ({
                 ...prev,
                 [event.toolCallId]: {
@@ -145,6 +154,7 @@ export function ChatView() {
             } else if (event.type === "error") {
               setError(event.message);
             } else if (event.type === "done") {
+              setThinkingText("");
               setActiveTools((currentTools) => {
                 const toolCalls = Object.values(currentTools);
                 setMessages((prev) => {
@@ -169,6 +179,7 @@ export function ChatView() {
         }
       } finally {
         setLoading(false);
+        setThinkingText("");
         setActiveTools({});
         abortRef.current = null;
       }
@@ -194,6 +205,8 @@ export function ChatView() {
               {messages.map((m) => (
                 <MessageBlock key={m.id} message={m} />
               ))}
+              {loading && <ThinkingIndicator text={thinkingText} />}
+
               {loading && activeToolsList(activeTools).length > 0 && (
                 <ToolCallTray tools={activeToolsList(activeTools)} />
               )}
@@ -341,6 +354,36 @@ function ToolCallTray({ tools, compact }: { tools: ToolCall[]; compact?: boolean
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function ThinkingIndicator({ text }: { text: string }) {
+  return (
+    <div className="flex gap-3 sm:gap-4 slide-up">
+      <div className="shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--accent)]/20 to-[var(--accent)]/5 border border-[var(--accent)]/30 flex items-center justify-center">
+          <Bot className="w-4 h-4 text-[var(--accent)]" />
+        </div>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="inline-block max-w-[85%] rounded-2xl px-4 py-3 border border-[var(--border-1)] bg-[var(--surface-2)]/60">
+          {!text ? (
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex gap-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] thinking-dot" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] thinking-dot" style={{ animationDelay: "0.15s" }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] thinking-dot" style={{ animationDelay: "0.3s" }} />
+              </span>
+              <span className="text-[13px] text-[var(--text-3)] font-mono">Réfléchit</span>
+            </div>
+          ) : (
+            <div className="text-[13px] text-[var(--text-3)] italic leading-relaxed whitespace-pre-wrap">
+              {text}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
