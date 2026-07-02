@@ -5,7 +5,7 @@ import {
   type UnifiedTool,
   type StreamEvent,
 } from "@/lib/ai-providers";
-import { getMemory, addMemoryFact, webSearch, addReminder, addWatchLaterItem, fetchPageTitle } from "@/lib/storage";
+import { getMemory, addMemoryFact, webSearch, addReminder, addWatchLaterItem, fetchPageMeta } from "@/lib/storage";
 import { fetchGmailMessages, sendGmailReply, createGoogleCalendarEvent } from "@/lib/google-actions";
 import type { ChatMessage } from "@/lib/types";
 
@@ -98,14 +98,15 @@ const tools: UnifiedTool[] = [
         url: { type: "string", description: "URL complete" },
         title: { type: "string", description: "Titre de l'element" },
         description: { type: "string", description: "Description courte" },
+        thumbnail: { type: "string", description: "URL de la miniature (si disponible)" },
         category: { type: "string", enum: ["video", "article", "photo", "music", "other"], description: "Categorie" },
       },
       required: ["url", "title"],
     },
   },
   {
-    name: "fetch_page_title",
-    description: "Recupere le titre d'une page web ou video YouTube a partir de son URL. Utilise cet outil quand l'utilisateur partage un lien sans donner de titre.",
+    name: "fetch_page_meta",
+    description: "Recupere le titre et la miniature d'une page web ou video YouTube a partir de son URL. Utilise cet outil quand l'utilisateur partage un lien, puis passe les donnees a add_watch_later.",
     parameters: {
       type: "object",
       properties: {
@@ -131,7 +132,7 @@ ${facts || "- Aucun fait memorise"}`;
     ? "Tu es en mode compagnon de code. Analyse les problemes algorithmiques, propose des solutions en TypeScript, explique la complexite et les cas limites."
     : "";
 
-  return `${base}\n\n${memoryBlock}\n\nTu as acces a des outils : web_search, fetch_and_search_emails, send_email_response, create_calendar_event, add_memory_fact, add_reminder, add_watch_later, fetch_page_title. Utilise-les quand c'est pertinent. Si l'utilisateur partage un lien (YouTube, article, musique), utilise d'abord fetch_page_title pour recuperer le titre, puis add_watch_later pour l'ajouter. Si l'utilisateur veut etre rappele plus tard, utilise add_reminder avec une date ISO 8601.\n${codeBlock}`.trim();
+  return `${base}\n\n${memoryBlock}\n\nTu as acces a des outils : web_search, fetch_and_search_emails, send_email_response, create_calendar_event, add_memory_fact, add_reminder, add_watch_later, fetch_page_meta. Utilise-les quand c'est pertinent. Si l'utilisateur partage un lien (YouTube, article, musique), utilise d'abord fetch_page_meta pour recuperer le titre et la miniature, puis add_watch_later pour l'ajouter en passant la miniature si disponible. Si l'utilisateur veut etre rappele plus tard, utilise add_reminder avec une date ISO 8601.\n${codeBlock}`.trim();
 }
 
 async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
@@ -186,16 +187,19 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       const url = String(args.url ?? "");
       const title = String(args.title ?? "");
       const description = args.description ? String(args.description) : undefined;
+      const thumbnail = args.thumbnail ? String(args.thumbnail) : undefined;
       const category = args.category as "video" | "article" | "photo" | "music" | "other" | undefined;
       if (!url || !title) return "Erreur : url et title requis.";
-      const item = await addWatchLaterItem({ url, title, description, category });
+      const item = await addWatchLaterItem({ url, title, description, thumbnail, category });
       return `Ajoute a 'A voir plus tard' : ${item.title} (${item.source}).`;
     }
-    case "fetch_page_title": {
+    case "fetch_page_meta": {
       const url = String(args.url ?? "");
       if (!url) return "Erreur : url requise.";
-      const title = await fetchPageTitle(url);
-      return title;
+      const meta = await fetchPageMeta(url);
+      let result = `Titre : ${meta.title}`;
+      if (meta.thumbnail) result += `\nMiniature : ${meta.thumbnail}`;
+      return result;
     }
     default:
       return `Outil inconnu : ${name}`;

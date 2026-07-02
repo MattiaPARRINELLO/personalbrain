@@ -240,21 +240,44 @@ export async function webSearch(query: string): Promise<string> {
   return `Resultats de recherche pour "${query}" : aucune information predefinie. Essaie avec un mot-cle comme Muse, React, TypeScript ou concert.`;
 }
 
-export async function fetchPageTitle(url: string): Promise<string> {
+function extractYouTubeId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+export async function fetchPageMeta(url: string): Promise<{ title: string; thumbnail?: string }> {
   try {
+    const ytId = extractYouTubeId(url);
+    if (ytId) {
+      return {
+        title: "",
+        thumbnail: `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`,
+      };
+    }
+
     const res = await fetch(url, {
       signal: AbortSignal.timeout(5000),
       headers: { "User-Agent": "Mozilla/5.0 (compatible; PersonalBrain/1.0)" },
     });
-    if (!res.ok) return `Impossible de récupérer la page (${res.status})`;
+    if (!res.ok) return { title: `Impossible de récupérer la page (${res.status})` };
     const html = await res.text();
+
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    if (titleMatch) return titleMatch[1].trim();
-    const ogMatch = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i);
-    if (ogMatch) return ogMatch[1].trim();
-    return "Titre non trouvé";
+    const ogTitle = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i);
+    const ogImage = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i);
+
+    return {
+      title: ogTitle?.[1]?.trim() ?? titleMatch?.[1]?.trim() ?? "Titre non trouvé",
+      thumbnail: ogImage?.[1] || undefined,
+    };
   } catch {
-    return "Erreur de récupération du titre";
+    return { title: "Erreur de récupération du titre" };
   }
 }
 
