@@ -29,6 +29,7 @@ export interface ChatCompletionResult {
 }
 
 export type StreamEvent =
+  | { type: "reasoning"; content: string }
   | { type: "delta"; content: string }
   | { type: "tool_start"; toolCallId: string; name: string; arguments: string }
   | { type: "tool_result"; name: string; result: string }
@@ -188,10 +189,16 @@ async function* streamOpenAI(
 
   const toolCalls = new Map<number, { id: string; name: string; args: string }>();
   let fullContent = "";
+  let reasoningBuffer = "";
 
   for await (const chunk of stream) {
     const choice = chunk.choices?.[0];
     const delta = choice?.delta;
+
+    if (delta?.reasoning_content) {
+      reasoningBuffer += delta.reasoning_content;
+      yield { type: "reasoning", content: delta.reasoning_content };
+    }
 
     if (delta?.content) {
       fullContent += delta.content;

@@ -102,6 +102,7 @@ export const api = {
 };
 
 export type ChatStreamEvent =
+  | { type: "reasoning"; content: string }
   | { type: "delta"; content: string }
   | { type: "tool_start"; toolCallId: string; name: string; arguments: string }
   | { type: "tool_result"; name: string; result: string }
