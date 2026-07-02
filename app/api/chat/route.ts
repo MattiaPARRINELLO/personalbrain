@@ -11,7 +11,7 @@ import type { ChatMessage } from "@/lib/types";
 
 const MODELS = {
   general: "deepseek-v4-pro",
-  generalAlt: "qwen3.7-max",
+  generalAlt: "kimi-k2.6",
   code: "kimi-k2.7-code",
 };
 
