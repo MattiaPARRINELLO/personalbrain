@@ -132,7 +132,12 @@ ${facts || "- Aucun fait memorise"}`;
     ? "Tu es en mode compagnon de code. Analyse les problemes algorithmiques, propose des solutions en TypeScript, explique la complexite et les cas limites."
     : "";
 
-  return `${base}\n\n${memoryBlock}\n\nTu as acces a des outils : web_search, fetch_and_search_emails, send_email_response, create_calendar_event, add_memory_fact, add_reminder, add_watch_later, fetch_page_meta. Utilise-les quand c'est pertinent. Si l'utilisateur partage un lien (YouTube, article, musique), utilise d'abord fetch_page_meta pour recuperer le titre et la miniature, puis add_watch_later pour l'ajouter en passant la miniature si disponible. Si l'utilisateur veut etre rappele plus tard, utilise add_reminder avec une date ISO 8601.\n${codeBlock}`.trim();
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("fr-FR", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
+
+  return `${base}\n\n${memoryBlock}\n\nAujourd'hui nous sommes le ${dateStr}.\n\nTu as acces a des outils : web_search, fetch_and_search_emails, send_email_response, create_calendar_event, add_memory_fact, add_reminder, add_watch_later, fetch_page_meta. Utilise-les quand c'est pertinent. Si l'utilisateur partage un lien (YouTube, article, musique), utilise d'abord fetch_page_meta pour recuperer le titre et la miniature, puis add_watch_later pour l'ajouter en passant la miniature si disponible. Si l'utilisateur veut etre rappele plus tard, utilise add_reminder avec une date ISO 8601.\n${codeBlock}`.trim();
 }
 
 async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
