@@ -167,15 +167,24 @@ async function* streamOpenAI(
     return { role: m.role, content: m.content ?? "" };
   });
 
-  const stream = await client.chat.completions.create({
-    model,
-    messages: openaiMessages,
-    tools: openaiTools.length > 0 ? openaiTools : undefined,
-    tool_choice: "auto",
-    temperature: 0.7,
-    max_tokens: 2048,
-    stream: true,
-  });
+  let stream;
+  try {
+    stream = await client.chat.completions.create({
+      model,
+      messages: openaiMessages,
+      tools: openaiTools.length > 0 ? openaiTools : undefined,
+      tool_choice: "auto",
+      temperature: 0.7,
+      max_tokens: 2048,
+      stream: true,
+    });
+  } catch (err: unknown) {
+    const detail = err instanceof Object && "status" in (err as object)
+      ? `status=${(err as { status: unknown }).status} message=${err instanceof Error ? err.message : String(err)}`
+      : String(err);
+    console.error(`[streamOpenAI] ${model} failed:`, detail);
+    throw err;
+  }
 
   const toolCalls = new Map<number, { id: string; name: string; args: string }>();
   let fullContent = "";
