@@ -195,9 +195,10 @@ async function* streamOpenAI(
     const choice = chunk.choices?.[0];
     const delta = choice?.delta;
 
-    if (delta?.reasoning_content) {
-      reasoningBuffer += delta.reasoning_content;
-      yield { type: "reasoning", content: delta.reasoning_content };
+    const rc = (delta as Record<string, unknown> | undefined)?.reasoning_content;
+    if (typeof rc === "string") {
+      reasoningBuffer += rc;
+      yield { type: "reasoning", content: rc };
     }
 
     if (delta?.content) {

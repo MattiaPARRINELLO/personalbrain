@@ -240,6 +240,24 @@ export async function webSearch(query: string): Promise<string> {
   return `Resultats de recherche pour "${query}" : aucune information predefinie. Essaie avec un mot-cle comme Muse, React, TypeScript ou concert.`;
 }
 
+export async function fetchPageTitle(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(5000),
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; PersonalBrain/1.0)" },
+    });
+    if (!res.ok) return `Impossible de récupérer la page (${res.status})`;
+    const html = await res.text();
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (titleMatch) return titleMatch[1].trim();
+    const ogMatch = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i);
+    if (ogMatch) return ogMatch[1].trim();
+    return "Titre non trouvé";
+  } catch {
+    return "Erreur de récupération du titre";
+  }
+}
+
 export async function getReminders(): Promise<RemindersData> {
   return readJson<RemindersData>("reminders.json", defaultReminders);
 }
