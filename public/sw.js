@@ -1,4 +1,4 @@
-const CACHE = "personalbrain-v2";
+const CACHE = "personalbrain-v3";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -27,6 +27,21 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.protocol !== "http:" && url.protocol !== "https:") return;
 
+  // Navigation (HTML) → network-first (toujours servir la version fraîche du serveur)
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((res) => {
+          const clone = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Static assets → cache-first
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const fetched = fetch(event.request)
