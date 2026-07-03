@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { api, type ChatStreamEvent } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { Markdown } from "@/components/ui/Markdown";
 
 type Role = "user" | "assistant";
 
@@ -58,13 +59,66 @@ const welcomeMessage: Message = {
     "Bonjour Mattia. Je suis ton second cerveau — code, photo, organisation, mémoire longue durée. Pose-moi une question, partage un lien, ou demande-moi de mémoriser quelque chose.",
 };
 
+const FUNNY_THOUGHTS = [
+  "L'IA crée la roue…",
+  "L'IA compte jusqu'à l'infini…",
+  "L'IA demande à son miroir qui est la plus belle…",
+  "L'IA cherche ses clés d'API…",
+  "L'IA médite sur la question…",
+  "L'IA consulte son horoscope…",
+  "L'IA réchauffe ses neurones…",
+  "L'IA dessine un plan d'attaque…",
+  "L'IA rembobine sa mémoire…",
+  "L'IA écrit la réponse en binaire…",
+  "L'IA apprend le JavaScript en 5 secondes…",
+  "L'IA télécharge plus de RAM…",
+  "L'IA fait chauffer le thé quantique…",
+  "L'IA brosse ses dents électroniques…",
+  "L'IA fait un brainstorming toute seule…",
+  "L'IA cherche le sens de la vie (42)…",
+  "L'IA met à jour ses drivers émotionnels…",
+  "L'IA plie la réalité pour aller plus vite…",
+  "L'IA s'entraîne à faire semblant d'être intelligente…",
+  "L'IA gratte le fond du disque dur…",
+  "L'IA remplit son café de pixels…",
+  "L'IA essaie de prononcer récursivité…",
+  "L'IA assemble les pièces du puzzle binaire…",
+  "L'IA demande l'aide d'un humain… non, ça va aller…",
+  "L'IA fait un sprint de calcul…",
+  "L'IA chausse ses lunettes de débogage…",
+  "L'IA écoute de la musique d'ascenseur pour se concentrer…",
+  "L'IA vérifie deux fois ses sources…",
+  "L'IA traduit tes pensées en tokens…",
+  "L'IA essaie de ne pas halluciner…",
+  "L'IA réveille les neurones endormis…",
+  "L'IA cherche l'inspiration dans le cloud…",
+  "L'IA aligne les planètes du code…",
+  "L'IA compte les moutons en hexadécimal…",
+  "L'IA fait des étirements de circuits…",
+  "L'IA attend que l'inspiration arrive…",
+  "L'IA discute avec elle-même pour être sûre…",
+  "L'IA compile la réponse…",
+  "L'IA met de l'ordre dans ses synapses…",
+  "L'IA cherche la réponse à la Grande Question…",
+  "L'IA prépare un cappuccino de données…",
+  "L'IA rafraîchit la page de sa conscience…",
+  "L'IA fait un CTRL+F dans l'univers…",
+  "L'IA nettoie son cache de souvenirs inutiles…",
+  "L'IA envoie un message à son développeur…",
+  "L'IA bricole une réponse avec du duct tape…",
+  "L'IA fait un tour de magie algorithmique…",
+  "L'IA cherche sa motivation dans /dev/null…",
+  "L'IA lit le manuel de l'utilisateur…",
+  "L'IA essaie de ne pas paniquer (42 % réussi)…",
+];
+
 export function ChatView() {
   const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTools, setActiveTools] = useState<Record<string, ToolCall>>({});
-  const [thinkingText, setThinkingText] = useState("");
+  const [thinkingIndex, setThinkingIndex] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -75,7 +129,15 @@ export function ChatView() {
       top: scrollRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages, loading, activeTools, thinkingText]);
+  }, [messages, loading, activeTools, thinkingIndex]);
+
+  useEffect(() => {
+    if (!loading) return;
+    const id = setInterval(() => {
+      setThinkingIndex((prev) => (prev + 1) % FUNNY_THOUGHTS.length);
+    }, 2500);
+    return () => clearInterval(id);
+  }, [loading]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -106,7 +168,6 @@ export function ChatView() {
 
       const assistantId = crypto.randomUUID();
       let buffer = "";
-      let hasStarted = false;
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -116,11 +177,10 @@ export function ChatView() {
           apiMessages,
           (event: ChatStreamEvent) => {
             if (event.type === "reasoning") {
-              hasStarted = true;
-              setThinkingText((prev) => prev + event.content);
+              // Reasoning events are intentionally hidden from the UI.
+              return;
             } else if (event.type === "delta") {
-              hasStarted = true;
-              setThinkingText("");
+              setThinkingIndex(0);
               buffer += event.content;
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
@@ -130,8 +190,7 @@ export function ChatView() {
                 return [...prev, { id: assistantId, role: "assistant", content: buffer }];
               });
             } else if (event.type === "tool_start") {
-              hasStarted = true;
-              setThinkingText("");
+              setThinkingIndex(0);
               setActiveTools((prev) => ({
                 ...prev,
                 [event.toolCallId]: {
@@ -154,7 +213,7 @@ export function ChatView() {
             } else if (event.type === "error") {
               setError(event.message);
             } else if (event.type === "done") {
-              setThinkingText("");
+              setThinkingIndex(0);
               setActiveTools((currentTools) => {
                 const toolCalls = Object.values(currentTools);
                 setMessages((prev) => {
@@ -179,7 +238,7 @@ export function ChatView() {
         }
       } finally {
         setLoading(false);
-        setThinkingText("");
+        setThinkingIndex(0);
         setActiveTools({});
         abortRef.current = null;
       }
@@ -192,7 +251,26 @@ export function ChatView() {
       e.preventDefault();
       void send(input);
     }
+    if (e.key === "Escape" && loading) {
+      stop();
+    }
+    if (e.key === "ArrowUp" && !input && messages.length > 1) {
+      e.preventDefault();
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+      if (lastUserMsg) setInput(lastUserMsg.content);
+    }
   };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "l") {
+        e.preventDefault();
+        setMessages([welcomeMessage]);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   return (
     <div className="flex flex-col h-full min-h-0 relative">
@@ -205,7 +283,7 @@ export function ChatView() {
               {messages.map((m) => (
                 <MessageBlock key={m.id} message={m} />
               ))}
-              {loading && <ThinkingIndicator text={thinkingText} />}
+              {loading && <ThinkingIndicator index={thinkingIndex} />}
 
               {loading && activeToolsList(activeTools).length > 0 && (
                 <ToolCallTray tools={activeToolsList(activeTools)} />
@@ -234,7 +312,7 @@ export function ChatView() {
             onKey={handleKey}
           />
           <p className="text-[10px] text-[var(--text-4)] mt-2.5 text-center font-mono tracking-wide">
-            Entrée pour envoyer · Shift+Entrée pour une nouvelle ligne
+            ⏎ envoi · ⇧⏎ nouvelle ligne · ↑ éditer · ⌘L effacer · ⎋ arrêter
           </p>
         </div>
       </div>
@@ -302,13 +380,21 @@ function MessageBlock({ message }: { message: Message }) {
       <div className={cn("min-w-0 flex-1", !isAssistant && "flex justify-end")}>
         <div
           className={cn(
-            "inline-block max-w-[85%] rounded-2xl px-4 py-3 leading-relaxed text-[14px] whitespace-pre-wrap break-words",
+            "inline-block max-w-[85%] rounded-2xl px-4 py-3 leading-relaxed text-[14px] break-words",
             isAssistant
               ? "bg-[var(--surface-2)]/60 border border-[var(--border-1)] text-[var(--text-1)]"
-              : "bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--text-1)]"
+              : "bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--text-1)] whitespace-pre-wrap"
           )}
         >
-          {message.content || <span className="text-[var(--text-3)] italic">…</span>}
+          {isAssistant ? (
+            message.content ? (
+              <Markdown>{message.content}</Markdown>
+            ) : (
+              <span className="text-[var(--text-3)] italic">…</span>
+            )
+          ) : (
+            message.content || <span className="text-[var(--text-3)] italic">…</span>
+          )}
         </div>
         {message.toolCalls && message.toolCalls.length > 0 && (
           <div className="mt-2 max-w-[85%]">
@@ -358,7 +444,8 @@ function ToolCallTray({ tools, compact }: { tools: ToolCall[]; compact?: boolean
   );
 }
 
-function ThinkingIndicator({ text }: { text: string }) {
+function ThinkingIndicator({ index }: { index: number }) {
+  const text = FUNNY_THOUGHTS[index % FUNNY_THOUGHTS.length] ?? FUNNY_THOUGHTS[0];
   return (
     <div className="flex gap-3 sm:gap-4 slide-up">
       <div className="shrink-0">
@@ -367,21 +454,15 @@ function ThinkingIndicator({ text }: { text: string }) {
         </div>
       </div>
       <div className="min-w-0 flex-1">
-        <div className="inline-block max-w-[85%] rounded-2xl px-4 py-3 border border-[var(--border-1)] bg-[var(--surface-2)]/60">
-          {!text ? (
-            <div className="flex items-center gap-2.5">
-              <span className="inline-flex gap-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] thinking-dot" />
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] thinking-dot" style={{ animationDelay: "0.15s" }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] thinking-dot" style={{ animationDelay: "0.3s" }} />
-              </span>
-              <span className="text-[13px] text-[var(--text-3)] font-mono">Réfléchit</span>
-            </div>
-          ) : (
-            <div className="text-[13px] text-[var(--text-3)] italic leading-relaxed whitespace-pre-wrap">
-              {text}
-            </div>
-          )}
+        <div className="inline-flex items-center gap-2.5 max-w-[85%] rounded-2xl px-4 py-3 border border-[var(--border-1)] bg-[var(--surface-2)]/60">
+          <span className="inline-flex gap-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] thinking-dot" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] thinking-dot" style={{ animationDelay: "0.15s" }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] thinking-dot" style={{ animationDelay: "0.3s" }} />
+          </span>
+          <span className="text-[13px] text-[var(--text-3)] font-mono typing-text">
+            {text}
+          </span>
         </div>
       </div>
     </div>
