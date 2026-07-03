@@ -5,20 +5,15 @@ import {
   type UnifiedTool,
   type StreamEvent,
 } from "@/lib/ai-providers";
-import { getMemory, addMemoryFact, webSearch, addReminder, addWatchLaterItem, fetchPageMeta } from "@/lib/storage";
-import { fetchGmailMessages, sendGmailReply, createGoogleCalendarEvent } from "@/lib/google-actions";
+import { getMemory, webSearch, addReminder, addWatchLaterItem, fetchPageMeta, getConcerts } from "@/lib/storage";
+import { fetchGmailMessages, sendGmailReply, createGoogleCalendarEvent, fetchGoogleCalendarEvents } from "@/lib/google-actions";
+import { getModel } from "@/lib/config";
 import type { ChatMessage } from "@/lib/types";
-
-const MODELS = {
-  general: "deepseek-v4-pro",
-  generalAlt: "kimi-k2.6",
-  code: "kimi-k2.7-code",
-};
 
 const tools: UnifiedTool[] = [
   {
     name: "web_search",
-    description: "Effectue une recherche web rapide pour recuperer des informations d'actualite ou des faits generaux.",
+    description: "Effectue une recherche web pour recuperer des informations d'actualite ou des faits generaux.",
     parameters: {
       type: "object",
       properties: {
@@ -29,7 +24,7 @@ const tools: UnifiedTool[] = [
   },
   {
     name: "fetch_and_search_emails",
-    description: "Recupere les derniers emails de la boite Gmail et permet de chercher par mot-cle dans les expediteurs, sujets ou contenus.",
+    description: "Recupere les derniers emails de la boite Gmail et cherche par mot-cle dans les expediteurs, sujets ou contenus.",
     parameters: {
       type: "object",
       properties: {
@@ -40,12 +35,12 @@ const tools: UnifiedTool[] = [
   },
   {
     name: "send_email_response",
-    description: "Envoie une reponse a un email existant via Gmail. L'email_id doit provenir de fetch_and_search_emails.",
+    description: "Envoie une reponse a un email existant via Gmail.",
     parameters: {
       type: "object",
       properties: {
         email_id: { type: "string", description: "ID de l'email auquel repondre" },
-        response_text: { type: "string", description: "Texte complet de la reponse a envoyer" },
+        response_text: { type: "string", description: "Texte complet de la reponse" },
       },
       required: ["email_id", "response_text"],
     },
@@ -57,11 +52,42 @@ const tools: UnifiedTool[] = [
       type: "object",
       properties: {
         title: { type: "string", description: "Titre de l'evenement" },
-        start_time: { type: "string", description: "Date/heure de debut au format ISO 8601" },
-        end_time: { type: "string", description: "Date/heure de fin au format ISO 8601" },
-        location: { type: "string", description: "Lieu de l'evenement (optionnel)" },
+        start_time: { type: "string", description: "Date/heure debut ISO 8601" },
+        end_time: { type: "string", description: "Date/heure fin ISO 8601" },
+        location: { type: "string", description: "Lieu (optionnel)" },
       },
       required: ["title", "start_time", "end_time"],
+    },
+  },
+  {
+    name: "search_calendar_events",
+    description: "Cherche des evenements dans le calendrier Google (concerts, cours, reunions).",
+    parameters: {
+      type: "object",
+      properties: {
+        days: { type: "number", description: "Nombre de jours a chercher (defaut: 30)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "lookup_concerts",
+    description: "Consulte la liste des concerts en cours (shootes, en selection, en montage, livres).",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "triage_emails",
+    description: "Analyse les emails non lus et les classe par priorite (urgent, newsletter, billetterie, personnel).",
+    parameters: {
+      type: "object",
+      properties: {
+        max_results: { type: "number", description: "Nombre max d'emails a analyser (defaut: 10)" },
+      },
+      required: [],
     },
   },
   {
@@ -78,27 +104,27 @@ const tools: UnifiedTool[] = [
   },
   {
     name: "add_reminder",
-    description: "Cree un rappel avec une date d'echeance ISO 8601. Utilise cet outil quand l'utilisateur veut etre rappele plus tard.",
+    description: "Cree un rappel avec une date d'echeance ISO 8601.",
     parameters: {
       type: "object",
       properties: {
         title: { type: "string", description: "Titre court du rappel" },
         notes: { type: "string", description: "Details optionnels" },
-        due_at: { type: "string", description: "Date d'echeance au format ISO 8601" },
+        due_at: { type: "string", description: "Date d'echeance ISO 8601" },
       },
       required: ["title", "due_at"],
     },
   },
   {
     name: "add_watch_later",
-    description: "Ajoute un lien (video YouTube, article, photo, musique) a la liste 'A voir plus tard' pour consultation ulterieure.",
+    description: "Ajoute un lien a la liste 'A voir plus tard'.",
     parameters: {
       type: "object",
       properties: {
         url: { type: "string", description: "URL complete" },
-        title: { type: "string", description: "Titre de l'element" },
+        title: { type: "string", description: "Titre" },
         description: { type: "string", description: "Description courte" },
-        thumbnail: { type: "string", description: "URL de la miniature (si disponible)" },
+        thumbnail: { type: "string", description: "URL miniature" },
         category: { type: "string", enum: ["video", "article", "photo", "music", "other"], description: "Categorie" },
       },
       required: ["url", "title"],
@@ -106,11 +132,11 @@ const tools: UnifiedTool[] = [
   },
   {
     name: "fetch_page_meta",
-    description: "Recupere le titre et la miniature d'une page web ou video YouTube a partir de son URL. Utilise cet outil quand l'utilisateur partage un lien, puis passe les donnees a add_watch_later.",
+    description: "Recupere le titre et la miniature d'une page web ou video YouTube.",
     parameters: {
       type: "object",
       properties: {
-        url: { type: "string", description: "URL complete de la page ou video" },
+        url: { type: "string", description: "URL complete" },
       },
       required: ["url"],
     },
@@ -136,15 +162,31 @@ ${facts || "- Aucun fait memorise"}`;
   const dateStr = now.toLocaleDateString("fr-FR", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
+  const timeStr = now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
-  return `${base}\n\n${memoryBlock}\n\nAujourd'hui nous sommes le ${dateStr}.\n\nTu as acces a des outils : web_search, fetch_and_search_emails, send_email_response, create_calendar_event, add_memory_fact, add_reminder, add_watch_later, fetch_page_meta. Utilise-les quand c'est pertinent. Si l'utilisateur partage un lien (YouTube, article, musique), utilise d'abord fetch_page_meta pour recuperer le titre et la miniature, puis add_watch_later pour l'ajouter en passant la miniature si disponible. Si l'utilisateur veut etre rappele plus tard, utilise add_reminder avec une date ISO 8601.\n${codeBlock}`.trim();
+  const toolList = tools.map((t) => t.name).join(", ");
+
+  // Daily Brief contextuel
+  let briefBlock = "";
+  try {
+    const { getConfig } = await import("@/lib/config");
+    const config = await getConfig();
+    if (config.features.dailyBrief) {
+      const { generateDailyBrief } = await import("@/lib/daily-brief");
+      const brief = await generateDailyBrief();
+      if (brief) briefBlock = `\n\nBrief du jour : ${brief}`;
+    }
+  } catch {
+    // Silencieux — le daily brief est optionnel
+  }
+
+  return `${base}\n\n${memoryBlock}\n\nAujourd'hui nous sommes le ${dateStr}, il est ${timeStr}.${briefBlock}\n\nTu as acces a ces outils : ${toolList}. Utilise-les quand c'est pertinent.\n\nSi l'utilisateur partage un lien, utilise d'abord fetch_page_meta puis add_watch_later.\n${codeBlock}`.trim();
 }
 
 async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
   switch (name) {
     case "web_search": {
-      const query = String(args.query ?? "");
-      return await webSearch(query);
+      return await webSearch(String(args.query ?? ""));
     }
     case "fetch_and_search_emails": {
       const query = args.query ? String(args.query) : undefined;
@@ -173,10 +215,47 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       const eventId = await createGoogleCalendarEvent(title, start, end, location);
       return `Evenement "${title}" cree dans Google Calendar (id: ${eventId}).`;
     }
+    case "search_calendar_events": {
+      const days = typeof args.days === "number" ? args.days : 30;
+      const timeMin = new Date().toISOString();
+      const timeMax = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+      const events = await fetchGoogleCalendarEvents(timeMin, timeMax);
+      if (events.length === 0) return "Aucun evenement trouve dans le calendrier.";
+      return events
+        .map(
+          (e) =>
+            `- ${e.summary} le ${new Date(e.start).toLocaleDateString("fr-FR")}${e.location ? ` (${e.location})` : ""}`
+        )
+        .join("\n");
+    }
+    case "lookup_concerts": {
+      const data = await getConcerts();
+      if (data.events.length === 0) return "Aucun concert enregistre.";
+      return data.events
+        .map(
+          (c) =>
+            `- ${c.artist} @ ${c.venue} le ${new Date(c.date).toLocaleDateString("fr-FR")} [${c.status}]`
+        )
+        .join("\n");
+    }
+    case "triage_emails": {
+      const maxResults = typeof args.max_results === "number" ? args.max_results : 10;
+      const emails = await fetchGmailMessages(undefined, maxResults);
+      if (emails.length === 0) return "Aucun email trouve.";
+      const urgent = emails.filter((e) => e.unread && /urgent|rappel|relance|deadline|échéance/i.test(e.subject + " " + e.snippet));
+      const normal = emails.filter((e) => !urgent.includes(e));
+      let result = "";
+      if (urgent.length > 0) {
+        result += "🔴 URGENT :\n" + urgent.map((e) => `  - ${e.from}: ${e.subject}`).join("\n") + "\n\n";
+      }
+      result += "📋 Autres emails :\n" + normal.map((e) => `  - ${e.from}: ${e.subject}${e.unread ? " (non lu)" : ""}`).join("\n");
+      return result;
+    }
     case "add_memory_fact": {
       const content = String(args.content ?? "");
       const category = String(args.category ?? "life") as "dev" | "photo" | "life" | "preference";
       if (!content) return "Erreur : contenu vide.";
+      const { addMemoryFact } = await import("@/lib/storage");
       await addMemoryFact(content, category);
       return `Fait memorise : ${content}`;
     }
@@ -218,8 +297,7 @@ export async function POST(request: NextRequest) {
   };
 
   const context = body.model === "code" ? "code" : "general";
-  const modelName = context === "code" ? MODELS.code : MODELS.general;
-  const altModel = context === "code" ? MODELS.code : MODELS.generalAlt;
+  const { primary: modelName, alt: altModel } = await getModel(context);
 
   const systemPrompt = await buildSystemPrompt(context);
 
@@ -334,7 +412,6 @@ export async function POST(request: NextRequest) {
             if (!shouldContinue) return;
           } catch {
             if (useFallback || currentModel === altModel) throw new Error(`Le modèle ${currentModel} a échoué après fallback`);
-            // Retry with alt model on next iteration
             continue;
           }
         }
