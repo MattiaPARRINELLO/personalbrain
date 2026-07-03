@@ -52,8 +52,8 @@ const tools: UnifiedTool[] = [
       type: "object",
       properties: {
         title: { type: "string", description: "Titre de l'evenement" },
-        start_time: { type: "string", description: "Date/heure debut ISO 8601" },
-        end_time: { type: "string", description: "Date/heure fin ISO 8601" },
+        start_time: { type: "string", description: "Date/heure debut ISO 8601. Pour un evenement toute la journee, utiliser le format date simple YYYY-MM-DD (ex: 2024-01-15)." },
+        end_time: { type: "string", description: "Date/heure fin ISO 8601. Pour un evenement toute la journee, utiliser le format date simple YYYY-MM-DD (ex: 2024-01-16 pour un evenement le 15)." },
         location: { type: "string", description: "Lieu (optionnel)" },
       },
       required: ["title", "start_time", "end_time"],
