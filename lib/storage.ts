@@ -15,33 +15,57 @@ import type {
   WatchLaterItem,
   WatchLaterData,
   WatchLaterCategory,
+  Accreditation,
+  AccreditationsData,
+  ActivityEntry,
+  ActivityData,
+  ActivityAction,
 } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
+const BACKUP_DIR = path.join(DATA_DIR, "backups");
 
-async function ensureDir() {
+async function ensureDir(dir: string) {
+  await fs.mkdir(dir, { recursive: true });
+}
+
+async function writeJsonAtomic<T>(filename: string, data: T): Promise<void> {
+  await ensureDir(DATA_DIR);
+  const filePath = path.join(DATA_DIR, filename);
+  const tmpPath = filePath + ".tmp";
+  await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), "utf-8");
+  await fs.rename(tmpPath, filePath);
+}
+
+async function readJson<T>(filename: string): Promise<T> {
+  await ensureDir(DATA_DIR);
+  const filePath = path.join(DATA_DIR, filename);
+  const raw = await fs.readFile(filePath, "utf-8");
+  return JSON.parse(raw) as T;
+}
+
+async function backupFile(filename: string): Promise<void> {
+  await ensureDir(BACKUP_DIR);
+  const src = path.join(DATA_DIR, filename);
+  const ts = new Date().toISOString().replace(/[:.]/g, "-");
+  const dst = path.join(BACKUP_DIR, `${filename}.${ts}.bak`);
   try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.copyFile(src, dst);
   } catch {
-    // ignore
+    // Fichier source n'existe pas encore
   }
 }
 
-async function readJson<T>(filename: string, fallback: T): Promise<T> {
-  await ensureDir();
-  const filePath = path.join(DATA_DIR, filename);
-  try {
-    const raw = await fs.readFile(filePath, "utf-8");
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
+const BACKUP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+const lastBackup = new Map<string, number>();
 
-async function writeJson<T>(filename: string, data: T): Promise<void> {
-  await ensureDir();
-  const filePath = path.join(DATA_DIR, filename);
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+async function maybeBackup(filename: string): Promise<void> {
+  const now = Date.now();
+  const last = lastBackup.get(filename) ?? 0;
+  if (now - last > BACKUP_INTERVAL_MS) {
+    lastBackup.set(filename, now);
+    await backupFile(filename);
+  }
 }
 
 const defaultConcerts: ConcertsData = {
@@ -98,12 +122,22 @@ const defaultEmails: EmailsData = {
 const defaultReminders: RemindersData = { reminders: [] };
 const defaultWatchLater: WatchLaterData = { items: [] };
 
+async function readOrCreate<T>(filename: string, fallback: T): Promise<T> {
+  try {
+    return await readJson<T>(filename);
+  } catch {
+    await writeJsonAtomic(filename, fallback);
+    return fallback;
+  }
+}
+
 export async function getConcerts(): Promise<ConcertsData> {
-  return readJson<ConcertsData>("concerts.json", defaultConcerts);
+  return readOrCreate("concerts.json", defaultConcerts);
 }
 
 export async function saveConcerts(data: ConcertsData): Promise<void> {
-  return writeJson("concerts.json", data);
+  await maybeBackup("concerts.json");
+  return writeJsonAtomic("concerts.json", data);
 }
 
 export async function updateConcertEvents(events: ConcertEvent[]): Promise<void> {
@@ -111,11 +145,12 @@ export async function updateConcertEvents(events: ConcertEvent[]): Promise<void>
 }
 
 export async function getLeetcode(): Promise<LeetcodeData> {
-  return readJson<LeetcodeData>("leetcode.json", defaultLeetcode);
+  return readOrCreate("leetcode.json", defaultLeetcode);
 }
 
 export async function saveLeetcode(data: LeetcodeData): Promise<void> {
-  return writeJson("leetcode.json", data);
+  await maybeBackup("leetcode.json");
+  return writeJsonAtomic("leetcode.json", data);
 }
 
 export async function addLeetcodeExercise(exercise: LeetcodeExercise): Promise<void> {
@@ -126,11 +161,12 @@ export async function addLeetcodeExercise(exercise: LeetcodeExercise): Promise<v
 }
 
 export async function getMemory(): Promise<MemoryData> {
-  return readJson<MemoryData>("memory.json", defaultMemory);
+  return readOrCreate("memory.json", defaultMemory);
 }
 
 export async function saveMemory(data: MemoryData): Promise<void> {
-  return writeJson("memory.json", data);
+  await maybeBackup("memory.json");
+  return writeJsonAtomic("memory.json", data);
 }
 
 export async function addMemoryFact(content: string, category: MemoryFact["category"]): Promise<MemoryFact> {
@@ -165,11 +201,12 @@ export async function deleteMemoryFact(id: string): Promise<boolean> {
 }
 
 export async function getEmails(): Promise<EmailsData> {
-  return readJson<EmailsData>("emails.json", defaultEmails);
+  return readOrCreate("emails.json", defaultEmails);
 }
 
 export async function saveEmails(data: EmailsData): Promise<void> {
-  return writeJson("emails.json", data);
+  await maybeBackup("emails.json");
+  return writeJsonAtomic("emails.json", data);
 }
 
 export async function markEmailRead(id: string): Promise<void> {
@@ -209,9 +246,10 @@ export async function addCalendarEvent(event: Omit<CalendarEvent, "id">): Promis
     });
     await saveConcerts(concerts);
   } else {
-    const existing = await readJson<{ events: CalendarEvent[] }>("calendar.json", { events: [] });
+    const existing = await readOrCreate("calendar.json", { events: [] as CalendarEvent[] });
     existing.events.push(newEvent);
-    await writeJson("calendar.json", existing);
+    await maybeBackup("calendar.json");
+    await writeJsonAtomic("calendar.json", existing);
   }
 
   return newEvent;
@@ -229,15 +267,53 @@ export async function searchEmails(query: string): Promise<Email[]> {
 }
 
 export async function webSearch(query: string): Promise<string> {
-  const facts: Record<string, string> = {
-    muse: "Muse est un groupe britannique forme en 1994. Leur prochaine tournee europeenne est attendue pour 2026.",
-    react: "React 19 est sorti avec de nouveaux hooks comme use() et des ameliorations de Server Components.",
-    typescript: "TypeScript 5.7 apporte des ameliorations de performance et de nouvelles regles de lint.",
-    concert: "Pour photographier un concert en interieur : ouverture f/2.8, ISO 3200-6400, vitesse 1/250s minimum.",
-  };
-  const key = Object.keys(facts).find((k) => query.toLowerCase().includes(k));
-  if (key) return facts[key];
-  return `Resultats de recherche pour "${query}" : aucune information predefinie. Essaie avec un mot-cle comme Muse, React, TypeScript ou concert.`;
+  const apiKey = process.env.SEARCHAPI_API_KEY;
+  if (apiKey) {
+    try {
+      const res = await fetch(
+        `https://www.searchapi.io/api/v1/search?engine=google&q=${encodeURIComponent(query)}&api_key=${apiKey}`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const results = data.organic_results ?? [];
+        if (results.length > 0) {
+          return results.slice(0, 3).map((r: { title: string; link: string; snippet: string }) =>
+            `- ${r.title}\n  ${r.snippet}\n  ${r.link}`
+          ).join("\n\n");
+        }
+        return `Aucun résultat web pour "${query}".`;
+      }
+    } catch {
+      // Fallback à DuckDuckGo
+    }
+  }
+
+  // Fallback : recherche DuckDuckGo (gratuite, sans clé)
+  try {
+    const res = await fetch(
+      `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const abstract = data.AbstractText;
+      const results = data.RelatedTopics ?? [];
+      if (abstract) {
+        return abstract;
+      }
+      if (results.length > 0) {
+        const texts = results.slice(0, 3).map((r: { Text?: string; Result?: string }) =>
+          r.Text ?? r.Result ?? ""
+        ).filter(Boolean);
+        if (texts.length > 0) return texts.join("\n\n");
+      }
+    }
+  } catch {
+    // Silence
+  }
+
+  return `Recherche web pour "${query}" : aucun résultat trouvé.`;
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -271,22 +347,25 @@ export async function fetchPageMeta(url: string): Promise<{ title: string; thumb
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const ogTitle = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i);
     const ogImage = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i);
+    const ogDesc = html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i);
 
     return {
       title: ogTitle?.[1]?.trim() ?? titleMatch?.[1]?.trim() ?? "Titre non trouvé",
       thumbnail: ogImage?.[1] || undefined,
-    };
+      description: ogDesc?.[1]?.trim(),
+    } as { title: string; thumbnail?: string; description?: string };
   } catch {
     return { title: "Erreur de récupération du titre" };
   }
 }
 
 export async function getReminders(): Promise<RemindersData> {
-  return readJson<RemindersData>("reminders.json", defaultReminders);
+  return readOrCreate("reminders.json", defaultReminders);
 }
 
 export async function saveReminders(data: RemindersData): Promise<void> {
-  return writeJson("reminders.json", data);
+  await maybeBackup("reminders.json");
+  return writeJsonAtomic("reminders.json", data);
 }
 
 export async function addReminder(input: {
@@ -327,11 +406,12 @@ export async function deleteReminder(id: string): Promise<boolean> {
 }
 
 export async function getWatchLater(): Promise<WatchLaterData> {
-  return readJson<WatchLaterData>("watch-later.json", defaultWatchLater);
+  return readOrCreate("watch-later.json", defaultWatchLater);
 }
 
 export async function saveWatchLater(data: WatchLaterData): Promise<void> {
-  return writeJson("watch-later.json", data);
+  await maybeBackup("watch-later.json");
+  return writeJsonAtomic("watch-later.json", data);
 }
 
 export async function addWatchLaterItem(input: {
@@ -358,7 +438,7 @@ export async function addWatchLaterItem(input: {
   return item;
 }
 
-export async function updateWatchLaterItem(id: string, updates: Partial<Pick<WatchLaterItem, "title" | "description" | "category">>): Promise<WatchLaterItem | null> {
+export async function updateWatchLaterItem(id: string, updates: Partial<Pick<WatchLaterItem, "title" | "description" | "category" | "summary" | "aiTags" | "read">>): Promise<WatchLaterItem | null> {
   const data = await getWatchLater();
   const idx = data.items.findIndex((i) => i.id === id);
   if (idx < 0) return null;
@@ -392,4 +472,163 @@ function detectCategory(url: string): WatchLaterCategory {
   if (/\.(jpg|jpeg|png|gif|webp|avif|unsplash|pexels|imgur)/.test(lower)) return "photo";
   if (/(medium\.|dev\.to|github\.com\/.*\/blob|arxiv\.|wikipedia|blog)/.test(lower)) return "article";
   return "other";
+}
+
+export async function markWatchLaterRead(id: string): Promise<void> {
+  const data = await getWatchLater();
+  const idx = data.items.findIndex((i) => i.id === id);
+  if (idx >= 0) {
+    data.items[idx] = { ...data.items[idx], read: true };
+    await saveWatchLater(data);
+  }
+}
+
+export async function autoSummarize(url: string, title: string): Promise<{ summary: string; tags: string[] }> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; PersonalBrain/1.0)" },
+    });
+    if (!res.ok) return { summary: "", tags: [] };
+    const html = await res.text();
+
+    // Extraction de texte minimal : enlever scripts, styles, balises
+    const text = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&[a-z]+;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 3000);
+
+    if (!text) return { summary: "", tags: [] };
+
+    const { chatCompletion } = await import("@/lib/ai-providers");
+    const { getConfig } = await import("@/lib/config");
+    const config = await getConfig();
+    const model = config.models.general;
+
+    const result = await chatCompletion(
+      model,
+      [
+        {
+          role: "system",
+          content:
+            'Tu analyses du contenu web en français. Réponds UNIQUEMENT au format JSON : {"summary": "résumé en 1-2 phrases", "tags": ["tag1","tag2","tag3"]}',
+        },
+        { role: "user", content: `Titre: ${title}\n\nContenu:\n${text}` },
+      ],
+      []
+    );
+
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]) as { summary?: string; tags?: string[] };
+      return {
+        summary: parsed.summary?.trim() ?? "",
+        tags: Array.isArray(parsed.tags) ? parsed.tags.slice(0, 5) : [],
+      };
+    }
+
+    return { summary: result.content.slice(0, 200).trim(), tags: [] };
+  } catch {
+    return { summary: "", tags: [] };
+  }
+}
+
+/* ───── Activity Log ───── */
+
+const MAX_ACTIVITY_ENTRIES = 200;
+const defaultActivity: ActivityData = { entries: [] };
+
+export async function getActivity(limit = 50): Promise<ActivityEntry[]> {
+  const data = await readOrCreate("activity.json", defaultActivity);
+  return data.entries.slice(0, limit);
+}
+
+export async function logActivity(action: ActivityAction, label: string, details?: string): Promise<void> {
+  const data = await readOrCreate("activity.json", defaultActivity);
+  const entry: ActivityEntry = {
+    id: crypto.randomUUID?.() ?? String(Date.now()),
+    action,
+    label,
+    details,
+    createdAt: new Date().toISOString(),
+  };
+  data.entries.unshift(entry);
+  if (data.entries.length > MAX_ACTIVITY_ENTRIES) {
+    data.entries = data.entries.slice(0, MAX_ACTIVITY_ENTRIES);
+  }
+  await writeJsonAtomic("activity.json", data);
+}
+
+/* ───── Accreditations ───── */
+
+const defaultAccreditations: AccreditationsData = { accreditations: [] };
+
+export async function getAccreditations(): Promise<AccreditationsData> {
+  return readOrCreate("accreditations.json", defaultAccreditations);
+}
+
+export async function saveAccreditations(data: AccreditationsData): Promise<void> {
+  await maybeBackup("accreditations.json");
+  return writeJsonAtomic("accreditations.json", data);
+}
+
+export async function addAccreditation(input: {
+  artist: string;
+  venue: string;
+  concertDate: string;
+  contactEmail?: string;
+  notes?: string;
+}): Promise<Accreditation> {
+  const data = await getAccreditations();
+  const now = new Date().toISOString();
+  const accreditation: Accreditation = {
+    id: crypto.randomUUID?.() ?? String(Date.now()),
+    artist: input.artist,
+    venue: input.venue,
+    concertDate: input.concertDate,
+    status: "pending",
+    contactEmail: input.contactEmail,
+    notes: input.notes,
+    createdAt: now,
+    updatedAt: now,
+  };
+  data.accreditations.unshift(accreditation);
+  await saveAccreditations(data);
+  return accreditation;
+}
+
+export async function updateAccreditation(
+  id: string,
+  updates: Partial<Pick<Accreditation, "status" | "notes" | "contactEmail">>
+): Promise<Accreditation | null> {
+  const data = await getAccreditations();
+  const idx = data.accreditations.findIndex((a) => a.id === id);
+  if (idx < 0) return null;
+  data.accreditations[idx] = { ...data.accreditations[idx], ...updates, updatedAt: new Date().toISOString() };
+  await saveAccreditations(data);
+  return data.accreditations[idx];
+}
+
+export async function deleteAccreditation(id: string): Promise<boolean> {
+  const data = await getAccreditations();
+  const before = data.accreditations.length;
+  data.accreditations = data.accreditations.filter((a) => a.id !== id);
+  if (data.accreditations.length === before) return false;
+  await saveAccreditations(data);
+  return true;
+}
+
+export async function searchAccreditations(query: string): Promise<Accreditation[]> {
+  const data = await getAccreditations();
+  const q = query.toLowerCase();
+  return data.accreditations.filter(
+    (a) =>
+      a.artist.toLowerCase().includes(q) ||
+      a.venue.toLowerCase().includes(q) ||
+      (a.notes && a.notes.toLowerCase().includes(q))
+  );
 }
