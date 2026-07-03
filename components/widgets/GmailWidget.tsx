@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowUpRight, Inbox } from "lucide-react";
+import { ArrowUpRight, Inbox, Loader2 } from "lucide-react";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { api, type GmailMessage } from "@/lib/api-client";
+import { useCachedFetch } from "@/lib/cache";
 import { formatDateShort } from "@/lib/date";
 
 function extractName(from: string): string {
@@ -14,51 +14,49 @@ function extractName(from: string): string {
   return em ? em[1] : from;
 }
 
-export function GmailWidget() {
-  const [messages, setMessages] = useState<GmailMessage[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+const GMAIL_CACHE_KEY = "gmail:widget:list";
 
-  useEffect(() => {
-    let cancelled = false;
-    api.gmail
-      .list()
-      .then((res) => {
-        if (cancelled) return;
-        setMessages((res.messages ?? []).slice(0, 4));
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Erreur de chargement");
-        setMessages([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+async function fetchWidgetGmail(): Promise<GmailMessage[]> {
+  const res = await api.gmail.list();
+  if (res.error) throw new Error(res.error);
+  return (res.messages ?? []).slice(0, 4);
+}
+
+export function GmailWidget() {
+  const { data: messages, loading, error } = useCachedFetch<GmailMessage[]>(
+    GMAIL_CACHE_KEY,
+    fetchWidgetGmail,
+    { ttl: 2 * 60 * 1000 }
+  );
+
+  const visible = messages ?? [];
 
   return (
-    <Card variant="default" hover>
-      <CardHeader
-        title="Inbox"
-        subtitle="contact.mprnl@gmail.com"
-        action={
-          <a
-            href="/api/auth/google?type=gmail"
-            className="text-[var(--text-3)] hover:text-[var(--accent)] transition-colors"
-            title="Ouvrir Gmail"
-          >
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </a>
-        }
-      />
+    <Card className="h-full">
+      <CardHeader className="flex items-center justify-between py-3 px-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] font-semibold text-[var(--text-1)]">Gmail</span>
+          {!loading && visible.length > 0 && (
+            <span className="text-[10px] font-mono text-[var(--text-3)]">{visible.length}</span>
+          )}
+        </div>
+        <a
+          href="https://mail.google.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[var(--text-3)] hover:text-[var(--accent)] transition-colors"
+        >
+          <ArrowUpRight className="w-4 h-4" />
+        </a>
+      </CardHeader>
       <CardBody className="p-2">
-        {error && (
+        {error && visible.length === 0 && (
           <div className="text-[11px] text-[var(--danger)] px-3 py-2.5 rounded-md bg-[var(--danger)]/8 border border-[var(--danger)]/20">
-            {error}
+            {error.message}
           </div>
         )}
 
-        {messages === null && !error && (
+        {loading && visible.length === 0 && (
           <div className="space-y-2 p-2">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-14" />
@@ -66,16 +64,21 @@ export function GmailWidget() {
           </div>
         )}
 
-        {messages !== null && messages.length === 0 && !error && (
+        {!loading && visible.length === 0 && (
           <div className="px-3 py-6 text-center">
             <Inbox className="w-6 h-6 text-[var(--text-4)] mx-auto mb-2" />
             <p className="text-[11px] text-[var(--text-3)] font-mono">Boîte vide</p>
           </div>
         )}
 
-        {messages && messages.length > 0 && (
-          <ul className="space-y-0.5">
-            {messages.map((msg) => (
+        {visible.length > 0 && (
+          <ul className="space-y-0.5 relative">
+            {loading && (
+              <li className="absolute top-1 right-1">
+                <Loader2 className="w-3 h-3 text-[var(--accent)] animate-spin" />
+              </li>
+            )}
+            {visible.map((msg) => (
               <li
                 key={msg.id}
                 className="group px-3 py-2.5 rounded-md hover:bg-[var(--surface-2)] transition-colors duration-150"
