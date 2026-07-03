@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { PwaLoader } from "@/components/ui/PwaLoader";
 import { ThemeApplier } from "@/components/ui/ThemeApplier";
+import { ViewTransitionProvider } from "@/components/ViewTransitionProvider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -47,7 +48,9 @@ export default function RootLayout({
       <body className="min-h-full relative font-sans">
         <PwaLoader />
         <ThemeApplier />
-        {children}
+        <ViewTransitionProvider>
+          {children}
+        </ViewTransitionProvider>
       </body>
     </html>
   );

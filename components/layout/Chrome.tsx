@@ -71,7 +71,7 @@ export function LeftNav() {
   };
 
   return (
-    <aside className="hidden lg:flex flex-col w-[68px] shrink-0 h-full border-r border-[var(--border-1)] bg-[var(--surface-1)]/40">
+    <aside className="hidden lg:flex flex-col w-[68px] shrink-0 h-full border-r border-[var(--border-1)] bg-[var(--surface-1)]/40" style={{ viewTransitionName: "sidebar" }}>
       <div className="flex items-center justify-center h-16 border-b border-[var(--border-1)]">
         <div className="relative w-9 h-9 rounded-lg border border-[var(--border-2)] flex items-center justify-center bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)]">
           <Sparkles className="w-4 h-4 text-[var(--accent)]" />
