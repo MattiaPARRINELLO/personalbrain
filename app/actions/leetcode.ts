@@ -1,6 +1,6 @@
 "use server";
 
-import { getLeetcode, saveLeetcode, addLeetcodeExercise } from "@/lib/storage";
+import { getLeetcode, saveLeetcode, addLeetcodeExercise, logActivity } from "@/lib/storage";
 import { fetchLeetCodeProfile } from "@/lib/leetcode-api";
 import type { LeetcodeData, LeetcodeExercise } from "@/lib/types";
 
@@ -33,6 +33,7 @@ export async function saveLeetcodeData(data: LeetcodeData): Promise<void> {
 
 export async function storeExercise(exercise: LeetcodeExercise): Promise<void> {
   await addLeetcodeExercise(exercise);
+  await logActivity("leetcode_solved", `Exercice LeetCode : ${exercise.title}`);
 }
 
 export async function syncLeetcode(): Promise<LeetcodeData> {

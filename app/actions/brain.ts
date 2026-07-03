@@ -7,6 +7,7 @@ import {
   getMemory,
   saveMemory,
   updateMemoryFact,
+  logActivity,
 } from "@/lib/storage";
 import type { MemoryCategory, MemoryData, MemoryFact } from "@/lib/types";
 
@@ -20,6 +21,7 @@ export async function rememberFact(
 ): Promise<MemoryFact> {
   if (!content?.trim()) throw new Error("Contenu requis");
   const fact = await addMemoryFact(content.trim(), category);
+  await logActivity("memory_added", `Mémorisé : ${content.trim().slice(0, 80)}`, category);
   revalidatePath("/brain");
   return fact;
 }
@@ -29,12 +31,14 @@ export async function editMemoryFact(
   updates: Partial<Pick<MemoryFact, "content" | "category">>
 ): Promise<MemoryFact | null> {
   const f = await updateMemoryFact(id, updates);
+  if (f) await logActivity("memory_updated", `Fait modifié : ${f.content.slice(0, 80)}`);
   revalidatePath("/brain");
   return f;
 }
 
 export async function forgetFact(id: string): Promise<boolean> {
   const ok = await deleteMemoryFact(id);
+  if (ok) await logActivity("memory_deleted", "Fait supprimé", id);
   revalidatePath("/brain");
   return ok;
 }
