@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 
 type CacheEntry<T> =
-  | { status: "loading"; promise: Promise<T>; data?: T; error?: unknown }
-  | { status: "success"; data: T; promise?: Promise<T> }
-  | { status: "error"; error: unknown; data?: T };
+  | { status: "loading"; promise: Promise<T>; data?: T; error?: unknown; fetchedAt?: number }
+  | { status: "success"; data: T; promise?: Promise<T>; fetchedAt: number }
+  | { status: "error"; error: unknown; data?: T; fetchedAt?: number };
 
 const globalCache = new Map<string, CacheEntry<unknown>>();
 
@@ -39,6 +39,11 @@ function setCacheEntry<T>(key: string, entry: CacheEntry<T>) {
   notify(key);
 }
 
+function isStale(ts: number, ttl: number | undefined): boolean {
+  if (!ttl || ttl <= 0) return true;
+  return Date.now() - ts > ttl;
+}
+
 export function invalidateCache(key: string) {
   globalCache.delete(key);
   notify(key);
@@ -55,7 +60,7 @@ export function preloadCache<T>(key: string, fetcher: () => Promise<T>): Promise
 
   const promise = fetcher()
     .then((data) => {
-      setCacheEntry(key, { status: "success", data });
+      setCacheEntry(key, { status: "success", data, fetchedAt: Date.now() });
       return data;
     })
     .catch((error) => {
@@ -67,6 +72,22 @@ export function preloadCache<T>(key: string, fetcher: () => Promise<T>): Promise
   return promise;
 }
 
+export function refreshCache<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  const promise = fetcher()
+    .then((data) => {
+      setCacheEntry(key, { status: "success", data, fetchedAt: Date.now() });
+      return data;
+    })
+    .catch((error) => {
+      const existing = globalCache.get(key);
+      if (existing?.status !== "success") {
+        setCacheEntry(key, { status: "error", error });
+      }
+      throw error;
+    });
+  return promise;
+}
+
 export interface UseCachedFetchResult<T> {
   data: T | undefined;
   loading: boolean;
@@ -74,12 +95,18 @@ export interface UseCachedFetchResult<T> {
   refetch: () => Promise<T>;
 }
 
+export interface UseCachedFetchOptions {
+  enabled?: boolean;
+  staleWhileRevalidate?: boolean;
+  ttl?: number;
+}
+
 export function useCachedFetch<T>(
   key: string,
   fetcher: () => Promise<T>,
-  options: { enabled?: boolean; staleWhileRevalidate?: boolean } = {}
+  options: UseCachedFetchOptions = {}
 ): UseCachedFetchResult<T> {
-  const { enabled = true, staleWhileRevalidate = false } = options;
+  const { enabled = true, staleWhileRevalidate = false, ttl } = options;
 
   const entry = useSyncExternalStore(
     useCallback((callback) => subscribe(key, callback), [key]),
@@ -94,20 +121,32 @@ export function useCachedFetch<T>(
 
   useEffect(() => {
     if (!enabled) return;
+
     const existing = globalCache.get(key);
     if (!existing) {
       void preloadCache(key, fetcher);
-    } else if (staleWhileRevalidate && existing.status === "success") {
-      void fetcher().then((data) => {
-        setCacheEntry(key, { status: "success", data });
-      });
+      return;
     }
-  }, [enabled, key, fetcher, staleWhileRevalidate]);
+
+    if (existing.status === "success" && ttl && isStale(existing.fetchedAt, ttl)) {
+      void refreshCache(key, fetcher);
+      return;
+    }
+
+    if (staleWhileRevalidate && existing.status === "success") {
+      void refreshCache(key, fetcher);
+    }
+  }, [enabled, key, fetcher, ttl, staleWhileRevalidate]);
 
   return {
     data: entry?.status === "success" ? entry.data : undefined,
     loading: entry?.status === "loading" || !entry,
-    error: entry?.status === "error" ? (entry.error instanceof Error ? entry.error : new Error(String(entry.error))) : null,
+    error:
+      entry?.status === "error"
+        ? entry.error instanceof Error
+          ? entry.error
+          : new Error(String(entry.error))
+        : null,
     refetch,
   };
 }
@@ -117,7 +156,7 @@ export function useOptimisticUpdate<T>(key: string) {
     (updater: (current: T) => T) => {
       const entry = globalCache.get(key);
       if (entry?.status === "success") {
-        setCacheEntry(key, { status: "success", data: updater(entry.data as T) });
+        setCacheEntry(key, { status: "success", data: updater(entry.data as T), fetchedAt: entry.fetchedAt });
       }
     },
     [key]
