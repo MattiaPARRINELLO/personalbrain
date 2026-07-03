@@ -280,4 +280,16 @@ textarea::placeholder {
     0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
     40% { opacity: 1; transform: scale(1); }
   }
+
+  .typing-text::after {
+    content: "▋";
+    margin-left: 2px;
+    color: var(--accent);
+    animation: blink-cursor 1s step-end infinite;
+  }
+
+  @keyframes blink-cursor {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
 }
