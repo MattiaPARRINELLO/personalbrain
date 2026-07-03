@@ -1,4 +1,3 @@
-const FALLBACK_SECRET = "personalbrain-fallback-secret-change-me";
 const SESSION_COOKIE = "pb_session";
 
 let cachedKey: CryptoKey | null = null;
@@ -6,7 +5,13 @@ let cachedKey: CryptoKey | null = null;
 async function getSigningKey(): Promise<CryptoKey> {
   if (cachedKey) return cachedKey;
 
-  const secret = new TextEncoder().encode(process.env.AUTH_SECRET ?? FALLBACK_SECRET);
+  if (!process.env.AUTH_SECRET) {
+    throw new Error(
+      "AUTH_SECRET non configuré. Définissez-le dans .env.local"
+    );
+  }
+
+  const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
   cachedKey = await crypto.subtle.importKey(
     "raw",
     secret as unknown as BufferSource,

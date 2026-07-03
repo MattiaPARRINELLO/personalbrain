@@ -6,10 +6,9 @@ export const CHALLENGE_COOKIE = "pb_challenge";
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 export const CHALLENGE_TTL_SECONDS = 5 * 60;
 
-const FALLBACK_SECRET = "personalbrain-fallback-secret-change-me";
 const SECRET_FILE = path.join(process.cwd(), "data", ".auth-secret");
 
-async function getOrCreateSecret(): Promise<Uint8Array> {
+async function getSecret(): Promise<Uint8Array> {
   if (process.env.AUTH_SECRET) {
     return Uint8Array.from(new TextEncoder().encode(process.env.AUTH_SECRET));
   }
@@ -18,15 +17,15 @@ async function getOrCreateSecret(): Promise<Uint8Array> {
     const existing = await fs.readFile(SECRET_FILE, "utf-8");
     return Uint8Array.from(Buffer.from(existing, "hex"));
   } catch {
-    // En l'absence de AUTH_SECRET, on utilise une cle deterministe pour que
-    // le middleware Edge et le runtime Node partagent le meme secret.
-    // Definissez AUTH_SECRET en production pour plus de securite.
-    return Uint8Array.from(new TextEncoder().encode(FALLBACK_SECRET));
+    throw new Error(
+      "AUTH_SECRET non configuré. Générez une clé avec : openssl rand -hex 32 " +
+      "et définissez-la dans .env.local ou data/.auth-secret"
+    );
   }
 }
 
 async function getSigningKey(): Promise<CryptoKey> {
-  const secret = await getOrCreateSecret();
+  const secret = await getSecret();
   return crypto.subtle.importKey(
     "raw",
     secret as unknown as BufferSource,
