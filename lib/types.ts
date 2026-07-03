@@ -101,8 +101,73 @@ export interface WatchLaterItem {
   source: string;
   category: WatchLaterCategory;
   createdAt: string;
+  summary?: string;
+  aiTags?: string[];
+  read?: boolean;
+}
+
+export interface DailyBrief {
+  date: string;
+  summary: string;
+  events: { title: string; type: string }[];
+  reminders: { title: string; dueAt: string }[];
+  emails: { from: string; subject: string }[];
+  generatedAt: string;
 }
 
 export interface WatchLaterData {
   items: WatchLaterItem[];
+}
+
+export interface Accreditation {
+  id: string;
+  artist: string;
+  venue: string;
+  concertDate: string;
+  status: "pending" | "sent" | "accepted" | "refused" | "follow-up";
+  emailThreadId?: string;
+  contactEmail?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccreditationsData {
+  accreditations: Accreditation[];
+}
+
+export type ActivityAction =
+  | "accreditation_created"
+  | "accreditation_updated"
+  | "accreditation_deleted"
+  | "concert_created"
+  | "concert_updated"
+  | "concert_deleted"
+  | "reminder_created"
+  | "reminder_updated"
+  | "reminder_deleted"
+  | "watch_later_added"
+  | "watch_later_read"
+  | "watch_later_deleted"
+  | "memory_added"
+  | "memory_updated"
+  | "memory_deleted"
+  | "email_sent"
+  | "email_triaged"
+  | "calendar_event_created"
+  | "leetcode_solved"
+  | "chat_message_sent"
+  | "login"
+  | "logout";
+
+export interface ActivityEntry {
+  id: string;
+  action: ActivityAction;
+  label: string;
+  details?: string;
+  createdAt: string;
+}
+
+export interface ActivityData {
+  entries: ActivityEntry[];
 }
