@@ -3,6 +3,9 @@
 import { type ReactNode } from "react";
 import { LeftNav, MobileTopBar, MobileBottomNav } from "./Chrome";
 import { RightPanel } from "./RightPanel";
+import { CommandPalette } from "@/components/ui/CommandPalette";
+import { KeyboardShortcuts } from "@/components/ui/KeyboardShortcuts";
+import { OfflineBanner } from "@/components/ui/OfflineBanner";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -16,6 +19,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
         <MobileBottomNav />
       </div>
+      <CommandPalette />
+      <KeyboardShortcuts />
+      <OfflineBanner />
     </div>
   );
 }

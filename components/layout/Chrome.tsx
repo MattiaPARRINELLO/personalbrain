@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   Brain,
   MessageSquareText,
@@ -14,9 +14,12 @@ import {
   Check,
   X as XIcon,
   Sparkles,
+  ShieldCheck,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, type GoogleLinkStatus } from "@/lib/api-client";
+import { useCachedFetch, refreshCache } from "@/lib/cache";
 
 type NavItem = {
   href: string;
@@ -30,27 +33,33 @@ const navItems: NavItem[] = [
   { href: "/brain", label: "Cerveau", icon: Brain },
   { href: "/reminders", label: "Rappels", icon: Bell },
   { href: "/watch-later", label: "À voir", icon: Bookmark },
+  { href: "/accreditations", label: "Accréditations", icon: ShieldCheck },
+  { href: "/calendar", label: "Calendrier", icon: CalendarRange },
+  { href: "/gmail", label: "Gmail", icon: Mail },
+  { href: "/settings", label: "Paramètres", icon: Settings },
 ];
+
+const GOOGLE_STATUS_KEY = "google:status";
+
+async function fetchGoogleStatus(): Promise<GoogleLinkStatus> {
+  return api.googleStatus();
+}
 
 export function LeftNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [status, setStatus] = useState<GoogleLinkStatus | null>(null);
-
-  const fetchStatus = useCallback(async () => {
-    try {
-      const s = await api.googleStatus();
-      setStatus(s);
-    } catch {
-      setStatus({ gmail: false, calendar: false });
-    }
-  }, []);
+  const { data: status } = useCachedFetch<GoogleLinkStatus>(
+    GOOGLE_STATUS_KEY,
+    fetchGoogleStatus,
+    { ttl: 60 * 1000 }
+  );
 
   useEffect(() => {
-    Promise.resolve().then(fetchStatus);
-    const id = setInterval(() => Promise.resolve().then(fetchStatus), 60_000);
+    const id = setInterval(() => {
+      void refreshCache(GOOGLE_STATUS_KEY, fetchGoogleStatus);
+    }, 60_000);
     return () => clearInterval(id);
-  }, [fetchStatus]);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -175,10 +184,11 @@ export function MobileTopBar() {
 }
 
 function GoogleMobileStatus() {
-  const [status, setStatus] = useState<GoogleLinkStatus | null>(null);
-  useEffect(() => {
-    void api.googleStatus().then(setStatus).catch(() => setStatus({ gmail: false, calendar: false }));
-  }, []);
+  const { data: status } = useCachedFetch<GoogleLinkStatus>(
+    GOOGLE_STATUS_KEY,
+    fetchGoogleStatus,
+    { ttl: 60 * 1000 }
+  );
   if (!status) return null;
   return (
     <div className="flex items-center gap-1.5">

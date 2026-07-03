@@ -5,9 +5,10 @@ import { Settings2, X } from "lucide-react";
 import { CalendarWidget } from "@/components/widgets/CalendarWidget";
 import { GmailWidget } from "@/components/widgets/GmailWidget";
 import { LeetCodeWidget } from "@/components/widgets/LeetCodeWidget";
+import { AccreditationsWidget } from "@/components/widgets/AccreditationsWidget";
 import { cn } from "@/lib/utils";
 
-type View = "all" | "calendar" | "gmail" | "leetcode";
+type View = "all" | "calendar" | "gmail" | "leetcode" | "accreditations";
 
 export function RightPanel() {
   const [view, setView] = useState<View>("all");
@@ -36,11 +37,15 @@ export function RightPanel() {
       </div>
 
       {!collapsed && (
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          {(view === "all" || view === "calendar") && <CalendarWidget />}
-          {(view === "all" || view === "gmail") && <GmailWidget />}
-          {(view === "all" || view === "leetcode") && <LeetCodeWidget />}
-        </div>
+        <>
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {(view === "all" || view === "calendar") && <CalendarWidget />}
+            {(view === "all" || view === "gmail") && <GmailWidget />}
+            {(view === "all" || view === "leetcode") && <LeetCodeWidget />}
+            {(view === "all" || view === "accreditations") && <AccreditationsWidget />}
+          </div>
+
+        </>
       )}
     </aside>
   );
@@ -52,6 +57,7 @@ function ViewSwitcher({ view, onChange }: { view: View; onChange: (v: View) => v
     { id: "calendar", label: "Agenda" },
     { id: "gmail", label: "Inbox" },
     { id: "leetcode", label: "Code" },
+    { id: "accreditations", label: "Accréd." },
   ];
   return (
     <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-1)]">
