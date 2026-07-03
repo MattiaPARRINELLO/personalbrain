@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarRange, MapPin, Clock, ArrowUpRight } from "lucide-react";
+import { CalendarRange, MapPin, Clock, ArrowUpRight, Loader2 } from "lucide-react";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { api, type CalendarEvent } from "@/lib/api-client";
+import { useCachedFetch } from "@/lib/cache";
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -33,27 +33,25 @@ function dayLabel(iso: string): string {
   return new Date(iso).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
 }
 
-export function CalendarWidget() {
-  const [events, setEvents] = useState<CalendarEvent[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+const CALENDAR_CACHE_KEY = "calendar:list";
 
-  useEffect(() => {
-    let cancelled = false;
-    api.calendar
-      .list()
-      .then((res) => {
-        if (cancelled) return;
-        setEvents((res.events ?? []).slice(0, 5));
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Erreur de chargement");
-        setEvents([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+async function fetchWidgetCalendar(): Promise<CalendarEvent[]> {
+  const now = new Date();
+  const timeMin = now.toISOString();
+  const timeMax = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const res = await api.calendar.list(timeMin, timeMax);
+  if (res.error) throw new Error(res.error);
+  return (res.events ?? []).slice(0, 5);
+}
+
+export function CalendarWidget() {
+  const { data: events, loading, error } = useCachedFetch<CalendarEvent[]>(
+    CALENDAR_CACHE_KEY,
+    fetchWidgetCalendar,
+    { ttl: 2 * 60 * 1000 }
+  );
+
+  const visible = events ?? [];
 
   return (
     <Card variant="default" hover>
@@ -62,7 +60,7 @@ export function CalendarWidget() {
         subtitle="7 prochains jours"
         action={
           <Link
-            href="/brain"
+            href="/calendar"
             className="text-[var(--text-3)] hover:text-[var(--accent)] transition-colors"
             title="Voir plus"
           >
@@ -71,13 +69,13 @@ export function CalendarWidget() {
         }
       />
       <CardBody className="p-2">
-        {error && (
+        {error && visible.length === 0 && (
           <div className="text-[11px] text-[var(--danger)] px-3 py-2.5 rounded-md bg-[var(--danger)]/8 border border-[var(--danger)]/20">
-            {error}
+            {error.message}
           </div>
         )}
 
-        {events === null && !error && (
+        {loading && visible.length === 0 && (
           <div className="space-y-2 p-2">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-14" />
@@ -85,16 +83,21 @@ export function CalendarWidget() {
           </div>
         )}
 
-        {events !== null && events.length === 0 && !error && (
+        {!loading && visible.length === 0 && (
           <div className="px-3 py-6 text-center">
             <CalendarRange className="w-6 h-6 text-[var(--text-4)] mx-auto mb-2" />
             <p className="text-[11px] text-[var(--text-3)] font-mono">Aucun événement à venir</p>
           </div>
         )}
 
-        {events && events.length > 0 && (
-          <ul className="space-y-0.5">
-            {events.map((evt) => (
+        {visible.length > 0 && (
+          <ul className="space-y-0.5 relative">
+            {loading && (
+              <li className="absolute top-1 right-1">
+                <Loader2 className="w-3 h-3 text-[var(--accent)] animate-spin" />
+              </li>
+            )}
+            {visible.map((evt) => (
               <li
                 key={evt.id}
                 className="group px-3 py-2.5 rounded-md hover:bg-[var(--surface-2)] transition-colors duration-150"
