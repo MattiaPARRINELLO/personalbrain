@@ -182,6 +182,8 @@ export async function createGoogleCalendarEvent(
 ): Promise<string> {
   const auth = await getCalendarClient();
 
+  const isAllDay = /^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end);
+
   const event = await googleFetch<{ id?: string }>(
     auth,
     "https://www.googleapis.com/calendar/v3/calendars/primary/events",
@@ -189,8 +191,8 @@ export async function createGoogleCalendarEvent(
       method: "POST",
       body: JSON.stringify({
         summary,
-        start: { dateTime: start },
-        end: { dateTime: end },
+        start: isAllDay ? { date: start } : { dateTime: start },
+        end: isAllDay ? { date: end } : { dateTime: end },
         location,
         description,
       }),
