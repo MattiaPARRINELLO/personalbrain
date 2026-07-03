@@ -189,7 +189,6 @@ async function* streamOpenAI(
 
   const toolCalls = new Map<number, { id: string; name: string; args: string }>();
   let fullContent = "";
-  let reasoningBuffer = "";
 
   for await (const chunk of stream) {
     const choice = chunk.choices?.[0];
@@ -197,7 +196,6 @@ async function* streamOpenAI(
 
     const rc = (delta as Record<string, unknown> | undefined)?.reasoning_content;
     if (typeof rc === "string") {
-      reasoningBuffer += rc;
       yield { type: "reasoning", content: rc };
     }
 
@@ -257,20 +255,119 @@ async function* streamOpenAI(
 
 async function* streamAnthropic(
   model: string,
-  _messages: UnifiedMessage[],
-  _tools: UnifiedTool[]
+  messages: UnifiedMessage[],
+  tools: UnifiedTool[]
 ): AsyncGenerator<StreamEvent> {
-  // Fallback to non-streaming for now
-  const result = await chatAnthropic(model, _messages, _tools);
-  if (result.content) {
-    yield { type: "delta", content: result.content };
+  const client = new Anthropic(getClientConfig());
+
+  const anthropicTools: Anthropic.Tool[] = tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.parameters as Anthropic.Tool.InputSchema,
+  }));
+
+  const systemParts: string[] = [];
+  const conversation: Anthropic.MessageParam[] = [];
+
+  for (const m of messages) {
+    if (m.role === "system") {
+      systemParts.push(m.content ?? "");
+      continue;
+    }
+    if (m.role === "tool") {
+      conversation.push({
+        role: "user",
+        content: [{
+          type: "tool_result",
+          tool_use_id: m.tool_call_id ?? "",
+          content: m.content ?? "",
+        }],
+      });
+      continue;
+    }
+    conversation.push({ role: m.role, content: m.content ?? "" });
   }
-  if (result.toolCalls.length > 0) {
-    for (const tc of result.toolCalls) {
-      yield { type: "tool_start", toolCallId: tc.id, name: tc.name, arguments: tc.arguments };
+
+  let stream;
+  try {
+    stream = await client.messages.create({
+      model,
+      system: systemParts.join("\n\n"),
+      messages: conversation,
+      tools: anthropicTools,
+      tool_choice: { type: "auto" },
+      max_tokens: 2048,
+      temperature: 0.7,
+      stream: true,
+    });
+  } catch (err: unknown) {
+    const detail = err instanceof Object && "status" in (err as object)
+      ? `status=${(err as { status: unknown }).status} message=${err instanceof Error ? err.message : String(err)}`
+      : String(err);
+    console.error(`[streamAnthropic] ${model} failed:`, detail);
+    throw err;
+  }
+
+  let fullContent = "";
+  let currentToolUse: { id: string; name: string; args: string } | null = null;
+  const toolCalls: { id: string; name: string; arguments: string }[] = [];
+
+  for await (const event of stream) {
+    if (event.type === "content_block_start") {
+      if (event.content_block.type === "tool_use") {
+        currentToolUse = {
+          id: event.content_block.id,
+          name: event.content_block.name,
+          args: "",
+        };
+      }
+    }
+
+    if (event.type === "content_block_delta") {
+      if (event.delta.type === "text_delta") {
+        fullContent += event.delta.text;
+        yield { type: "delta", content: event.delta.text };
+      }
+      if (event.delta.type === "input_json_delta" && currentToolUse) {
+        currentToolUse.args += event.delta.partial_json;
+      }
+    }
+
+    if (event.type === "content_block_stop" && currentToolUse) {
+      try {
+        JSON.parse(currentToolUse.args);
+      } catch {
+        // args may be incomplete, pad to valid JSON
+        currentToolUse.args += "}";
+      }
+      toolCalls.push({
+        id: currentToolUse.id,
+        name: currentToolUse.name,
+        arguments: currentToolUse.args,
+      });
+      currentToolUse = null;
+    }
+
+    if (event.type === "message_delta") {
+      if (event.delta.stop_reason === "tool_use") {
+        for (const tc of toolCalls) {
+          yield {
+            type: "tool_start",
+            toolCallId: tc.id,
+            name: tc.name,
+            arguments: tc.arguments,
+          };
+        }
+        return;
+      }
+      if (event.delta.stop_reason === "end_turn") {
+        yield { type: "done", content: fullContent };
+        return;
+      }
     }
   }
-  yield { type: "done", content: result.content };
+
+  yield { type: "done", content: fullContent };
 }
 
 async function chatAnthropic(

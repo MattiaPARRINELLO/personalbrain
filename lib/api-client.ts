@@ -59,7 +59,20 @@ export const api = {
   },
 
   calendar: {
-    list: () => jsonFetch<{ events?: CalendarEvent[]; error?: string }>("/api/calendar"),
+    list: (timeMin: string, timeMax: string) =>
+      jsonFetch<{ events?: CalendarEvent[]; error?: string }>(
+        `/api/calendar?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`
+      ),
+    create: (data: { summary: string; start: string; end: string; description?: string; location?: string }) =>
+      jsonFetch<{ success: boolean; id?: string }>("/api/calendar", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (eventId: string, data: { summary?: string; description?: string; location?: string; colorId?: string }) =>
+      jsonFetch<{ success: boolean }>("/api/calendar", {
+        method: "PATCH",
+        body: JSON.stringify({ eventId, ...data }),
+      }),
   },
 
   chat: {
