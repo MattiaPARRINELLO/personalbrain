@@ -72,7 +72,7 @@ export default function GmailPage() {
             <EmptyState
               icon={<Mail className="w-6 h-6" />}
               title="Aucun email"
-              description="Votre boîte de réception est vide."
+              description="Ta boîte de réception est vide."
             />
           )}
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import {
@@ -13,7 +14,6 @@ import {
   CalendarRange,
   Check,
   X as XIcon,
-  Sparkles,
   ShieldCheck,
   Settings,
 } from "lucide-react";
@@ -33,11 +33,13 @@ const navItems: NavItem[] = [
   { href: "/brain", label: "Cerveau", icon: Brain },
   { href: "/reminders", label: "Rappels", icon: Bell },
   { href: "/watch-later", label: "À voir", icon: Bookmark },
-  { href: "/accreditations", label: "Accréditations", icon: ShieldCheck },
+  { href: "/accreditations", label: "Accréd.", icon: ShieldCheck },
   { href: "/calendar", label: "Calendrier", icon: CalendarRange },
   { href: "/gmail", label: "Gmail", icon: Mail },
   { href: "/settings", label: "Paramètres", icon: Settings },
 ];
+
+const mobileNavItems: NavItem[] = navItems.slice(0, 5);
 
 const GOOGLE_STATUS_KEY = "google:status";
 
@@ -73,8 +75,14 @@ export function LeftNav() {
   return (
     <aside className="hidden lg:flex flex-col w-[68px] shrink-0 h-full border-r border-[var(--border-1)] bg-[var(--surface-1)]/40" style={{ viewTransitionName: "sidebar" }}>
       <div className="flex items-center justify-center h-16 border-b border-[var(--border-1)]">
-        <div className="relative w-9 h-9 rounded-lg border border-[var(--border-2)] flex items-center justify-center bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)]">
-          <Sparkles className="w-4 h-4 text-[var(--accent)]" />
+        <div className="relative w-9 h-9 rounded-lg border border-[var(--border-2)] flex items-center justify-center bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)] overflow-hidden">
+          <Image
+            src="/backstage-logo.png"
+            alt="BACKSTAGE"
+            width={36}
+            height={36}
+            className="w-7 h-7 object-contain"
+          />
           <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--accent)] breathe" />
         </div>
       </div>
@@ -173,10 +181,16 @@ export function MobileTopBar() {
   return (
     <div className="lg:hidden flex items-center justify-between h-14 px-4 border-b border-[var(--border-1)] bg-[var(--surface-1)]/60 backdrop-blur">
       <div className="flex items-center gap-2">
-        <div className="w-7 h-7 rounded-md border border-[var(--border-2)] flex items-center justify-center bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)]">
-          <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
+        <div className="w-7 h-7 rounded-md border border-[var(--border-2)] flex items-center justify-center bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)] overflow-hidden">
+          <Image
+            src="/backstage-logo.png"
+            alt="BACKSTAGE"
+            width={28}
+            height={28}
+            className="w-5 h-5 object-contain"
+          />
         </div>
-        <span className="text-[12px] font-semibold tracking-wide text-[var(--text-1)]">PersonalBrain</span>
+        <span className="text-[12px] font-semibold tracking-wide text-[var(--text-1)]">BACKSTAGE</span>
       </div>
       <GoogleMobileStatus />
     </div>
@@ -224,7 +238,7 @@ export function MobileBottomNav() {
   const pathname = usePathname();
   return (
     <nav className="lg:hidden flex items-center justify-around h-16 border-t border-[var(--border-1)] bg-[var(--surface-1)]/90 backdrop-blur px-2">
-      {navItems.map((item) => {
+      {mobileNavItems.map((item) => {
         const active = item.exact
           ? pathname === item.href
           : pathname === item.href || pathname.startsWith(`${item.href}/`);
