@@ -43,6 +43,9 @@ PRODUCT.md
 # vercel
 .vercel
 
+# graphify analysis output
+/graphify-out
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
