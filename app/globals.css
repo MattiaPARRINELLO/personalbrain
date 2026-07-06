@@ -52,6 +52,12 @@
   --success: #4ade80;
   --danger: #f87171;
   --violet-deep: #1e1b4b;
+
+  --accent-warm: #d4a373;
+  --accent-cool: #7aa2f7;
+  --accent-success: #9ece6a;
+  --ai-thinking: #bb9af7;
+  --ai-tool-call: #7dcfff;
 }
 
 * {
@@ -292,6 +298,125 @@ textarea::placeholder {
     0%, 100% { opacity: 1; }
     50% { opacity: 0; }
   }
+
+  .blink-cursor {
+    animation: blink-cursor 1s step-end infinite;
+    color: var(--accent-cool);
+    margin-left: 1px;
+  }
+
+  .fade-in-action-chips {
+    animation: fade-in-chips 200ms ease-out;
+  }
+
+  @keyframes fade-in-chips {
+    from { opacity: 0; transform: translateY(2px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .tool-progress-bar {
+    animation: tool-progress 2s ease-in-out infinite;
+    width: 60%;
+  }
+
+  @keyframes tool-progress {
+    0% { width: 10%; }
+    50% { width: 75%; }
+    100% { width: 10%; }
+  }
+
+  .thinking-dot {
+    animation: thinking-dot 800ms ease-in-out infinite;
+  }
+
+  @keyframes thinking-dot {
+    0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1); }
+  }
+
+  .chat-stagger > * {
+    animation: chat-stagger-enter 350ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+  .chat-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .chat-stagger > *:nth-child(2) { animation-delay: 150ms; }
+  .chat-stagger > *:nth-child(3) { animation-delay: 300ms; }
+  .chat-stagger > *:nth-child(4) { animation-delay: 450ms; }
+  .chat-stagger > *:nth-child(5) { animation-delay: 600ms; }
+  .chat-stagger > *:nth-child(6) { animation-delay: 750ms; }
+  .chat-stagger > *:nth-child(n+7) { animation-delay: 900ms; }
+
+  @keyframes chat-stagger-enter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .tool-scan {
+    position: relative;
+    overflow: hidden;
+  }
+  .tool-scan::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--ai-tool-call) 50%,
+      transparent 100%
+    );
+    opacity: 0.18;
+    animation: tool-scan-move 1.5s linear infinite;
+    pointer-events: none;
+  }
+
+  @keyframes tool-scan-move {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+  }
+
+  .toast-slide-in {
+    animation: toast-slide-in 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes toast-slide-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .toast-fade-out {
+    animation: toast-fade-out 300ms ease-out forwards;
+  }
+
+  @keyframes toast-fade-out {
+    to { opacity: 0; transform: translateY(-4px); }
+  }
+
+  .context-slide-from-right {
+    animation: context-slide-from-right 350ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes context-slide-from-right {
+    from { opacity: 0; transform: translateX(16px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .context-view-enter {
+    animation: context-view-fade 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes context-view-fade {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .context-pulse {
+    animation: context-pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes context-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--accent); }
+    50% { box-shadow: 0 0 0 4px transparent; }
+  }
 }
 
 @keyframes vt-fade-in {
@@ -316,4 +441,73 @@ textarea::placeholder {
 ::view-transition-new(sidebar) {
   animation: none;
   mix-blend-mode: normal;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes orbit-ring {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes orbit-ring-reverse {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+@keyframes orbit-ring-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes magic-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes shimmer-move {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes input-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(165,180,252,0), 0 0 20px 0 rgba(165,180,252,0); }
+  50% { box-shadow: 0 0 0 1px rgba(165,180,252,0.25), 0 0 30px 2px rgba(165,180,252,0.12); }
+}
+
+@keyframes dot-orbit {
+  0% { transform: rotate(0deg) translateX(var(--orbit-radius)) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(var(--orbit-radius)) rotate(-360deg); }
+}
+
+.animate-breathe {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+.animate-orbit-ring {
+  animation: orbit-ring 8s linear infinite;
+}
+
+.animate-orbit-ring-reverse {
+  animation: orbit-ring-reverse 12s linear infinite;
+}
+
+.animate-orbit-ring-slow {
+  animation: orbit-ring-slow 20s linear infinite;
+}
+
+.animate-magic-spin {
+  animation: magic-spin 12s linear infinite;
+}
+
+.animate-shimmer-move {
+  background-size: 200% 100%;
+  animation: shimmer-move 3s linear infinite;
+}
+
+.animate-input-glow {
+  animation: input-glow 4s ease-in-out infinite;
 }

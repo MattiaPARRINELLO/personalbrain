@@ -1,11 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Send,
   Sparkles,
-  Bot,
-  User as UserIcon,
   Globe,
   Mail,
   SendHorizontal,
@@ -14,10 +13,18 @@ import {
   Bookmark,
   Bell,
   Square,
+  Copy,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  AtSign,
+  Plus,
 } from "lucide-react";
 import { api, type ChatStreamEvent } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/ui/Markdown";
+import { VoiceInput } from "@/components/chat/VoiceInput";
+import { useChatContext } from "@/lib/chat-context";
 
 type Role = "user" | "assistant";
 
@@ -25,14 +32,18 @@ type Message = {
   id: string;
   role: Role;
   content: string;
+  timestamp: string;
   toolCalls?: ToolCall[];
 };
 
 type ToolCall = {
   id: string;
   name: string;
-  result: string;
-  status: "running" | "done";
+  arguments?: string;
+  result?: string;
+  status: "running" | "success" | "error";
+  duration?: number;
+  resultCount?: number;
 };
 
 const toolMeta: Record<string, { label: string; icon: typeof Globe }> = {
@@ -43,6 +54,10 @@ const toolMeta: Record<string, { label: string; icon: typeof Globe }> = {
   add_memory_fact: { label: "Mémoire", icon: Brain },
   add_reminder: { label: "Rappel", icon: Bell },
   add_watch_later: { label: "Ajout à la liste", icon: Bookmark },
+  search_calendar_events: { label: "Calendrier", icon: CalendarPlus },
+  lookup_concerts: { label: "Concerts", icon: Globe },
+  triage_emails: { label: "Tri emails", icon: Mail },
+  fetch_page_meta: { label: "Aperçu lien", icon: Globe },
 };
 
 const SUGGESTIONS = [
@@ -57,6 +72,7 @@ const welcomeMessage: Message = {
   role: "assistant",
   content:
     "Bonjour Mattia. Je suis ton second cerveau — code, photo, organisation, mémoire longue durée. Pose-moi une question, partage un lien, ou demande-moi de mémoriser quelque chose.",
+  timestamp: new Date().toISOString(),
 };
 
 const FUNNY_THOUGHTS = [
@@ -112,38 +128,136 @@ const FUNNY_THOUGHTS = [
   "L'IA essaie de ne pas paniquer (42 % réussi)…",
 ];
 
-export function ChatView() {
-  const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
+const TITLE_MAX_LENGTH = 50;
+
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function generateTitle(text: string): string {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= TITLE_MAX_LENGTH) return cleaned;
+  return cleaned.slice(0, TITLE_MAX_LENGTH).replace(/\s\S*$/, "") + "…";
+}
+
+function formatTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+interface ChatViewProps {
+  sessionId?: string;
+  onSessionChange?: (sessionId: string) => void;
+}
+
+export function ChatView({ sessionId: externalSessionId, onSessionChange }: ChatViewProps = {}) {
+  const [messages, setMessages] = useState<Message[]>(() =>
+    typeof window !== "undefined"
+      ? [welcomeMessage]
+      : [welcomeMessage]
+  );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTools, setActiveTools] = useState<Record<string, ToolCall>>({});
   const [thinkingIndex, setThinkingIndex] = useState(0);
-  const abortRef = useRef<AbortController | null>(null);
+  const chatCtx = useChatContext();
+  const activeToolsRef = useRef<Record<string, ToolCall>>({});
+  const [, forceRender] = useState(0);
+  const [streamingContent, setStreamingContent] = useState("");
+  const [streamingActive, setStreamingActive] = useState(false);
+  const [sessionId, setSessionId] = useState<string>("");
+  const [sessionTitle, setSessionTitle] = useState<string>("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const abortRef = useRef<(() => void) | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasTitleRef = useRef(false);
 
   useEffect(() => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
+    if (externalSessionId) return;
+    import("@/app/actions/chat-history").then(({ getChatHistory }) => {
+      getChatHistory().then((history) => {
+        const sessions = history.sessions;
+        if (sessions.length > 0) {
+          const last = sessions[sessions.length - 1];
+          setSessionId(last.id);
+          setSessionTitle(last.title || "");
+          hasTitleRef.current = true;
+          const restored: Message[] = last.messages.map((m) => ({
+            ...m,
+            toolCalls: m.toolCalls?.map((tc) => ({
+              ...tc,
+              status: (tc.status as ToolCall["status"]) || "success",
+            })),
+          }));
+          setMessages(restored.length > 0 ? restored : [welcomeMessage]);
+        } else {
+          const newId = generateId();
+          setSessionId(newId);
+        }
+      });
     });
-  }, [messages, loading, activeTools, thinkingIndex]);
+  }, [externalSessionId]);
+
+  const saveSession = useCallback(() => {
+    if (!sessionId) return;
+    const filtered = messages.filter((m) => m.id !== "welcome");
+    if (filtered.length === 0) return;
+    const title = sessionTitle || (filtered[0]?.role === "user" ? generateTitle(filtered[0].content) : "Nouvelle conversation");
+    import("@/app/actions/chat-history").then(({ saveChatSession }) => {
+      saveChatSession({
+        id: sessionId,
+        title,
+        messages: filtered.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp,
+          toolCalls: m.toolCalls?.map((tc) => ({
+            id: tc.id,
+            name: tc.name,
+            arguments: tc.arguments || "",
+            result: tc.result,
+            status: tc.status,
+            duration: tc.duration,
+            resultCount: tc.resultCount,
+          })),
+        })),
+        createdAt: filtered[0]?.timestamp || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+  }, [messages, sessionId, sessionTitle]);
 
   useEffect(() => {
-    if (!loading) return;
-    const id = setInterval(() => {
-      setThinkingIndex((prev) => (prev + 1) % FUNNY_THOUGHTS.length);
-    }, 2500);
-    return () => clearInterval(id);
-  }, [loading]);
+    if (!sessionId || messages.length <= 1 || messages[0]?.id === "welcome") return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(saveSession, 2000);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [messages, sessionId, saveSession]);
 
-  const stop = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setLoading(false);
-  }, []);
+  useEffect(() => {
+    if (loading && streamingActive) {
+      const interval = setInterval(() => {
+        setThinkingIndex((prev) => (prev + 1) % FUNNY_THOUGHTS.length);
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [loading, streamingActive]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, streamingContent]);
 
   const send = useCallback(
     async (text: string) => {
@@ -151,86 +265,126 @@ export function ChatView() {
       if (!trimmed || loading) return;
 
       const userMsg: Message = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         role: "user",
         content: trimmed,
+        timestamp: new Date().toISOString(),
       };
-      const next = [...messages, userMsg];
-      setMessages(next);
+
+      if (!hasTitleRef.current) {
+        const title = generateTitle(trimmed);
+        setSessionTitle(title);
+        hasTitleRef.current = true;
+        if (onSessionChange && sessionId) onSessionChange(sessionId);
+      }
+
       setInput("");
       setError(null);
-      setActiveTools({});
+      activeToolsRef.current = {};
+      chatCtx.clearActiveTools();
+      setStreamingContent("");
       setLoading(true);
+      setStreamingActive(false);
+
+      const next = [...messages.filter((m) => m.id !== "welcome"), userMsg];
+      setMessages(next);
 
       const apiMessages = next
-        .filter((m) => m.id !== "welcome")
-        .map((m) => ({ role: m.role, content: m.content }));
+        .filter((m) => m.role !== "assistant" || m.content)
+        .map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
 
-      const assistantId = crypto.randomUUID();
+      const startTime = Date.now();
       let buffer = "";
-
-      const controller = new AbortController();
-      abortRef.current = controller;
 
       try {
         await api.chat.stream(
           apiMessages,
           (event: ChatStreamEvent) => {
-            if (event.type === "reasoning") {
-              // Reasoning events are intentionally hidden from the UI.
-              return;
-            } else if (event.type === "delta") {
-              setThinkingIndex(0);
+            if (event.type === "delta") {
               buffer += event.content;
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last?.id === assistantId) {
-                  return [...prev.slice(0, -1), { ...last, content: buffer }];
-                }
-                return [...prev, { id: assistantId, role: "assistant", content: buffer }];
-              });
+              setStreamingContent(buffer);
+              setStreamingActive(true);
             } else if (event.type === "tool_start") {
-              setThinkingIndex(0);
-              setActiveTools((prev) => ({
-                ...prev,
+              setStreamingActive(false);
+              activeToolsRef.current = {
+                ...activeToolsRef.current,
                 [event.toolCallId]: {
                   id: event.toolCallId,
                   name: event.name,
-                  result: "",
+                  arguments: event.arguments,
                   status: "running",
                 },
-              }));
-            } else if (event.type === "tool_result") {
-              setActiveTools((prev) => {
-                const next = { ...prev };
-                for (const [k, v] of Object.entries(next)) {
-                  if (v.name === event.name && v.status === "running") {
-                    next[k] = { ...v, result: event.result, status: "done" };
-                  }
-                }
-                return next;
+              };
+              chatCtx.registerToolStart({
+                id: event.toolCallId,
+                name: event.name,
+                arguments: event.arguments,
               });
+              forceRender((n) => n + 1);
+            } else if (event.type === "tool_result") {
+              const toolEnd = Date.now();
+              const key = Object.keys(activeToolsRef.current).find(
+                (k) => activeToolsRef.current[k].name === event.name
+              );
+              const existing = key ? activeToolsRef.current[key] : null;
+              const duration = (toolEnd - startTime) / 1000;
+              const resultCount = event.result
+                ? event.result.split("\n").filter(Boolean).length
+                : 0;
+              const isError = event.result.includes("Erreur");
+              if (existing) {
+                activeToolsRef.current = {
+                  ...activeToolsRef.current,
+                  [key!]: {
+                    ...existing,
+                    result: event.result,
+                    status: isError ? "error" : "success",
+                    duration,
+                    resultCount: resultCount || 1,
+                  },
+                };
+                if (key) delete activeToolsRef.current[key];
+              }
+              chatCtx.registerToolResult(event.name, event.result, isError, duration);
+              forceRender((n) => n + 1);
             } else if (event.type === "error") {
               setError(event.message);
             } else if (event.type === "done") {
-              setThinkingIndex(0);
-              setActiveTools((currentTools) => {
-                const toolCalls = Object.values(currentTools);
+              if (buffer) {
+                const toolCalls = Object.values(activeToolsRef.current).filter(
+                  (t) => t.status === "success" || t.status === "error"
+                ) as ToolCall[];
                 setMessages((prev) => {
                   const last = prev[prev.length - 1];
-                  if (last?.id === assistantId) {
+                  if (last && last.role === "assistant") {
                     return [
                       ...prev.slice(0, -1),
-                      { ...last, content: buffer || last.content, toolCalls: toolCalls.length ? toolCalls : undefined },
+                      { ...last, content: buffer, toolCalls: toolCalls.length > 0 ? toolCalls : undefined },
                     ];
                   }
-                  return prev;
+                  return [
+                    ...prev,
+                    {
+                      id: generateId(),
+                      role: "assistant",
+                      content: buffer,
+                      timestamp: new Date().toISOString(),
+                      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+                    },
+                  ];
                 });
-                return currentTools;
-              });
+                activeToolsRef.current = {};
+              }
+              buffer = "";
+              setStreamingContent("");
+              setStreamingActive(false);
+              setLoading(false);
             }
           },
-          controller.signal
+          abortRef.current ? undefined : undefined
         );
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
@@ -238,23 +392,27 @@ export function ChatView() {
         }
       } finally {
         setLoading(false);
-        setThinkingIndex(0);
-        setActiveTools({});
-        abortRef.current = null;
+        setStreamingActive(false);
+        setStreamingContent("");
       }
     },
-    [loading, messages]
+    [loading, messages, sessionId, onSessionChange, chatCtx]
   );
 
+  const stop = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current();
+      abortRef.current = null;
+    }
+    setLoading(false);
+    setStreamingActive(false);
+  }, []);
+
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       void send(input);
-    }
-    if (e.key === "Escape" && loading) {
-      stop();
-    }
-    if (e.key === "ArrowUp" && !input && messages.length > 1) {
+    } else if (e.key === "ArrowUp" && !input && messages.length > 1) {
       e.preventDefault();
       const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
       if (lastUserMsg) setInput(lastUserMsg.content);
@@ -267,10 +425,436 @@ export function ChatView() {
         e.preventDefault();
         setMessages([welcomeMessage]);
       }
+      if (e.key === "Escape" && loading) {
+        stop();
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [loading, stop]);
+
+  function activeToolsList(tools: Record<string, ToolCall>): ToolCall[] {
+    return Object.values(tools);
+  }
+
+  function Hero({ onPrompt, disabled }: { onPrompt: (p: string) => void; disabled: boolean }) {
+    return (
+      <div className="flex flex-col items-center text-center">
+        <div className="-mx-6 -mt-10 sm:-mx-8 sm:-mt-16 relative flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-[400px] h-[400px] sm:w-[500px] sm:h-[500px] rounded-full bg-[var(--accent)]/8 blur-[100px] animate-breathe" />
+          </div>
+
+          {/* Outer ring */}
+          <div className="absolute w-[340px] h-[340px] sm:w-[420px] sm:h-[420px] animate-orbit-ring pointer-events-none">
+            <div className="absolute inset-0 rounded-full border border-[var(--accent)]/15" />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[var(--accent)] shadow-[0_0_8px_rgba(165,180,252,0.6)]" />
+            <div className="absolute bottom-[15%] right-[10%] w-1.5 h-1.5 rounded-full bg-[var(--accent)]/40" />
+          </div>
+
+          {/* Middle ring */}
+          <div className="absolute w-[260px] h-[260px] sm:w-[320px] sm:h-[320px] animate-orbit-ring-reverse pointer-events-none">
+            <div className="absolute inset-0 rounded-full border border-[var(--accent-cool)]/15" />
+            <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)] shadow-[0_0_6px_rgba(122,162,247,0.5)]" />
+          </div>
+
+          {/* Inner ring */}
+          <div className="absolute w-[180px] h-[180px] sm:w-[220px] sm:h-[220px] animate-orbit-ring-slow pointer-events-none">
+            <div className="absolute inset-0 rounded-full border border-[var(--accent-warm)]/15" />
+            <div className="absolute top-[10%] left-[20%] w-1 h-1 rounded-full bg-[var(--accent-warm)] shadow-[0_0_6px_rgba(212,163,115,0.5)]" />
+          </div>
+
+          <div className="relative">
+            <Image
+            src="/backstage-logo.png"
+            alt="BACKSTAGE"
+            width={500}
+            height={500}
+            priority
+            className="w-full max-w-[450px] sm:max-w-[500px] h-auto object-contain drop-shadow-[0_0_40px_rgba(165,180,252,0.35)]"
+          />
+        </div>
+        </div>
+        <h1 className="text-4xl sm:text-5xl font-semibold tracking-[0.15em] uppercase text-[var(--text-1)] mb-2">
+          BACKSTAGE
+        </h1>
+        <p className="text-[13px] sm:text-[14px] text-[var(--text-2)] max-w-md leading-relaxed mb-8 font-sans">
+          Ton espace de contrôle personnel.
+        </p>
+        <div className="grid grid-cols-2 gap-2 max-w-lg w-full">
+          {SUGGESTIONS.map((s) => (
+            <button
+              key={s.label}
+              onClick={() => void onPrompt(s.label)}
+              disabled={disabled}
+              className="flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-[var(--text-2)] bg-[var(--surface-1)] border border-[var(--border-1)] rounded-lg hover:border-[var(--border-2)] hover:text-[var(--text-1)] transition-colors duration-200 text-left disabled:opacity-40"
+            >
+              <s.icon className="w-3.5 h-3.5 shrink-0 text-[var(--text-3)]" />
+              <span className="line-clamp-2">{s.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function ActionChips({ message }: { message: Message }) {
+    const isAssistant = message.role === "assistant" && message.id !== "welcome";
+    if (!isAssistant || !message.content) return null;
+
+    const handleCopy = async () => {
+      try {
+        await navigator.clipboard.writeText(message.content);
+        setCopiedId(message.id);
+        setTimeout(() => setCopiedId(null), 2000);
+      } catch {
+        // clipboard not available
+      }
+    };
+
+    return (
+      <div className="mt-2 flex flex-wrap gap-1.5 fade-in-action-chips">
+        <button
+          onClick={handleCopy}
+          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--border-2)] hover:text-[var(--text-2)] transition-colors duration-200"
+        >
+          {copiedId === message.id ? <Check className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
+          {copiedId === message.id ? "Copié" : "Copier"}
+        </button>
+        <a
+          href={`mailto:?body=${encodeURIComponent(message.content)}`}
+          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--border-2)] hover:text-[var(--text-2)] transition-colors duration-200"
+        >
+          <Mail className="w-2.5 h-2.5" />
+          Voir le mail
+        </a>
+        <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--accent-warm)]/40 hover:text-[var(--accent-warm)] transition-colors duration-200">
+          <CalendarPlus className="w-2.5 h-2.5" />
+          Ajouter au calendrier
+        </button>
+        <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--border-2)] hover:text-[var(--text-2)] transition-colors duration-200">
+          <Bell className="w-2.5 h-2.5" />
+          Créer un rappel
+        </button>
+      </div>
+    );
+  }
+
+  function MessageBlock({ message }: { message: Message }) {
+    const isUser = message.role === "user";
+    const isWelcome = message.id === "welcome";
+
+    if (isWelcome) {
+      return (
+        <div className="flex gap-3">
+          <div className="shrink-0 w-6 h-6 rounded-full border border-[var(--border-2)] bg-[var(--surface-1)] flex items-center justify-center mt-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)]" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)]">ASSISTANT</span>
+            </div>
+            <div className="text-[14px] text-[var(--text-2)] leading-relaxed">
+              <Markdown>{message.content}</Markdown>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+        <div
+          className={cn(
+            "relative max-w-[85%] rounded-lg p-3.5",
+            isUser
+              ? "bg-[var(--surface-2)] border-r-2 border-[var(--accent-warm)]"
+              : "bg-[var(--surface-1)] border-l-2 border-[var(--accent-cool)]"
+          )}
+        >
+          <div className="flex items-center gap-2 mb-1.5">
+            {!isUser && (
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)] shrink-0" />
+            )}
+            <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)]">
+              {isUser ? "TOI" : "ASSISTANT"}
+            </span>
+            <span className="text-[10px] font-mono text-[var(--text-3)]">
+              · {formatTime(message.timestamp)}
+            </span>
+          </div>
+          <div className={cn(
+            "text-[14px] leading-relaxed",
+            isUser ? "text-[var(--text-1)]" : "text-[var(--text-1)]"
+          )}>
+            <Markdown>{message.content}</Markdown>
+          </div>
+          {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
+            <div className="mt-2 space-y-1.5">
+              {message.toolCalls.map((tc) => (
+                <ToolCallResult key={tc.id} tool={tc} />
+              ))}
+            </div>
+          )}
+          <ActionChips message={message} />
+        </div>
+      </div>
+    );
+  }
+
+  function ToolCallResult({ tool }: { tool: ToolCall }) {
+    const [expanded, setExpanded] = useState(false);
+    const isError = tool.status === "error";
+    const isRunning = tool.status === "running";
+
+    return (
+      <div
+        className={cn(
+          "text-[11px] font-mono rounded border px-2.5 py-1.5",
+          isRunning && "tool-scan",
+          isRunning
+            ? "border-[var(--ai-tool-call)]/40 bg-[var(--ai-tool-call)]/5"
+            : isError
+              ? "border-[var(--danger)]/30 bg-[var(--danger)]/5"
+              : "border-[var(--accent-success)]/30 bg-[var(--accent-success)]/5"
+        )}
+      >
+        {isRunning ? (
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-tool-call)] animate-pulse" />
+              <span className="text-[var(--ai-tool-call)]">
+                ◈ {toolMeta[tool.name]?.label || tool.name}
+              </span>
+              <span className="text-[var(--text-4)]">running...</span>
+            </div>
+            <div className="mt-1.5 h-0.5 bg-[var(--border-1)] rounded-full overflow-hidden">
+              <div className="h-full bg-[var(--ai-tool-call)]/50 rounded-full tool-progress-bar" />
+            </div>
+            {expanded && tool.arguments && (
+              <div className="mt-2 text-[var(--text-3)] whitespace-pre-wrap break-all">
+                {tool.arguments}
+              </div>
+            )}
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="mt-1 text-[var(--text-4)] hover:text-[var(--text-2)] transition-colors inline-flex items-center gap-0.5"
+            >
+              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              {expanded ? "Masquer" : "Détails"}
+            </button>
+          </div>
+        ) : (
+          <div>
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="w-full flex items-center gap-1.5 text-left"
+            >
+              <span className={isError ? "text-[var(--danger)]" : "text-[var(--accent-success)]"}>
+                {isError ? "✗" : "✓"}
+              </span>
+              <span className="text-[var(--text-2)]">{toolMeta[tool.name]?.label || tool.name}</span>
+              {tool.duration != null && (
+                <span className="text-[var(--text-4)]">· {tool.duration.toFixed(1)}s</span>
+              )}
+              {tool.resultCount != null && (
+                <span className="text-[var(--text-4)]">· {tool.resultCount} résultats</span>
+              )}
+              <span className="text-[var(--text-4)] ml-auto">
+                {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </span>
+            </button>
+            {expanded && tool.result && (
+              <div className={cn(
+                "mt-2 pt-2 border-t border-[var(--border-1)] whitespace-pre-wrap break-all",
+                isError ? "text-[var(--danger)]" : "text-[var(--text-3)]"
+              )}>
+                {tool.result}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function ToolCallTray({ tools }: { tools: ToolCall[] }) {
+    return (
+      <div className="flex gap-2 flex-wrap py-1">
+        {tools.map((t) => (
+          <ToolCallResult key={t.id} tool={t} />
+        ))}
+      </div>
+    );
+  }
+
+  function ThinkingIndicator({ index }: { index: number }) {
+    return (
+      <div className="flex items-center gap-2.5 pl-9">
+        <div className="flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)] thinking-dot" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)] thinking-dot" style={{ animationDelay: "0.15s" }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)] thinking-dot" style={{ animationDelay: "0.3s" }} />
+        </div>
+        <span className="text-[11px] font-mono text-[var(--text-4)] italic">
+          {FUNNY_THOUGHTS[index % FUNNY_THOUGHTS.length]}
+        </span>
+      </div>
+    );
+  }
+
+  function Composer({
+    value,
+    onChange,
+    onSubmit,
+    onStop,
+    loading: isLoading,
+    inputRef: ref,
+    onKey,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    onSubmit: () => void;
+    onStop: () => void;
+    loading: boolean;
+    inputRef: React.RefObject<HTMLTextAreaElement | null>;
+    onKey: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  }) {
+    const [dragOver, setDragOver] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [showMentionMenu, setShowMentionMenu] = useState(false);
+
+    const handleDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(true);
+    };
+    const handleDragLeave = () => setDragOver(false);
+    const handleDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        onChange(value + ` [Fichier: ${files[0].name}]`);
+      }
+    };
+
+    const insertMention = (mention: string) => {
+      onChange(value + mention + " ");
+      setShowMentionMenu(false);
+      ref.current?.focus();
+    };
+
+    const handleFileUpload = () => {
+      fileInputRef.current?.click();
+    };
+
+    return (
+      <div className="relative group animate-input-glow rounded-2xl">
+        <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-[var(--accent)]/0 via-[var(--accent)]/30 to-[var(--accent)]/0 opacity-0 group-focus-within:opacity-100 transition-opacity duration-500 blur" />
+        <div
+          className={cn(
+            "relative flex items-end gap-2 p-2 rounded-2xl bg-[var(--surface-2)]/80 border transition-colors duration-200 backdrop-blur",
+            dragOver
+              ? "border-[var(--accent-cool)] bg-[var(--accent-cool)]/5"
+              : "border-[var(--border-2)] focus-within:border-[var(--accent)]/50"
+          )}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <div className="relative">
+            <button
+              onClick={() => setShowMentionMenu(!showMentionMenu)}
+              className="shrink-0 w-8 h-8 rounded-lg border border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-[var(--border-2)] flex items-center justify-center transition-colors duration-200"
+              title="Mentionner un module (@gmail, @calendar, @memory)"
+            >
+              <AtSign className="w-3.5 h-3.5" />
+            </button>
+            {showMentionMenu && (
+              <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--border-2)] bg-[var(--surface-1)] shadow-lg shadow-black/40 p-1 z-50">
+                {[
+                  { label: "@gmail", desc: "Rechercher dans les mails" },
+                  { label: "@calendar", desc: "Consulter le calendrier" },
+                  { label: "@memory", desc: "Interroger la mémoire" },
+                ].map((m) => (
+                  <button
+                    key={m.label}
+                    onClick={() => insertMention(m.label)}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-[var(--surface-2)] transition-colors duration-150"
+                  >
+                    <span className="text-[13px] text-[var(--accent-cool)] font-mono">{m.label}</span>
+                    <span className="block text-[11px] text-[var(--text-4)]">{m.desc}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <VoiceInput
+            onResult={(text) => onChange(value + text)}
+            disabled={isLoading}
+          />
+          <button
+            onClick={handleFileUpload}
+            className="shrink-0 w-8 h-8 rounded-lg border border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-[var(--border-2)] flex items-center justify-center transition-colors duration-200"
+            title="Uploader un fichier"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onChange(value + ` [Fichier: ${file.name}]`);
+              e.target.value = "";
+            }}
+          />
+
+          <textarea
+            ref={ref}
+            value={value}
+            onChange={(e) => {
+              onChange(e.target.value);
+              const el = e.target;
+              el.style.height = "auto";
+              el.style.height = Math.min(el.scrollHeight, 200) + "px";
+            }}
+            onKeyDown={onKey}
+            placeholder="Ctrl+Enter pour envoyer, Shift+Enter nouvelle ligne…"
+            rows={1}
+            className="flex-1 bg-transparent text-[14px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none resize-none font-sans px-3 py-2 max-h-[200px]"
+          />
+          {isLoading ? (
+            <button
+              onClick={onStop}
+              className="shrink-0 w-9 h-9 rounded-xl bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] flex items-center justify-center hover:bg-[var(--danger)]/15 transition-colors"
+              title="Arrêter"
+            >
+              <Square className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <button
+              onClick={onSubmit}
+              disabled={!value.trim()}
+              className="shrink-0 w-9 h-9 rounded-xl bg-[var(--accent)] text-[#0a0a0b] flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Envoyer (Ctrl+Enter)"
+            >
+              <Send className="w-3.5 h-3.5" strokeWidth={2} />
+            </button>
+          )}
+        </div>
+        {dragOver && (
+          <div className="absolute inset-0 rounded-2xl flex items-center justify-center bg-[var(--surface-2)]/90 border-2 border-dashed border-[var(--accent-cool)] z-10">
+            <span className="text-[12px] font-mono text-[var(--accent-cool)]">
+              Déposer le fichier
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0 relative">
@@ -279,14 +863,31 @@ export function ChatView() {
           {messages.length <= 1 && messages[0]?.id === "welcome" ? (
             <Hero onPrompt={(p) => void send(p)} disabled={loading} />
           ) : (
-            <div className="space-y-8">
+            <div className="space-y-6 chat-stagger">
               {messages.map((m) => (
                 <MessageBlock key={m.id} message={m} />
               ))}
-              {loading && <ThinkingIndicator index={thinkingIndex} />}
-
-              {loading && activeToolsList(activeTools).length > 0 && (
-                <ToolCallTray tools={activeToolsList(activeTools)} />
+              {streamingActive && streamingContent && (
+                <div className="flex justify-start">
+                  <div className="relative max-w-[85%] rounded-lg p-3.5 bg-[var(--surface-1)] border-l-2 border-[var(--accent-cool)]">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)] shrink-0" />
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)]">ASSISTANT</span>
+                    </div>
+                    <div className="text-[14px] leading-relaxed text-[var(--text-1)]">
+                      <Markdown>{streamingContent}</Markdown>
+                      <span className="blink-cursor">█</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {loading && !streamingActive && activeToolsList(activeToolsRef.current).length > 0 && (
+                <div className="pl-9">
+                  <ToolCallTray tools={activeToolsList(activeToolsRef.current)} />
+                </div>
+              )}
+              {loading && !streamingActive && activeToolsList(activeToolsRef.current).length === 0 && (
+                <ThinkingIndicator index={thinkingIndex} />
               )}
             </div>
           )}
@@ -312,216 +913,9 @@ export function ChatView() {
             onKey={handleKey}
           />
           <p className="text-[10px] text-[var(--text-4)] mt-2.5 text-center font-mono tracking-wide">
-            ⏎ envoi · ⇧⏎ nouvelle ligne · ↑ éditer · ⌘L effacer · ⎋ arrêter
+            Ctrl+Enter envoi · Shift+Enter nouvelle ligne · ↑ éditer · Ctrl+L effacer · Esc arrêter
           </p>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function activeToolsList(tools: Record<string, ToolCall>): ToolCall[] {
-  return Object.values(tools);
-}
-
-function Hero({ onPrompt, disabled }: { onPrompt: (p: string) => void; disabled: boolean }) {
-  return (
-    <div className="text-center pt-2 fade-in">
-      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl border border-[var(--border-2)] bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)] mb-6 relative">
-        <Sparkles className="w-6 h-6 text-[var(--accent)]" />
-        <span className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-[var(--accent)] breathe" />
-      </div>
-      <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-balance">
-        <span className="gradient-text-ai">Bonjour Mattia.</span>
-      </h1>
-      <p className="text-[15px] text-[var(--text-2)] mt-3 max-w-lg mx-auto text-balance leading-relaxed">
-        Ton second cerveau IA. Code, photo, agenda, mémoire — tout au même endroit.
-      </p>
-
-      <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-2xl mx-auto text-left">
-        {SUGGESTIONS.map((s, i) => {
-          const Icon = s.icon;
-          return (
-            <button
-              key={i}
-              onClick={() => onPrompt(s.label)}
-              disabled={disabled}
-              className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)]/40 hover:border-[var(--border-3)] hover:bg-[var(--surface-2)] transition-all duration-200 disabled:opacity-40"
-            >
-              <span className="w-7 h-7 rounded-lg bg-[var(--surface-2)] border border-[var(--border-1)] flex items-center justify-center text-[var(--accent)] group-hover:border-[var(--accent)]/30 transition-colors">
-                <Icon className="w-3.5 h-3.5" />
-              </span>
-              <span className="text-[12.5px] text-[var(--text-2)] group-hover:text-[var(--text-1)] transition-colors">
-                {s.label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function MessageBlock({ message }: { message: Message }) {
-  const isAssistant = message.role === "assistant";
-  return (
-    <div className={cn("flex gap-3 sm:gap-4 slide-up", isAssistant ? "" : "flex-row-reverse")}>
-      <div className="shrink-0">
-        {isAssistant ? (
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--accent)]/20 to-[var(--accent)]/5 border border-[var(--accent)]/30 flex items-center justify-center">
-            <Bot className="w-4 h-4 text-[var(--accent)]" />
-          </div>
-        ) : (
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--warm)]/20 to-[var(--warm)]/5 border border-[var(--warm)]/30 flex items-center justify-center">
-            <UserIcon className="w-4 h-4 text-[var(--warm)]" />
-          </div>
-        )}
-      </div>
-      <div className={cn("min-w-0 flex-1", !isAssistant && "flex justify-end")}>
-        <div
-          className={cn(
-            "inline-block max-w-[85%] rounded-2xl px-4 py-3 leading-relaxed text-[14px] break-words",
-            isAssistant
-              ? "bg-[var(--surface-2)]/60 border border-[var(--border-1)] text-[var(--text-1)]"
-              : "bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--text-1)] whitespace-pre-wrap"
-          )}
-        >
-          {isAssistant ? (
-            message.content ? (
-              <Markdown>{message.content}</Markdown>
-            ) : (
-              <span className="text-[var(--text-3)] italic">…</span>
-            )
-          ) : (
-            message.content || <span className="text-[var(--text-3)] italic">…</span>
-          )}
-        </div>
-        {message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="mt-2 max-w-[85%]">
-            <ToolCallTray tools={message.toolCalls} compact />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ToolCallTray({ tools, compact }: { tools: ToolCall[]; compact?: boolean }) {
-  return (
-    <div className={cn("space-y-1", compact ? "" : "pl-1")}>
-      {tools.map((t) => {
-        const meta = toolMeta[t.name] ?? { label: t.name, icon: Globe };
-        const Icon = meta.icon;
-        return (
-          <div
-            key={t.id}
-            className={cn(
-              "flex items-center gap-2 text-[11px] text-[var(--text-3)] font-mono rounded-md px-2.5 py-1.5",
-              "border border-[var(--border-1)] bg-[var(--surface-1)]/40"
-            )}
-          >
-            <Icon className="w-3 h-3 text-[var(--accent)] shrink-0" />
-            <span className="text-[var(--accent)]">{meta.label}</span>
-            <span className="text-[var(--text-4)]">·</span>
-            <span className="truncate flex-1">
-              {t.status === "running" ? (
-                <span className="inline-flex items-center gap-1">
-                  <span className="text-[var(--text-3)]">en cours</span>
-                  <span className="inline-flex gap-0.5">
-                    <span className="w-0.5 h-0.5 rounded-full bg-[var(--accent)] pulse-dot" />
-                    <span className="w-0.5 h-0.5 rounded-full bg-[var(--accent)] pulse-dot" style={{ animationDelay: "0.2s" }} />
-                    <span className="w-0.5 h-0.5 rounded-full bg-[var(--accent)] pulse-dot" style={{ animationDelay: "0.4s" }} />
-                  </span>
-                </span>
-              ) : (
-                <span className="text-[var(--text-2)]">{t.result.slice(0, 100)}{t.result.length > 100 ? "…" : ""}</span>
-              )}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ThinkingIndicator({ index }: { index: number }) {
-  const text = FUNNY_THOUGHTS[index % FUNNY_THOUGHTS.length] ?? FUNNY_THOUGHTS[0];
-  return (
-    <div className="flex gap-3 sm:gap-4 slide-up">
-      <div className="shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--accent)]/20 to-[var(--accent)]/5 border border-[var(--accent)]/30 flex items-center justify-center">
-          <Bot className="w-4 h-4 text-[var(--accent)]" />
-        </div>
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="inline-flex items-center gap-2.5 max-w-[85%] rounded-2xl px-4 py-3 border border-[var(--border-1)] bg-[var(--surface-2)]/60">
-          <span className="inline-flex gap-0.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] thinking-dot" />
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] thinking-dot" style={{ animationDelay: "0.15s" }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] thinking-dot" style={{ animationDelay: "0.3s" }} />
-          </span>
-          <span className="text-[13px] text-[var(--text-3)] font-mono typing-text">
-            {text}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Composer({
-  value,
-  onChange,
-  onSubmit,
-  onStop,
-  loading,
-  inputRef,
-  onKey,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onSubmit: () => void;
-  onStop: () => void;
-  loading: boolean;
-  inputRef: React.RefObject<HTMLTextAreaElement | null>;
-  onKey: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-}) {
-  return (
-    <div className="relative group">
-      <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-[var(--accent)]/0 via-[var(--accent)]/30 to-[var(--accent)]/0 opacity-0 group-focus-within:opacity-100 transition-opacity duration-500 blur" />
-      <div className="relative flex items-end gap-2 p-2 rounded-2xl bg-[var(--surface-2)]/80 border border-[var(--border-2)] focus-within:border-[var(--accent)]/50 transition-colors duration-200 backdrop-blur">
-        <textarea
-          ref={inputRef}
-          value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            const el = e.target;
-            el.style.height = "auto";
-            el.style.height = Math.min(el.scrollHeight, 200) + "px";
-          }}
-          onKeyDown={onKey}
-          placeholder="Demande, partage un lien, ou écris ce que tu veux mémoriser…"
-          rows={1}
-          className="flex-1 bg-transparent text-[14px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none resize-none font-sans px-3 py-2 max-h-[200px]"
-        />
-        {loading ? (
-          <button
-            onClick={onStop}
-            className="shrink-0 w-9 h-9 rounded-xl bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] flex items-center justify-center hover:bg-[var(--danger)]/15 transition-colors"
-            title="Arrêter"
-          >
-            <Square className="w-3.5 h-3.5" />
-          </button>
-        ) : (
-          <button
-            onClick={onSubmit}
-            disabled={!value.trim()}
-            className="shrink-0 w-9 h-9 rounded-xl bg-[var(--accent)] text-[#0a0a0b] flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            title="Envoyer"
-          >
-            <Send className="w-3.5 h-3.5" strokeWidth={2} />
-          </button>
-        )}
       </div>
     </div>
   );
