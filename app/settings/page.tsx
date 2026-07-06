@@ -155,7 +155,7 @@ export default function SettingsPage() {
             <Card>
               <CardHeader
                 title="Application"
-                subtitle="Version web — PersonalBrain"
+                subtitle="Version web — BACKSTAGE"
                 action={<Smartphone className="w-4 h-4 text-[var(--text-3)]" />}
               />
               <CardBody>

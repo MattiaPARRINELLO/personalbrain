@@ -104,7 +104,7 @@ export default function LoginPage() {
             <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-[var(--accent)] breathe" />
           </div>
           <h1 className="text-[20px] font-semibold tracking-tight text-[var(--text-1)]">
-            <span className="gradient-text-ai">PersonalBrain</span>
+            <span className="gradient-text-ai">BACKSTAGE</span>
           </h1>
           <p className="text-[12.5px] text-[var(--text-3)] mt-1.5 leading-relaxed">
             Accès privé. Authentification sans mot de passe.

@@ -94,7 +94,7 @@ export function SearchView() {
             <EmptyState
               icon={<Search className="w-5 h-5" />}
               title="Recherche unifiée"
-              description="Tape une requête pour chercher dans toutes les données de PersonalBrain."
+              description="Tape une requête pour chercher dans toutes les données de BACKSTAGE."
             />
           )}
 

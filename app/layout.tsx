@@ -18,14 +18,14 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PersonalBrain — Second Brain IA",
+  title: "BACKSTAGE — Second Brain IA",
   description:
     "Second cerveau IA pour le code, la photo et la mémoire.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "PersonalBrain",
+    title: "BACKSTAGE",
   },
 };
 

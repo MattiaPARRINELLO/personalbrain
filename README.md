@@ -1,4 +1,4 @@
-# PersonalBrain
+# BACKSTAGE
 
 **Second cerveau IA · Code · Photo · Mémoire**
 
@@ -12,7 +12,7 @@ watch-later, accréditations photo et brief du matin — le tout dans une seule 
 
 ## 🧠 Ce que c'est
 
-PersonalBrain n'est pas un dashboard de plus. C'est un espace de travail unique où
+BACKSTAGE n'est pas un dashboard de plus. C'est un espace de travail unique où
 l'IA conversationnelle, la mémoire persistante et les outils du quotidien (Gmail,
 Calendar, LeetCode, concerts) se répondent entre eux.
 
@@ -69,8 +69,8 @@ Calendar, LeetCode, concerts) se répondent entre eux.
 ## 🚀 Installation
 
 ```bash
-git clone https://github.com/MattiaPARRINELLO/personalbrain.git
-cd personalbrain
+git clone https://github.com/MattiaPARRINELLO/backstage.git
+cd backstage
 bun install
 cp .env.example .env.local   # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OPENAI_API_KEY, ANTHROPIC_API_KEY, SEARCHAPI_API_KEY
 bun dev
