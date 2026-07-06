@@ -1,33 +1,27 @@
-import { promises as fs } from "fs";
-import path from "path";
-import { getReminders, getConcerts, getEmails } from "./storage";
+import { getReminders, getConcerts, getEmails, getLeetcode, getCalendar, writeJsonAtomic, readJsonSafe, prepareConcert } from "./storage";
 import { chatCompletion } from "./ai-providers";
 import { getConfig } from "./config";
 import type { DailyBrief } from "./types";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const BRIEF_FILE = path.join(DATA_DIR, "daily-briefs.json");
+const BRIEF_FILENAME = "daily-briefs.json";
 
 interface DailyBriefsData {
   briefs: DailyBrief[];
 }
 
-/**
- * Génère un résumé de la journée en collectant les événements, rappels
- * et emails non lus, puis en les résumant via l'IA.
- * Retourne le texte du brief, ou null si la feature est désactivée.
- */
 export async function generateDailyBrief(): Promise<string | null> {
   try {
     const config = await getConfig();
     if (!config.features.dailyBrief) return null;
 
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const today = new Date().toISOString().slice(0, 10);
 
-    const [remindersData, concertsData, emailsData] = await Promise.all([
+    const [remindersData, concertsData, emailsData, leetcodeData, calendarEvents] = await Promise.all([
       getReminders(),
       getConcerts(),
       getEmails(),
+      getLeetcode(),
+      getCalendar().catch(() => []),
     ]);
 
     // Rappels du jour encore pending
@@ -38,40 +32,72 @@ export async function generateDailyBrief(): Promise<string | null> {
     // Concerts du jour
     const todayConcerts = concertsData.events.filter((c) => c.date === today);
 
-    // Emails non lus
+    // Agenda du jour depuis le calendrier
+    const todayAgenda = calendarEvents.filter(
+      (e) => e.date.slice(0, 10) === today
+    );
+
+    // Emails non lus + urgents
     const unreadEmails = emailsData.emails.filter((e) => e.unread);
+    const urgentEmails = unreadEmails.filter(
+      (e) => e.triage?.priority === "urgent"
+    );
 
-    // Construction de la structure DailyBrief
-    const events: DailyBrief["events"] = [
-      ...todayConcerts.map((c) => ({
-        title: `Concert : ${c.artist} @ ${c.venue}`,
-        type: "concert" as const,
-      })),
-      ...todayReminders.map((r) => ({
-        title: r.title,
-        type: "reminder" as const,
-      })),
-    ];
+    // LeetCode
+    const leetcodeDaily = leetcodeData.exercises.length > 0
+      ? leetcodeData.exercises[0]
+      : null;
 
-    const reminders: DailyBrief["reminders"] = todayReminders.map((r) => ({
-      title: r.title,
-      dueAt: r.dueAt,
-    }));
+    // Météo du jour (via OpenWeatherMap)
+    let weather = "";
+    const apiKey = process.env.OPENWEATHERMAP_API_KEY;
+    if (apiKey) {
+      try {
+        const res = await fetch(
+          `https://api.openweathermap.org/data/2.5/weather?q=Paris&appid=${apiKey}&units=metric&lang=fr`
+        );
+        if (res.ok) {
+          const w = await res.json() as { main: { temp: number; feels_like: number }; weather: { description: string }[] };
+          weather = `${w.main.temp}°C (ressenti ${w.main.feels_like}°C), ${w.weather[0].description}`;
+        }
+      } catch {}
+    }
 
-    const emails: DailyBrief["emails"] = unreadEmails.map((e) => ({
-      from: e.from,
-      subject: e.subject,
-    }));
+    // Concert checklist si applicable
+    let concertChecklist: string[] | undefined;
+    if (todayConcerts.length > 0) {
+      try {
+        const prep = await prepareConcert(todayConcerts[0].id);
+        concertChecklist = prep.checklist;
+      } catch {}
+    }
 
-    // Construction du prompt pour l'IA
+    // Construction du prompt
     let prompt = "Résume la journée de Mattia en 3-4 phrases en français :\n";
-    if (events.length > 0) {
-      prompt += "\nÉvénements du jour :\n" + events.map((e) => `- ${e.title}`).join("\n") + "\n";
+
+    if (todayAgenda.length > 0) {
+      prompt += "\nAgenda :\n" + todayAgenda.map((e) => `- ${e.title}`).join("\n") + "\n";
     }
-    if (emails.length > 0) {
-      prompt += "\nEmails non lus :\n" + emails.map((e) => `- ${e.from} : ${e.subject}`).join("\n") + "\n";
+    if (todayConcerts.length > 0) {
+      prompt += "\nConcerts aujourd'hui :\n" + todayConcerts.map((c) => `- ${c.artist} @ ${c.venue}`).join("\n") + "\n";
     }
-    if (events.length === 0 && emails.length === 0) {
+    if (todayReminders.length > 0) {
+      prompt += "\nRappels du jour :\n" + todayReminders.map((r) => `- ${r.title} (${r.dueAt.slice(11, 16)})`).join("\n") + "\n";
+    }
+    if (urgentEmails.length > 0) {
+      prompt += "\nEmails urgents :\n" + urgentEmails.map((e) => `- ${e.from} : ${e.subject}`).join("\n") + "\n";
+    }
+    if (unreadEmails.length > 0 && urgentEmails.length === 0) {
+      prompt += `\n${unreadEmails.length} email(s) non lu(s).\n`;
+    }
+    if (leetcodeDaily) {
+      prompt += `\nDernier exercice LeetCode : ${leetcodeDaily.title} (${leetcodeDaily.difficulty})\n`;
+    }
+    if (weather) {
+      prompt += `\nMétéo du jour à Paris : ${weather}\n`;
+    }
+
+    if (todayConcerts.length === 0 && todayReminders.length === 0 && urgentEmails.length === 0) {
       prompt += "\nRien de particulier de prévu aujourd'hui.\n";
     }
 
@@ -81,8 +107,7 @@ export async function generateDailyBrief(): Promise<string | null> {
       [
         {
           role: "system",
-          content:
-            "Tu es PersonalBrain, l'assistant de Mattia. Résume sa journée en 3-4 phrases naturelles en français, sans listes. Sois utile et concis.",
+          content: "Tu es Backstage, l'assistant de Mattia. Résume sa journée en 3-4 phrases naturelles en français, sans listes. Sois utile et concis.",
         },
         { role: "user", content: prompt },
       ],
@@ -94,25 +119,29 @@ export async function generateDailyBrief(): Promise<string | null> {
     const brief: DailyBrief = {
       date: today,
       summary,
-      events,
-      reminders,
-      emails,
+      events: [
+        ...todayConcerts.map((c) => ({
+          title: `Concert : ${c.artist} @ ${c.venue}`,
+          type: "concert" as const,
+        })),
+        ...todayReminders.map((r) => ({
+          title: r.title,
+          type: "reminder" as const,
+        })),
+      ],
+      reminders: todayReminders.map((r) => ({ title: r.title, dueAt: r.dueAt })),
+      emails: unreadEmails.map((e) => ({ from: e.from, subject: e.subject })),
       generatedAt: new Date().toISOString(),
+      urgentEmails: urgentEmails.map((e) => ({ from: e.from, subject: e.subject })),
+      leetcodeDaily: leetcodeDaily ? { title: leetcodeDaily.title, difficulty: leetcodeDaily.difficulty ?? "" } : undefined,
+      weather: weather || undefined,
+      concertChecklist,
     };
 
-    // Sauvegarde persistante
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    let existing: DailyBriefsData = { briefs: [] };
-    try {
-      const raw = await fs.readFile(BRIEF_FILE, "utf-8");
-      existing = JSON.parse(raw);
-    } catch {
-      // Fichier pas encore créé
-    }
+    const existing = await readJsonSafe<DailyBriefsData>(BRIEF_FILENAME, { briefs: [] });
     existing.briefs.unshift(brief);
-    // Garder les 30 derniers jours seulement
     existing.briefs = existing.briefs.slice(0, 30);
-    await fs.writeFile(BRIEF_FILE, JSON.stringify(existing, null, 2), "utf-8");
+    await writeJsonAtomic(BRIEF_FILENAME, existing);
 
     return summary;
   } catch (err) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, useMemo } from "react";
+import { useEffect, useState, useTransition, useMemo, useRef, useCallback } from "react";
 import {
   Plus,
   ExternalLink,
@@ -14,16 +14,19 @@ import {
   X,
   Check,
   Search,
+  GripVertical,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader, EmptyState } from "@/components/layout/Chrome";
 import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 import {
   loadWatchLater,
   createWatchLaterItem,
   removeWatchLaterItem,
+  reorderWatchLater,
 } from "@/app/actions/watch-later";
 import type { WatchLaterCategory, WatchLaterItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -37,6 +40,15 @@ const categoryMeta: Record<WatchLaterCategory, { label: string; icon: typeof Pla
   other: { label: "Autres", icon: Globe, tone: "muted" },
 };
 
+const FILTER_ORDER: { id: "all" | WatchLaterCategory; label: string; icon: typeof Play }[] = [
+  { id: "all", label: "Tout", icon: Filter },
+  { id: "video", label: "Vidéos", icon: Play },
+  { id: "article", label: "Articles", icon: FileText },
+  { id: "photo", label: "Photos", icon: ImageIcon },
+  { id: "music", label: "Musique", icon: Music2 },
+  { id: "other", label: "Autres", icon: Globe },
+];
+
 type FilterId = "all" | WatchLaterCategory;
 
 export default function WatchLaterPage() {
@@ -45,29 +57,100 @@ export default function WatchLaterPage() {
   const [query, setQuery] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [, startTransition] = useTransition();
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const dragSnapshotRef = useRef<WatchLaterItem[] | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     startTransition(async () => {
       const d = await loadWatchLater();
-      setItems(d.items.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
+      setItems(d.items);
     });
   }, []);
 
   const handleCreate = (input: { url: string; title: string; description?: string; category?: WatchLaterCategory }) => {
     startTransition(async () => {
       const item = await createWatchLaterItem(input);
-      setItems((prev) => [item, ...(prev ?? [])]);
+      setItems((prev) => (prev ? [item, ...prev] : [item]));
       setShowAdd(false);
+      toast.show({ message: "Lien ajouté à À voir", tone: "success", duration: 2200 });
     });
   };
 
   const handleDelete = (id: string) => {
-    startTransition(async () => {
-      const ok = await removeWatchLaterItem(id);
-      if (ok) {
-        setItems((prev) => (prev ?? []).filter((x) => x.id !== id));
-      }
+    if (!items) return;
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    setItems((prev) => (prev ?? []).filter((x) => x.id !== id));
+    const toastId = toast.show({
+      message: `Retiré : "${item.title.slice(0, 50)}${item.title.length > 50 ? "…" : ""}"`,
+      tone: "default",
+      duration: 5000,
+      action: {
+        label: "Annuler",
+        onClick: () => {
+          setItems((prev) => (prev ? [item, ...prev] : [item]));
+          void createWatchLaterItem({
+            url: item.url,
+            title: item.title,
+            description: item.description,
+            category: item.category,
+            source: item.source,
+          }).then((restored) => {
+            setItems((prev) =>
+              prev ? prev.map((x) => (x.id === id ? restored : x)) : prev
+            );
+            toast.dismiss(toastId);
+            toast.show({ message: "Lien restauré", tone: "success", duration: 2000 });
+          });
+        },
+      },
     });
+    void removeWatchLaterItem(id);
+  };
+
+  const persistOrder = useCallback(
+    (next: WatchLaterItem[]) => {
+      setItems(next);
+      const orderedIds = next.map((i) => i.id);
+      void reorderWatchLater(orderedIds);
+    },
+    []
+  );
+
+  const handleDragStart = (id: string, currentItems: WatchLaterItem[]) => {
+    dragSnapshotRef.current = currentItems;
+    setDraggingId(id);
+  };
+
+  const handleDragOver = (e: React.DragEvent, overId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (overId !== dragOverId) setDragOverId(overId);
+  };
+
+  const handleDrop = (e: React.DragEvent, dropId: string) => {
+    e.preventDefault();
+    const dragId = draggingId;
+    setDraggingId(null);
+    setDragOverId(null);
+    if (!dragId || dragId === dropId) return;
+    const snap = dragSnapshotRef.current;
+    if (!snap) return;
+    const fromIdx = snap.findIndex((i) => i.id === dragId);
+    const toIdx = snap.findIndex((i) => i.id === dropId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const next = [...snap];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    persistOrder(next);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDragOverId(null);
+    dragSnapshotRef.current = null;
   };
 
   const filtered = useMemo(() => {
@@ -102,7 +185,7 @@ export default function WatchLaterPage() {
           <PageHeader
             eyebrow="Bookmarks IA"
             title="À voir plus tard"
-            description="Liens que tu as partagés avec l'IA ou ajoutés à la main. Filtre par catégorie, retrouve tout au même endroit."
+            description="Liens que tu as partagés avec l'IA ou ajoutés à la main. Filtre par catégorie, retrouve tout au même endroit. Glisse les cartes pour réorganiser."
             actions={
               <Button
                 variant="primary"
@@ -124,10 +207,9 @@ export default function WatchLaterPage() {
 
           <div className="flex items-center gap-3 mb-6 flex-wrap">
             <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-1)] overflow-x-auto">
-              {(["all", ...Object.keys(categoryMeta)] as FilterId[]).map((id) => {
-                const meta = id === "all" ? null : categoryMeta[id as WatchLaterCategory];
-                const Icon = meta?.icon ?? Filter;
+              {FILTER_ORDER.map(({ id, label, icon: Icon }) => {
                 const active = filter === id;
+                const count = counts[id] ?? 0;
                 return (
                   <button
                     key={id}
@@ -140,10 +222,8 @@ export default function WatchLaterPage() {
                     )}
                   >
                     <Icon className="w-3 h-3" />
-                    {id === "all" ? "Tout" : meta?.label}
-                    {counts[id] !== undefined && (
-                      <span className="text-[9px] text-[var(--text-4)] tabular-nums">{counts[id]}</span>
-                    )}
+                    {label}
+                    <span className="text-[9px] text-[var(--text-4)] tabular-nums">{count}</span>
                   </button>
                 );
               })}
@@ -161,8 +241,8 @@ export default function WatchLaterPage() {
           </div>
 
           {items === null ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {Array.from({ length: 6 }).map((_, i) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton key={i} className="h-44" />
               ))}
             </div>
@@ -181,9 +261,19 @@ export default function WatchLaterPage() {
               />
             )
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {filtered.map((item) => (
-                <ItemCard key={item.id} item={item} onDelete={() => handleDelete(item.id)} />
+                <ItemCard
+                  key={item.id}
+                  item={item}
+                  isDragging={draggingId === item.id}
+                  isDragOver={dragOverId === item.id && draggingId !== item.id}
+                  onDelete={() => handleDelete(item.id)}
+                  onDragStart={() => items && handleDragStart(item.id, items)}
+                  onDragOver={(e) => handleDragOver(e, item.id)}
+                  onDrop={(e) => handleDrop(e, item.id)}
+                  onDragEnd={handleDragEnd}
+                />
               ))}
             </div>
           )}
@@ -193,29 +283,68 @@ export default function WatchLaterPage() {
   );
 }
 
-function ItemCard({ item, onDelete }: { item: WatchLaterItem; onDelete: () => void }) {
+function ItemCard({
+  item,
+  isDragging,
+  isDragOver,
+  onDelete,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+}: {
+  item: WatchLaterItem;
+  isDragging: boolean;
+  isDragOver: boolean;
+  onDelete: () => void;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
+}) {
   const meta = categoryMeta[item.category];
   const Icon = meta.icon;
   return (
-    <article className="group relative flex flex-col rounded-2xl border border-[var(--border-1)] bg-[var(--surface-1)]/40 hover:border-[var(--border-2)] hover:bg-[var(--surface-2)]/60 transition-all duration-200 overflow-hidden">
+    <article
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      className={cn(
+        "group relative flex flex-col rounded-2xl border bg-[var(--surface-1)]/40 hover:bg-[var(--surface-2)]/60 transition-all duration-200 overflow-hidden cursor-grab active:cursor-grabbing",
+        isDragging
+          ? "opacity-40 border-[var(--accent)]/40"
+          : isDragOver
+            ? "border-[var(--accent)]/60 ring-2 ring-[var(--accent)]/20 scale-[1.01]"
+            : "border-[var(--border-1)] hover:border-[var(--border-2)]"
+      )}
+    >
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <Pill tone={meta.tone} dot>
           <Icon className="w-2.5 h-2.5" />
           {meta.label}
         </Pill>
-        <button
-          onClick={onDelete}
-          className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-4)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors opacity-0 group-hover:opacity-100"
-          title="Supprimer"
-        >
-          <Trash2 className="w-3 h-3" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={onDelete}
+            className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-4)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors opacity-0 group-hover:opacity-100"
+            title="Supprimer"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+          <span className="w-6 h-7 flex items-center justify-center text-[var(--text-4)] opacity-0 group-hover:opacity-100 transition-opacity">
+            <GripVertical className="w-3.5 h-3.5" />
+          </span>
+        </div>
       </div>
 
       <a
         href={item.url}
         target="_blank"
         rel="noopener noreferrer"
+        draggable={false}
+        onDragStart={(e) => e.preventDefault()}
         className="px-4 pb-3 flex-1 flex flex-col"
       >
         {item.thumbnail ? (
@@ -253,6 +382,8 @@ function ItemCard({ item, onDelete }: { item: WatchLaterItem; onDelete: () => vo
         href={item.url}
         target="_blank"
         rel="noopener noreferrer"
+        draggable={false}
+        onDragStart={(e) => e.preventDefault()}
         className="absolute top-3 right-12 w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] transition-colors opacity-0 group-hover:opacity-100"
         title="Ouvrir"
       >
