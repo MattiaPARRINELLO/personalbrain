@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const origin = getOrigin(request);
 
   const options = await generateRegistrationOptions({
-    rpName: "PersonalBrain",
+    rpName: "BACKSTAGE",
     rpID,
     userID: new TextEncoder().encode("owner"),
     userName: "owner",

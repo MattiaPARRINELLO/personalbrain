@@ -85,7 +85,7 @@ export function ActivityView({ entries: initial }: { entries: ActivityEntry[] })
         <PageHeader
           eyebrow="Historique"
           title="Journal d'activité"
-          description="Toutes les actions récentes dans PersonalBrain"
+          description="Toutes les actions récentes dans BACKSTAGE"
           actions={
             <button
               onClick={refresh}

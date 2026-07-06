@@ -678,7 +678,7 @@ export function CommandPalette() {
           </span>
           <span className="ml-auto text-[10px] text-[var(--text-4)] font-mono flex items-center gap-1">
             <Sparkles className="w-2.5 h-2.5 text-[var(--accent)]" />
-            PersonalBrain
+            BACKSTAGE
           </span>
         </div>
       </div>
