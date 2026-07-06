@@ -1,5 +1,5 @@
-import { promises as fs } from "fs";
 import path from "path";
+import { writeJsonAtomic, readJsonSafe } from "./storage";
 
 export interface AppConfig {
   models: {
@@ -20,7 +20,8 @@ export interface AppConfig {
   };
 }
 
-const CONFIG_PATH = path.join(process.cwd(), "data", "config.json");
+const CONFIG_FILENAME = "config.json";
+const CONFIG_PATH = path.join(process.cwd(), "data", CONFIG_FILENAME);
 
 const defaultConfig: AppConfig = {
   models: {
@@ -41,29 +42,39 @@ const defaultConfig: AppConfig = {
   },
 };
 
-let cachedConfig: AppConfig | null = null;
+const CACHE_TTL = 60_000;
+
+let cachedConfig: { data: AppConfig; ts: number } | null = null;
+
+function invalidateCache() {
+  cachedConfig = null;
+}
 
 export async function getConfig(): Promise<AppConfig> {
-  if (cachedConfig) return cachedConfig;
-
-  try {
-    const raw = await fs.readFile(CONFIG_PATH, "utf-8");
-    cachedConfig = { ...defaultConfig, ...JSON.parse(raw) };
-    return cachedConfig!;
-  } catch {
-    await fs.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
-    await fs.writeFile(CONFIG_PATH, JSON.stringify(defaultConfig, null, 2), "utf-8");
-    cachedConfig = defaultConfig;
-    return defaultConfig;
+  if (cachedConfig && Date.now() - cachedConfig.ts < CACHE_TTL) {
+    return cachedConfig.data;
   }
+
+  const parsed = await readJsonSafe<Partial<AppConfig>>(CONFIG_FILENAME, defaultConfig);
+  const merged: AppConfig = { ...defaultConfig, ...parsed };
+  cachedConfig = { data: merged, ts: Date.now() };
+  return merged;
 }
 
 export async function updateConfig(partial: Partial<AppConfig>): Promise<AppConfig> {
   const current = await getConfig();
-  const next = { ...current, ...partial };
-  await fs.writeFile(CONFIG_PATH, JSON.stringify(next, null, 2), "utf-8");
-  cachedConfig = next;
+  const next: AppConfig = { ...current, ...partial };
+  await writeJsonAtomic(CONFIG_FILENAME, next);
+  cachedConfig = { data: next, ts: Date.now() };
   return next;
+}
+
+export function getConfigCachePath(): string {
+  return CONFIG_PATH;
+}
+
+export function clearConfigCache() {
+  invalidateCache();
 }
 
 export async function getModel(context: "general" | "code"): Promise<{ primary: string; alt: string }> {
