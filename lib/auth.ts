@@ -1,7 +1,9 @@
 import { promises as fs } from "fs";
 import path from "path";
+import { writeJsonAtomic, readJsonSafe } from "./storage";
 
 const USERS_FILE = path.join(process.cwd(), "data", "users.json");
+const USERS_FILENAME = "users.json";
 
 export type PasskeyCredential = {
   id: string;
@@ -20,24 +22,24 @@ async function ensureUsersFile(): Promise<void> {
   await fs.mkdir(path.dirname(USERS_FILE), { recursive: true });
   try {
     await fs.access(USERS_FILE);
+    return;
   } catch {
-    await fs.writeFile(USERS_FILE, JSON.stringify(defaultStore, null, 2), "utf-8");
+    // Fichier absent, on l'initialise.
   }
+  await writeJsonAtomic(USERS_FILENAME, defaultStore);
 }
 
 export async function getUserStore(): Promise<UserStore> {
   await ensureUsersFile();
   try {
-    const raw = await fs.readFile(USERS_FILE, "utf-8");
-    return JSON.parse(raw) as UserStore;
+    return await readJsonSafe<UserStore>(USERS_FILENAME, defaultStore);
   } catch {
     return defaultStore;
   }
 }
 
 export async function saveUserStore(store: UserStore): Promise<void> {
-  await ensureUsersFile();
-  await fs.writeFile(USERS_FILE, JSON.stringify(store, null, 2), "utf-8");
+  await writeJsonAtomic(USERS_FILENAME, store);
 }
 
 export async function hasCredentials(): Promise<boolean> {

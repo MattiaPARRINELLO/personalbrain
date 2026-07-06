@@ -8,6 +8,7 @@ import type {
   ConcertEvent,
   LeetcodeExercise,
   MemoryFact,
+  MemoryRelationship,
   CalendarEvent,
   Email,
   Reminder,
@@ -20,6 +21,13 @@ import type {
   ActivityEntry,
   ActivityData,
   ActivityAction,
+  ChatHistory,
+  ChatSession,
+  ConcertPrep,
+  GalleryItem,
+  GalleryData,
+  GalleryStatus,
+  DailyBrief,
 } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -29,19 +37,155 @@ async function ensureDir(dir: string) {
   await fs.mkdir(dir, { recursive: true });
 }
 
-async function writeJsonAtomic<T>(filename: string, data: T): Promise<void> {
+const fileLocks = new Map<string, Promise<void>>();
+
+async function withFileLock<T>(filename: string, fn: () => Promise<T>): Promise<T> {
+  const previous = fileLocks.get(filename);
+  let release!: () => void;
+  const next = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  fileLocks.set(
+    filename,
+    previous?.then(() => next) ?? next
+  );
+
+  if (previous) {
+    try {
+      await previous;
+    } catch {
+      // La promesse précédente gère déjà ses propres erreurs ; on continue.
+    }
+  }
+
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (fileLocks.get(filename) === next) {
+      fileLocks.delete(filename);
+    }
+  }
+}
+
+const TRANSIENT_ERROR_CODES = new Set([
+  "EACCES",
+  "EAGAIN",
+  "EBUSY",
+  "ENFILE",
+  "ENOSPC",
+  "ENOTEMPTY",
+  "EPERM",
+  "ETXTBSY",
+  "EWOULDBLOCK",
+]);
+
+function isTransientError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = (err as { code?: string }).code;
+  return typeof code === "string" && TRANSIENT_ERROR_CODES.has(code);
+}
+
+async function writeJsonAtomic<T>(filename: string, data: T, retries = 3): Promise<void> {
   await ensureDir(DATA_DIR);
   const filePath = path.join(DATA_DIR, filename);
   const tmpPath = filePath + ".tmp";
-  await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), "utf-8");
-  await fs.rename(tmpPath, filePath);
+
+  await withFileLock(filename, async () => {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), "utf-8");
+        await fs.rename(tmpPath, filePath);
+        return;
+      } catch (err) {
+        lastError = err;
+        if (!isTransientError(err) || attempt === retries - 1) {
+          try {
+            await fs.unlink(tmpPath);
+          } catch {
+            // Le fichier tmp n'existe pas forcément, on ignore.
+          }
+          throw err;
+        }
+        await new Promise((r) => setTimeout(r, 50 * Math.pow(2, attempt)));
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error("writeJsonAtomic failed");
+  });
 }
+
+export { writeJsonAtomic };
 
 async function readJson<T>(filename: string): Promise<T> {
   await ensureDir(DATA_DIR);
   const filePath = path.join(DATA_DIR, filename);
   const raw = await fs.readFile(filePath, "utf-8");
   return JSON.parse(raw) as T;
+}
+
+function isValidJson(raw: string): boolean {
+  try {
+    JSON.parse(raw);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function readBackupJson<T>(filename: string): Promise<T | null> {
+  try {
+    await ensureDir(BACKUP_DIR);
+  } catch {
+    return null;
+  }
+  const prefix = `${filename}.`;
+  let entries: string[];
+  try {
+    entries = await fs.readdir(BACKUP_DIR);
+  } catch {
+    return null;
+  }
+  const candidates = entries
+    .filter((name) => name.startsWith(prefix) && name.endsWith(".bak"))
+    .sort()
+    .reverse();
+  for (const name of candidates) {
+    const backupPath = path.join(BACKUP_DIR, name);
+    try {
+      const raw = await fs.readFile(backupPath, "utf-8");
+      if (isValidJson(raw)) {
+        return JSON.parse(raw) as T;
+      }
+    } catch {
+      // Continue avec le backup suivant.
+    }
+  }
+  return null;
+}
+
+export async function readJsonSafe<T>(filename: string, fallback: T): Promise<T> {
+  const filePath = path.join(DATA_DIR, filename);
+  const tmpPath = filePath + ".tmp";
+
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    if (isValidJson(raw)) return JSON.parse(raw) as T;
+  } catch {
+    // Fichier principal absent ou illisible.
+  }
+
+  try {
+    const raw = await fs.readFile(tmpPath, "utf-8");
+    if (isValidJson(raw)) return JSON.parse(raw) as T;
+  } catch {
+    // Pas de fichier tmp.
+  }
+
+  const fromBackup = await readBackupJson<T>(filename);
+  if (fromBackup !== null) return fromBackup;
+
+  return fallback;
 }
 
 async function backupFile(filename: string): Promise<void> {
@@ -56,6 +200,50 @@ async function backupFile(filename: string): Promise<void> {
   }
 }
 
+async function rotateBackups(filename: string): Promise<void> {
+  const prefix = `${filename}.`;
+  let entries: string[];
+  try {
+    entries = await fs.readdir(BACKUP_DIR);
+  } catch {
+    return;
+  }
+
+  const backups = entries
+    .filter((name) => name.startsWith(prefix) && name.endsWith(".bak"))
+    .sort()
+    .reverse();
+
+  const now = Date.now();
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  let kept = 0;
+
+  for (const name of backups) {
+    const backupPath = path.join(BACKUP_DIR, name);
+    kept++;
+
+    if (kept > 5) {
+      try {
+        await fs.unlink(backupPath);
+      } catch {
+        // Concurrent cleanup, ignore
+      }
+      continue;
+    }
+
+    const tsStr = name.slice(prefix.length, -".bak".length);
+    try {
+      const isoStr = tsStr.replace(/-(\d{2})-(\d{2})-(\d{3})Z$/, ":$1:$2.$3Z");
+      const backupTime = new Date(isoStr).getTime();
+      if (now - backupTime > SEVEN_DAYS_MS) {
+        await fs.unlink(backupPath);
+      }
+    } catch {
+      // Timestamp illisible, on garde le backup par sécurité
+    }
+  }
+}
+
 const BACKUP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const lastBackup = new Map<string, number>();
 
@@ -65,6 +253,7 @@ async function maybeBackup(filename: string): Promise<void> {
   if (now - last > BACKUP_INTERVAL_MS) {
     lastBackup.set(filename, now);
     await backupFile(filename);
+    await rotateBackups(filename);
   }
 }
 
@@ -88,6 +277,7 @@ const defaultLeetcode: LeetcodeData = {
 };
 
 const defaultMemory: MemoryData = {
+  relationships: [],
   profile: {
     name: "Mattia",
     preferences: ["TypeScript", "React", "Next.js", "photographie de concert"],
@@ -111,8 +301,8 @@ const defaultEmails: EmailsData = {
     {
       id: "2",
       from: "Billetterie",
-      subject: "Vos billets pour Justice",
-      body: "Votre commande pour Justice a l'Olympia est confirmee. Places numerotees, rang A.",
+      subject: "Tes billets pour Justice",
+      body: "Ta commande pour Justice a l'Olympia est confirmee. Places numerotees, rang A.",
       date: new Date(Date.now() - 172800000).toISOString(),
       unread: false,
     },
@@ -144,6 +334,112 @@ export async function updateConcertEvents(events: ConcertEvent[]): Promise<void>
   await saveConcerts({ events });
 }
 
+export async function prepareConcert(concertId: string): Promise<ConcertPrep> {
+  const data = await getConcerts();
+  const concert = data.events.find((c) => c.id === concertId);
+  if (!concert) throw new Error(`Concert ${concertId} introuvable`);
+
+  const weather = await (async () => {
+    const apiKey = process.env.OPENWEATHERMAP_API_KEY;
+    if (!apiKey) return "Météo non disponible";
+    try {
+      const res = await fetch(
+        `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(concert.venue)}&appid=${apiKey}&units=metric&lang=fr`
+      );
+      if (!res.ok) return "Météo non disponible";
+      const data = await res.json() as { list: { dt_txt: string; main: { temp: number; feels_like: number }; weather: { description: string }[] }[] };
+      const concertDate = concert.date.slice(0, 10);
+      const dayForecast = data.list.find((f: { dt_txt: string }) => f.dt_txt.startsWith(concertDate));
+      if (!dayForecast) return "Météo non disponible pour cette date";
+      return `${dayForecast.main.temp}°C (ressenti ${dayForecast.main.feels_like}°C), ${dayForecast.weather[0].description}`;
+    } catch {
+      return "Météo non disponible";
+    }
+  })();
+
+  const venueInfo = await webSearch(
+    `caractéristiques salle de concert ${concert.venue} capacité fosse photo`
+  );
+
+  const checklist = [
+    `📷 Boîtier principal (vérifier batterie + carte mémoire)`,
+    `📷 Boîtier secondaire (si applicable)`,
+    `🔭 Objectif 24-70mm f/2.8 (standard concert)`,
+    `🔭 Objectif 70-200mm f/2.8 (zoom)`,
+    `🔭 Objectif grand-angle 16-35mm (si fosse)`,
+    `⚡ Batteries supplémentaires (×2 minimum)`,
+    `💾 Cartes mémoire formatées (×3 minimum)`,
+    `🎒 Sac photo adapté (vérifier poids)`,
+    `🎟️ Accréditation / Pass imprimé`,
+    `🆔 Pièce d'identité`,
+    `💧 Bouteille d'eau`,
+    `🔦 Lampe torche (si salle sombre)`,
+  ];
+
+  return {
+    weather,
+    venueInfo,
+    checklist,
+    travelTips: [
+      `Arriver 1h30 avant l'ouverture des portes`,
+      `Vérifier les restrictions (sac, flash, monopode)`,
+      `Repérer la fosse photo et les zones autorisées`,
+      `Prévoir des bouchons d'oreilles`,
+    ],
+  };
+}
+
+export async function getGallery(): Promise<GalleryData> {
+  return readOrCreate("gallery.json", { items: [] });
+}
+
+export async function saveGallery(data: GalleryData): Promise<void> {
+  await maybeBackup("gallery.json");
+  return writeJsonAtomic("gallery.json", data);
+}
+
+export async function addGalleryItem(input: {
+  concertId: string;
+  title: string;
+  totalPhotos: number;
+  deadline?: string;
+}): Promise<GalleryItem> {
+  const data = await getGallery();
+  const item: GalleryItem = {
+    id: crypto.randomUUID?.() ?? String(Date.now()),
+    concertId: input.concertId,
+    title: input.title,
+    totalPhotos: input.totalPhotos,
+    selectedPhotos: 0,
+    editedPhotos: 0,
+    status: "shooted",
+    deadline: input.deadline,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  data.items.unshift(item);
+  await saveGallery(data);
+  return item;
+}
+
+export async function updateGalleryItem(id: string, updates: Partial<Pick<GalleryItem, "status" | "selectedPhotos" | "editedPhotos" | "deliveredTo" | "totalPhotos">>): Promise<GalleryItem | null> {
+  const data = await getGallery();
+  const idx = data.items.findIndex((g) => g.id === id);
+  if (idx < 0) return null;
+  data.items[idx] = { ...data.items[idx], ...updates, updatedAt: new Date().toISOString() };
+  await saveGallery(data);
+  return data.items[idx];
+}
+
+export async function deleteGalleryItem(id: string): Promise<boolean> {
+  const data = await getGallery();
+  const before = data.items.length;
+  data.items = data.items.filter((g) => g.id !== id);
+  if (data.items.length === before) return false;
+  await saveGallery(data);
+  return true;
+}
+
 export async function getLeetcode(): Promise<LeetcodeData> {
   return readOrCreate("leetcode.json", defaultLeetcode);
 }
@@ -169,13 +465,20 @@ export async function saveMemory(data: MemoryData): Promise<void> {
   return writeJsonAtomic("memory.json", data);
 }
 
-export async function addMemoryFact(content: string, category: MemoryFact["category"]): Promise<MemoryFact> {
+export async function addMemoryFact(
+  content: string,
+  category: MemoryFact["category"],
+  options?: { source?: MemoryFact["source"]; confidence?: number }
+): Promise<MemoryFact> {
   const data = await getMemory();
   const fact: MemoryFact = {
     id: crypto.randomUUID?.() ?? String(Date.now()),
     content,
     category,
     createdAt: new Date().toISOString(),
+    source: options?.source ?? "manual",
+    confidence: options?.confidence,
+    accessCount: 0,
   };
   data.facts.push(fact);
   await saveMemory(data);
@@ -191,6 +494,29 @@ export async function updateMemoryFact(id: string, updates: Partial<Pick<MemoryF
   return data.facts[idx];
 }
 
+export async function touchMemoryFact(id: string): Promise<void> {
+  const data = await getMemory();
+  const idx = data.facts.findIndex((f) => f.id === id);
+  if (idx < 0) return;
+  data.facts[idx] = {
+    ...data.facts[idx],
+    accessCount: (data.facts[idx].accessCount ?? 0) + 1,
+    lastAccessedAt: new Date().toISOString(),
+  };
+  await saveMemory(data);
+}
+
+export async function findSimilarMemoryFacts(content: string, category: MemoryFact["category"]): Promise<MemoryFact | null> {
+  const data = await getMemory();
+  const norm = (s: string) => s.toLowerCase().trim();
+  const target = norm(content);
+  return (
+    data.facts.find(
+      (f) => f.category === category && norm(f.content) === target
+    ) ?? null
+  );
+}
+
 export async function deleteMemoryFact(id: string): Promise<boolean> {
   const data = await getMemory();
   const before = data.facts.length;
@@ -198,6 +524,46 @@ export async function deleteMemoryFact(id: string): Promise<boolean> {
   if (data.facts.length === before) return false;
   await saveMemory(data);
   return true;
+}
+
+export async function getMemoryRelationships(): Promise<MemoryRelationship[]> {
+  const data = await getMemory();
+  return data.relationships ?? [];
+}
+
+export async function addMemoryRelationship(
+  sourceId: string,
+  targetId: string,
+  type: string
+): Promise<MemoryRelationship> {
+  const data = await getMemory();
+  const rel: MemoryRelationship = {
+    sourceId,
+    targetId,
+    type,
+    createdAt: new Date().toISOString(),
+  };
+  const exists = data.relationships.some(
+    (r) => r.sourceId === sourceId && r.targetId === targetId && r.type === type
+  );
+  if (exists) return rel;
+  data.relationships.push(rel);
+  await saveMemory(data);
+  return rel;
+}
+
+export async function getRelatedFacts(factId: string): Promise<{ fact: MemoryFact; relationship: MemoryRelationship }[]> {
+  const data = await getMemory();
+  const rels = data.relationships.filter(
+    (r) => r.sourceId === factId || r.targetId === factId
+  );
+  const result: { fact: MemoryFact; relationship: MemoryRelationship }[] = [];
+  for (const rel of rels) {
+    const otherId = rel.sourceId === factId ? rel.targetId : rel.sourceId;
+    const fact = data.facts.find((f) => f.id === otherId);
+    if (fact) result.push({ fact, relationship: rel });
+  }
+  return result;
 }
 
 export async function getEmails(): Promise<EmailsData> {
@@ -269,11 +635,14 @@ export async function searchEmails(query: string): Promise<Email[]> {
 export async function webSearch(query: string): Promise<string> {
   const apiKey = process.env.SEARCHAPI_API_KEY;
   if (apiKey) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
     try {
       const res = await fetch(
         `https://www.searchapi.io/api/v1/search?engine=google&q=${encodeURIComponent(query)}&api_key=${apiKey}`,
-        { signal: AbortSignal.timeout(8000) }
+        { signal: controller.signal }
       );
+      clearTimeout(timeout);
       if (res.ok) {
         const data = await res.json();
         const results = data.organic_results ?? [];
@@ -285,16 +654,20 @@ export async function webSearch(query: string): Promise<string> {
         return `Aucun résultat web pour "${query}".`;
       }
     } catch {
+      clearTimeout(timeout);
       // Fallback à DuckDuckGo
     }
   }
 
   // Fallback : recherche DuckDuckGo (gratuite, sans clé)
+  const fallbackController = new AbortController();
+  const fallbackTimeout = setTimeout(() => fallbackController.abort(), 10_000);
   try {
     const res = await fetch(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`,
-      { signal: AbortSignal.timeout(5000) }
+      { signal: fallbackController.signal }
     );
+    clearTimeout(fallbackTimeout);
     if (res.ok) {
       const data = await res.json();
       const abstract = data.AbstractText;
@@ -310,7 +683,7 @@ export async function webSearch(query: string): Promise<string> {
       }
     }
   } catch {
-    // Silence
+    clearTimeout(fallbackTimeout);
   }
 
   return `Recherche web pour "${query}" : aucun résultat trouvé.`;
@@ -339,7 +712,7 @@ export async function fetchPageMeta(url: string): Promise<{ title: string; thumb
 
     const res = await fetch(url, {
       signal: AbortSignal.timeout(5000),
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; PersonalBrain/1.0)" },
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; BACKSTAGE/1.0)" },
     });
     if (!res.ok) return { title: `Impossible de récupérer la page (${res.status})` };
     const html = await res.text();
@@ -372,6 +745,7 @@ export async function addReminder(input: {
   title: string;
   notes?: string;
   dueAt: string;
+  recurrence?: Reminder["recurrence"];
 }): Promise<Reminder> {
   const data = await getReminders();
   const reminder: Reminder = {
@@ -381,19 +755,38 @@ export async function addReminder(input: {
     dueAt: input.dueAt,
     status: "pending",
     createdAt: new Date().toISOString(),
+    recurrence: input.recurrence,
   };
   data.reminders.unshift(reminder);
   await saveReminders(data);
   return reminder;
 }
 
-export async function updateReminder(id: string, updates: Partial<Pick<Reminder, "title" | "notes" | "dueAt" | "status" | "notifiedAt">>): Promise<Reminder | null> {
+export async function updateReminder(id: string, updates: Partial<Pick<Reminder, "title" | "notes" | "dueAt" | "status" | "notifiedAt" | "recurrence">>): Promise<Reminder | null> {
   const data = await getReminders();
   const idx = data.reminders.findIndex((r) => r.id === id);
   if (idx < 0) return null;
   data.reminders[idx] = { ...data.reminders[idx], ...updates };
   await saveReminders(data);
   return data.reminders[idx];
+}
+
+export function computeNextRecurrence(dueAt: string, recurrence: Reminder["recurrence"]): string | null {
+  if (!recurrence) return null;
+  const d = new Date(dueAt);
+  if (isNaN(d.getTime())) return null;
+  switch (recurrence) {
+    case "daily":
+      d.setDate(d.getDate() + 1);
+      break;
+    case "weekly":
+      d.setDate(d.getDate() + 7);
+      break;
+    case "monthly":
+      d.setMonth(d.getMonth() + 1);
+      break;
+  }
+  return d.toISOString();
 }
 
 export async function deleteReminder(id: string): Promise<boolean> {
@@ -456,6 +849,22 @@ export async function deleteWatchLaterItem(id: string): Promise<boolean> {
   return true;
 }
 
+export async function reorderWatchLaterItems(orderedIds: string[]): Promise<boolean> {
+  const data = await getWatchLater();
+  const byId = new Map(data.items.map((i) => [i.id, i] as const));
+  const next: typeof data.items = [];
+  for (const id of orderedIds) {
+    const found = byId.get(id);
+    if (found) next.push(found);
+  }
+  for (const i of data.items) {
+    if (!orderedIds.includes(i.id)) next.push(i);
+  }
+  data.items = next;
+  await saveWatchLater(data);
+  return true;
+}
+
 function detectSource(url: string): string {
   try {
     const host = new URL(url).hostname.replace(/^www\./, "");
@@ -487,7 +896,7 @@ export async function autoSummarize(url: string, title: string): Promise<{ summa
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(8000),
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; PersonalBrain/1.0)" },
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; BACKSTAGE/1.0)" },
     });
     if (!res.ok) return { summary: "", tags: [] };
     const html = await res.text();
@@ -631,4 +1040,37 @@ export async function searchAccreditations(query: string): Promise<Accreditation
       a.venue.toLowerCase().includes(q) ||
       (a.notes && a.notes.toLowerCase().includes(q))
   );
+}
+
+const defaultChatHistory: ChatHistory = {
+  sessions: [],
+};
+
+export async function getChatHistory(): Promise<ChatHistory> {
+  return readJsonSafe<ChatHistory>("chat-history.json", defaultChatHistory);
+}
+
+export async function saveChatHistory(data: ChatHistory): Promise<void> {
+  await writeJsonAtomic("chat-history.json", data);
+}
+
+export async function saveChatSession(session: ChatSession): Promise<void> {
+  const data = await getChatHistory();
+  const idx = data.sessions.findIndex((s) => s.id === session.id);
+  session.updatedAt = new Date().toISOString();
+  if (idx >= 0) {
+    data.sessions[idx] = session;
+  } else {
+    data.sessions.push(session);
+  }
+  await saveChatHistory(data);
+}
+
+export async function deleteChatSession(id: string): Promise<boolean> {
+  const data = await getChatHistory();
+  const before = data.sessions.length;
+  data.sessions = data.sessions.filter((s) => s.id !== id);
+  if (data.sessions.length === before) return false;
+  await saveChatHistory(data);
+  return true;
 }
