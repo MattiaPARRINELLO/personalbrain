@@ -9,7 +9,7 @@ import { AccreditationsWidget } from "@/components/widgets/AccreditationsWidget"
 import { useChatContext, type ContextTool } from "@/lib/chat-context";
 import { cn } from "@/lib/utils";
 
-type View = "all" | "calendar" | "gmail" | "leetcode" | "accreditations";
+type View = "all" | "calendar" | "gmail" | "leetcode" | "photos";
 
 const TOOL_CONTEXT_MAP: Record<string, "calendar" | "gmail" | "memory" | "reminder" | "watch" | "search"> = {
   create_calendar_event: "calendar",
@@ -117,7 +117,7 @@ export function ContextPanel() {
                 {(view === "all" || view === "calendar") && <CalendarWidget />}
                 {(view === "all" || view === "gmail") && <GmailWidget />}
                 {(view === "all" || view === "leetcode") && <LeetCodeWidget />}
-                {(view === "all" || view === "accreditations") && <AccreditationsWidget />}
+                {(view === "all" || view === "photos") && <AccreditationsWidget />}
                 {view === "all" && <UrgentRemindersWidget />}
               </>
             )}
@@ -148,7 +148,7 @@ function ViewSwitcher({ view, onChange }: { view: View; onChange: (v: View) => v
     { id: "calendar", label: "Agenda" },
     { id: "gmail", label: "Inbox" },
     { id: "leetcode", label: "Code" },
-    { id: "accreditations", label: "Accréd." },
+    { id: "photos", label: "Photos" },
   ];
   return (
     <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-1)]">

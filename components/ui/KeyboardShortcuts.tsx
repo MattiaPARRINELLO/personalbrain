@@ -8,7 +8,7 @@ const SHORTCUTS = [
   { keys: "g + c", label: "Console IA", href: "/" },
   { keys: "g + r", label: "Rappels", href: "/reminders" },
   { keys: "g + w", label: "À voir plus tard", href: "/watch-later" },
-  { keys: "g + a", label: "Accréditations", href: "/accreditations" },
+  { keys: "g + a", label: "Suivi Photos", href: "/photos" },
   { keys: "g + b", label: "Cerveau (mémoire)", href: "/brain" },
   { keys: "g + l", label: "Journal d'activité", href: "/activity" },
   { keys: "g + s", label: "Recherche unifiée", href: "/search" },
@@ -43,7 +43,7 @@ export function KeyboardShortcuts() {
             case "c": router.push("/"); break;
             case "r": router.push("/reminders"); break;
             case "w": router.push("/watch-later"); break;
-            case "a": router.push("/accreditations"); break;
+            case "a": router.push("/photos"); break;
             case "b": router.push("/brain"); break;
             case "l": router.push("/activity"); break;
             case "s": router.push("/search"); break;
