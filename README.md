@@ -72,7 +72,7 @@ Calendar, LeetCode, concerts) se répondent entre eux.
 git clone https://github.com/MattiaPARRINELLO/backstage.git
 cd backstage
 bun install
-cp .env.example .env.local   # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OPENAI_API_KEY, ANTHROPIC_API_KEY, SEARCHAPI_API_KEY
+cp .env.example .env.local   # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OPENAI_API_KEY, ANTHROPIC_API_KEY, BRAVE_SEARCH_API_KEY
 bun dev
 ```
 
@@ -86,7 +86,7 @@ L'app démarre sur [http://localhost:3000](http://localhost:3000).
 | `GOOGLE_CLIENT_SECRET` | OAuth Google                                        |
 | `OPENAI_API_KEY`       | Modèles OpenAI (chat, raisonnement)                 |
 | `ANTHROPIC_API_KEY`    | Modèles Anthropic (chat, raisonnement)              |
-| `SEARCHAPI_API_KEY`    | Recherche web Google (optionnel, fallback DDG)      |
+| `BRAVE_SEARCH_API_KEY` | Recherche web Brave (optionnel, fallback DDG)       |
 | `AUTH_SECRET`          | Session cookie signing (passkey + Google)           |
 
 ### Commandes
