@@ -23,7 +23,7 @@ export function Pill({ className, tone = "neutral", dot, children, ...rest }: Pi
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] font-mono",
+        "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] font-mono whitespace-nowrap",
         toneClasses[tone],
         className
       )}
