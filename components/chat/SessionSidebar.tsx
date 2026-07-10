@@ -129,10 +129,10 @@ export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession 
             className="w-[100px] h-[100px] object-contain drop-shadow-[0_0_12px_rgba(165,180,252,0.18)] transition-all duration-500 ease-out group-hover/logo:drop-shadow-[0_0_20px_rgba(165,180,252,0.30)] group-hover/logo:translate-y-[-3px]"
           />
         </div>
-        <h1 className="mt-2 text-[13px] font-semibold tracking-[0.25em] uppercase text-[var(--text-1)]">
+        <h1 className="mt-2 text-[13px] font-black tracking-[0.25em] uppercase text-[var(--text-1)] font-mono">
           BACKSTAGE
         </h1>
-        <p className="mt-0.5 text-[10px] text-[var(--text-2)] tracking-wide">
+        <p className="mt-0.5 text-[10px] text-[var(--text-2)] tracking-wide font-mono">
           Ton espace de contrôle personnel.
         </p>
       </div>
@@ -175,9 +175,12 @@ export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession 
                 </h3>
                 <div className="space-y-0.5">
                   {groupSessions.map((s) => (
-                    <button
+                    <div
                       key={s.id}
                       onClick={() => handleSelect(s.id)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleSelect(s.id); }}
+                      role="button"
+                      tabIndex={0}
                       className={cn(
                         "w-full text-left px-2.5 py-2 rounded-lg group transition-colors duration-150",
                         s.id === activeSessionId
@@ -188,7 +191,7 @@ export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession 
                       <div className="flex items-center gap-2">
                         <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", getDotColor(s.context))} />
                         <div className="min-w-0 flex-1">
-                          <p className="text-[12px] text-[var(--text-2)] truncate leading-tight">
+                          <p className="text-[12px] text-[var(--text-2)] truncate leading-tight font-mono">
                             {s.title}
                           </p>
                           <p className="text-[10px] text-[var(--text-4)] font-mono mt-0.5">
@@ -203,7 +206,7 @@ export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession 
                           <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>

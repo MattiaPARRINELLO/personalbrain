@@ -5,7 +5,7 @@ import {
   type UnifiedTool,
   type StreamEvent,
 } from "@/lib/ai-providers";
-import { getMemory, webSearch, addReminder, addWatchLaterItem, fetchPageMeta, getConcerts, getAccreditations, getReminders, getCalendar, addMemoryRelationship, getMemoryRelationships, addAccreditation, searchAccreditations, autoSummarize, saveAccreditations, prepareConcert } from "@/lib/storage";
+import { getMemory, webSearch, addReminder, addWatchLaterItem, fetchPageMeta, getConcerts, getAccreditations, getReminders, getCalendar, addMemoryRelationship, getMemoryRelationships, addAccreditation, searchAccreditations, autoSummarize, saveAccreditations, prepareConcert, getWeather, getPhotoShoots, addPhotoShoot, updatePhotoShoot } from "@/lib/storage";
 import { fetchGmailMessages, sendGmailReply, createGoogleCalendarEvent, fetchGoogleCalendarEvents } from "@/lib/google-actions";
 import { getModel } from "@/lib/config";
 import type { ChatMessage, MemoryCategory, Accreditation } from "@/lib/types";
@@ -196,6 +196,54 @@ const tools: UnifiedTool[] = [
       required: ["concertId"],
     },
   },
+  {
+    name: "get_weather",
+    description: "Recupere la meteo actuelle d'une ville (temperature, ressenti, humidite, vent). Exemple : 'get_weather Paris'.",
+    parameters: {
+      type: "object",
+      properties: {
+        city: { type: "string", description: "Nom de la ville" },
+      },
+      required: ["city"],
+    },
+  },
+  {
+    name: "add_photo_shoot",
+    description: "Ajoute un nouveau shooting photo au suivi. Statuts possibles: upcoming (à venir), done (fait), on_pc (sur PC), sorted (trié), edited (retouché), exported (exporté), sent (envoyé).",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Titre du shooting (ex: 'Concert Mariane')" },
+        date: { type: "string", description: "Date du shooting au format YYYY-MM-DD" },
+        client: { type: "string", description: "Nom du client/artiste" },
+        notes: { type: "string", description: "Notes optionnelles" },
+      },
+      required: ["title", "date", "client"],
+    },
+  },
+  {
+    name: "update_photo_shoot",
+    description: "Met a jour le statut ou les infos d'un shooting photo. Utilise 'list_photo_shoots' d'abord pour trouver l'ID.",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "ID du shooting" },
+        status: { type: "string", enum: ["upcoming", "done", "on_pc", "sorted", "edited", "exported", "sent"], description: "Nouveau statut" },
+        galleryLink: { type: "string", description: "Lien galerie (quand status='sent')" },
+        photosSent: { type: "number", description: "Nombre de photos envoyees (quand status='sent')" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "list_photo_shoots",
+    description: "Liste tous les shootings photo avec leur statut, date et client.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
 ];
 
 async function buildSystemPrompt(context: "general" | "code"): Promise<string> {
@@ -243,16 +291,16 @@ ${factsBlock || "- Aucun fait memorise"}`;
     }
   } catch {}
 
-  // Accreditations en attente
-  let accreditationsBlock = "";
+  // Shooting photos en cours
+  let photoBlock = "";
   try {
-    const accreditations = await getAccreditations();
-    const pending = accreditations.accreditations.filter(
-      (a: Accreditation) => a.status === "pending" || a.status === "sent"
+    const shoots = await getPhotoShoots();
+    const active = shoots.shoots.filter(
+      (s) => s.status !== "sent"
     );
-    if (pending.length > 0) {
-      accreditationsBlock = "\nAccreditations en attente :\n" + pending.map(
-        (a: Accreditation) => `- ${a.artist} @ ${a.venue} (${a.concertDate}) [${a.status}]`
+    if (active.length > 0) {
+      photoBlock = "\nShooting photos en cours :\n" + active.map(
+        (s) => `- ${s.title} (${s.client}) [${s.status}]`
       ).join("\n");
     }
   } catch {}
@@ -286,7 +334,7 @@ ${factsBlock || "- Aucun fait memorise"}`;
     }
   } catch {}
 
-  return `${base}\n\n${memoryBlock}\n\nAujourd'hui nous sommes le ${dateStr}, il est ${timeStr}.${eventsBlock}${accreditationsBlock}${remindersBlock}${briefBlock}\n\nTu as acces a ces outils : ${toolList}. Utilise-les quand c'est pertinent.\n\nSi l'utilisateur partage un lien, utilise d'abord fetch_page_meta puis add_watch_later.\n\nNote : utilise scan_accreditations pour analyser les emails et mettre à jour les accreditations automatiquement.\n${codeBlock}`.trim();
+  return `${base}\n\n${memoryBlock}\n\nAujourd'hui nous sommes le ${dateStr}, il est ${timeStr}.${eventsBlock}${photoBlock}${remindersBlock}${briefBlock}\n\nTu as acces a ces outils : ${toolList}. Utilise-les quand c'est pertinent.\n\nSi l'utilisateur partage un lien, utilise d'abord fetch_page_meta puis add_watch_later.\n${codeBlock}`.trim();
 }
 
 async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
@@ -481,6 +529,38 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
         return `Erreur : ${err instanceof Error ? err.message : String(err)}`;
       }
     }
+    case "get_weather": {
+      const city = String(args.city ?? "").trim();
+      if (!city) return "Erreur : ville requise.";
+      return await getWeather(city);
+    }
+    case "add_photo_shoot": {
+      const title = String(args.title ?? "").trim();
+      const date = String(args.date ?? "").trim();
+      const client = String(args.client ?? "").trim();
+      const notes = String(args.notes ?? "").trim() || undefined;
+      if (!title || !date || !client) return "Erreur : titre, date et client requis.";
+      const shoot = await addPhotoShoot({ title, date, client, notes });
+      return `Shooting ajouté : ${shoot.title} (${shoot.client}) le ${new Date(shoot.date).toLocaleDateString("fr-FR")} [${shoot.status}]`;
+    }
+    case "update_photo_shoot": {
+      const id = String(args.id ?? "").trim();
+      if (!id) return "Erreur : ID requis.";
+      const updates: Record<string, unknown> = {};
+      if (args.status) updates.status = args.status;
+      if (args.galleryLink) updates.galleryLink = String(args.galleryLink);
+      if (args.photosSent !== undefined) updates.photosSent = Number(args.photosSent);
+      const updated = await updatePhotoShoot(id, updates as Parameters<typeof updatePhotoShoot>[1]);
+      if (!updated) return "Shooting introuvable.";
+      return `Shooting mis à jour : ${updated.title} → ${updated.status}${updated.galleryLink ? ` (galerie: ${updated.galleryLink})` : ""}${updated.photosSent ? ` (${updated.photosSent} photos)` : ""}`;
+    }
+    case "list_photo_shoots": {
+      const data = await getPhotoShoots();
+      if (data.shoots.length === 0) return "Aucun shooting photo enregistré.";
+      return data.shoots.map((s) =>
+        `- ${s.title} (${s.client}) le ${new Date(s.date).toLocaleDateString("fr-FR")} [${s.status}]${s.galleryLink ? ` - ${s.galleryLink}` : ""}${s.photosSent ? ` - ${s.photosSent} photos` : ""}`
+      ).join("\n");
+    }
     default:
       return `Outil inconnu : ${name}`;
   }
@@ -539,13 +619,18 @@ Faits a extraire :`;
 
 async function runMemoryExtraction(
   model: string,
-  originalMessages: ChatMessage[]
+  originalMessages: ChatMessage[],
+  send?: (data: StreamEvent) => void,
+  newAssistantContent?: string
 ): Promise<void> {
   try {
     const transcript = originalMessages
       .filter((m) => m.role === "user" || m.role === "assistant")
       .filter((m) => typeof m.content === "string" && m.content.length > 0)
       .map((m) => ({ role: m.role as "user" | "assistant", content: m.content as string }));
+    if (newAssistantContent && newAssistantContent.length > 0) {
+      transcript.push({ role: "assistant", content: newAssistantContent });
+    }
     if (transcript.length < 2) return;
     const lastUser = [...transcript].reverse().find((m) => m.role === "user");
     if (!lastUser || lastUser.content.length < 12) return;
@@ -555,6 +640,7 @@ async function runMemoryExtraction(
     const facts = await extractMemoryFacts(model, transcript);
     if (facts.length > 0) {
       await autoExtractMemoryFacts({ facts });
+      send?.({ type: "memory_facts", facts });
     }
   } catch (err) {
     console.error("Memory extraction error:", err);
@@ -631,6 +717,7 @@ export async function POST(request: NextRequest) {
               name: event.name,
               arguments: event.arguments,
             });
+            send(event);
             continue;
           }
 
@@ -695,6 +782,8 @@ export async function POST(request: NextRequest) {
         return true;
       }
 
+      let lastAssistantContent = "";
+
       try {
         for (let i = 0; i < maxIterations; i++) {
           const useFallback = i > 0;
@@ -702,17 +791,22 @@ export async function POST(request: NextRequest) {
 
           try {
             const shouldContinue = await runModel(currentModel);
+            const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
+            if (lastAssistantMsg && typeof lastAssistantMsg.content === "string") {
+              lastAssistantContent = lastAssistantMsg.content;
+            }
             if (!shouldContinue) {
-              void runMemoryExtraction(modelName, body.messages);
+              void runMemoryExtraction(modelName, body.messages, send, lastAssistantContent);
               return;
             }
-          } catch {
+          } catch (err) {
+            console.error(`[chat] runModel(${currentModel}) failed:`, err instanceof Error ? err.message : String(err));
             if (useFallback || currentModel === altModel) throw new Error(`Le modèle ${currentModel} a échoué après fallback`);
             continue;
           }
         }
 
-        void runMemoryExtraction(modelName, body.messages);
+        void runMemoryExtraction(modelName, body.messages, send, lastAssistantContent);
         send({ type: "done", content: "" });
         controller.close();
       } catch (error) {
