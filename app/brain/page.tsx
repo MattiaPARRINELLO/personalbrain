@@ -489,7 +489,7 @@ function EditFactForm({
           ))}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <Button variant="ghost" size="sm" onClick={onCancel} leftIcon={<X className="w-3 h-3" />}>
+          <Button variant="ghost" size="sm" onClick={onCancel} leftIcon={<X className="w-3.5 h-3.5" />}>
             Annuler
           </Button>
           <Button
@@ -497,7 +497,7 @@ function EditFactForm({
             size="sm"
             onClick={() => onSave(fact.id, content, category)}
             disabled={!content.trim()}
-            leftIcon={<Check className="w-3 h-3" />}
+            leftIcon={<Check className="w-3.5 h-3.5" />}
           >
             Sauver
           </Button>
@@ -556,7 +556,7 @@ function AddFactForm({
             size="sm"
             onClick={() => onSubmit(content, category)}
             disabled={!content.trim()}
-            leftIcon={<Plus className="w-3 h-3" />}
+            leftIcon={<Plus className="w-3.5 h-3.5" />}
           >
             Mémoriser
           </Button>
