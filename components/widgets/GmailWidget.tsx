@@ -46,7 +46,7 @@ export function GmailWidget() {
           rel="noopener noreferrer"
           className="text-[var(--text-3)] hover:text-[var(--accent)] transition-colors"
         >
-          <ArrowUpRight className="w-4 h-4" />
+          <ArrowUpRight className="w-3.5 h-3.5" />
         </a>
       </CardHeader>
       <CardBody className="p-2">

@@ -461,7 +461,7 @@ function AddItemForm({
         </div>
       </div>
       <div className="flex items-center justify-end gap-1.5 mt-3">
-        <Button variant="ghost" size="sm" onClick={onCancel} leftIcon={<X className="w-3 h-3" />}>
+        <Button variant="ghost" size="sm" onClick={onCancel} leftIcon={<X className="w-3.5 h-3.5" />}>
           Annuler
         </Button>
         <Button
@@ -469,7 +469,7 @@ function AddItemForm({
           size="sm"
           onClick={handleSubmit}
           disabled={!url.trim() || !title.trim()}
-          leftIcon={<Check className="w-3 h-3" />}
+          leftIcon={<Check className="w-3.5 h-3.5" />}
         >
           Ajouter
         </Button>

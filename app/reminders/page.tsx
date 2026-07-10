@@ -208,9 +208,9 @@ export default function RemindersPage() {
           <PageHeader
             eyebrow="Notifications natives"
             title="Rappels"
-            description="Liste ce que tu dois faire. Active les notifications de bureau pour recevoir une vraie alerte système quand un rappel arrive à échéance."
+            description="Liste ce que tu dois faire."
             actions={
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <PermissionPill permission={permission} onRequest={handleRequestPermission} />
                 <Button
                   variant="primary"
@@ -341,7 +341,7 @@ function PermissionPill({
     return (
       <Pill tone="success" dot>
         <BellRing className="w-3 h-3" />
-        Notifications actives
+        <span className="hidden sm:inline">Notifications actives</span>
       </Pill>
     );
   }
@@ -349,14 +349,14 @@ function PermissionPill({
     return (
       <Pill tone="danger" dot>
         <BellOff className="w-3 h-3" />
-        Refusées
+        <span className="hidden sm:inline">Refusées</span>
       </Pill>
     );
   }
   if (permission === "unsupported") return null;
   return (
-    <Button variant="outline" size="md" onClick={onRequest} leftIcon={<Bell className="w-3.5 h-3.5" />}>
-      Activer les notifications
+    <Button variant="outline" size="sm" onClick={onRequest} leftIcon={<Bell className="w-3.5 h-3.5" />}>
+      <span className="hidden sm:inline">Activer</span>
     </Button>
   );
 }
@@ -413,7 +413,7 @@ function ReminderRow({
             <Clock className="w-2.5 h-2.5 mr-0.5" />
             {overdue ? "En retard" : formatRelative(reminder.dueAt)}
           </Pill>
-          <span className="text-[10px] text-[var(--text-4)] font-mono">
+          <span className="text-[10px] text-[var(--text-4)] font-mono hidden sm:inline">
             {new Date(reminder.dueAt).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
           </span>
           {reminder.recurrence && (
@@ -424,7 +424,7 @@ function ReminderRow({
           )}
         </div>
       </div>
-      <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="shrink-0 flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <button
           onClick={onEdit}
           className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] transition-colors"
@@ -532,7 +532,7 @@ function ReminderForm({
         </div>
       </div>
       <div className="flex items-center justify-end gap-1.5 mt-3">
-        <Button variant="ghost" size="sm" onClick={onCancel} leftIcon={<X className="w-3 h-3" />}>
+        <Button variant="ghost" size="sm" onClick={onCancel} leftIcon={<X className="w-3.5 h-3.5" />}>
           Annuler
         </Button>
         <Button
@@ -540,7 +540,7 @@ function ReminderForm({
           size="sm"
           onClick={() => onSubmit({ title, notes: notes || undefined, dueAt: fromLocalInputValue(dueAt), recurrence })}
           disabled={!title.trim() || !dueAt}
-          leftIcon={<Check className="w-3 h-3" />}
+          leftIcon={<Check className="w-3.5 h-3.5" />}
         >
           {initial ? "Sauver" : "Créer"}
         </Button>
