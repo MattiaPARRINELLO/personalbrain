@@ -2,11 +2,17 @@ const CACHE = "backstage-v1";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
+  "/backstage-logo-simple.png",
   "/icons/icon-192.svg",
   "/icons/icon-512.svg",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/apple-touch-icon.png",
 ];
 const REMINDER_CHECK_INTERVAL = 60000;
 const DAILY_BRIEF_HOUR = 7;
+
+const shownReminders = new Set();
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -20,11 +26,18 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
     ).then(() => {
+      resetDailyBriefFlag();
       startReminderPolling();
       scheduleDailyBrief();
     })
   );
   self.clients.claim();
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 function scheduleDailyBrief() {
@@ -43,16 +56,38 @@ function scheduleDailyBrief() {
   }, msUntilTarget);
 }
 
+let dailyBriefFiredToday = false;
+
+function resetDailyBriefFlag() {
+  const now = new Date();
+  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+  setTimeout(() => {
+    dailyBriefFiredToday = false;
+    resetDailyBriefFlag();
+  }, nextMidnight.getTime() - now.getTime());
+}
+
 async function triggerDailyBrief() {
+  if (dailyBriefFiredToday) return;
   try {
     const res = await fetch("/api/daily-brief", { method: "POST" });
     if (res.ok) {
       const data = await res.json();
       if (data?.brief) {
+        dailyBriefFiredToday = true;
         const clientsList = await self.clients.matchAll({ type: "window" });
         for (const client of clientsList) {
           client.postMessage({ type: "daily-brief", brief: data.brief });
         }
+        self.registration.showNotification("Brief du jour", {
+          body: data.brief.slice(0, 120) + (data.brief.length > 120 ? "…" : ""),
+          icon: "/icons/icon-192.png",
+          badge: "/icons/icon-192.png",
+          tag: "daily-brief",
+          data: { type: "daily-brief", url: "/notif/daily-brief" },
+          vibrate: [100, 50, 100],
+          requireInteraction: false,
+        });
       }
     }
   } catch (err) {
@@ -60,26 +95,30 @@ async function triggerDailyBrief() {
   }
 }
 
-async function startReminderPolling() {
-  setInterval(async () => {
+let reminderInterval = null;
+
+function startReminderPolling() {
+  if (reminderInterval) return;
+  getPendingReminders();
+  reminderInterval = setInterval(async () => {
     try {
       const reminders = await getPendingReminders();
       for (const r of reminders) {
-        if (new Date(r.dueAt).getTime() <= Date.now()) {
-          self.registration.showNotification(r.title, {
-            body: r.notes || "C'est l'heure !",
-            icon: "/icons/icon-192.svg",
-            badge: "/icons/icon-192.svg",
-            tag: `reminder-${r.id}`,
-            data: { reminderId: r.id, url: "/reminders", recurrence: r.recurrence },
-            requireInteraction: true,
-            actions: [
-              { action: "done", title: "✓ Fait" },
-              { action: "snooze", title: "⏰ +15 min" },
-            ],
-            vibrate: [200, 100, 200],
-          });
-        }
+        if (shownReminders.has(r.id)) continue;
+        shownReminders.add(r.id);
+        self.registration.showNotification(r.title, {
+          body: r.description || "Rappel",
+          icon: "/icons/icon-192.png",
+          badge: "/icons/icon-192.png",
+          tag: "reminder-" + r.id,
+          data: { type: "reminder", reminderId: r.id, url: r.link || "/reminders", recurrence: r.recurrence },
+          requireInteraction: true,
+          actions: [
+            { action: "done", title: "✓ Fait" },
+            { action: "snooze", title: "⏰ +15 min" },
+          ],
+          vibrate: [200, 100, 200],
+        });
       }
     } catch (err) {
       console.error("[SW] Reminder check failed:", err);
@@ -113,7 +152,23 @@ async function getPendingReminders() {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const { reminderId, url, recurrence } = event.notification.data;
+  const { reminderId, url, recurrence, type } = event.notification.data;
+
+  if (type === "daily-brief") {
+    event.waitUntil(
+      clients.matchAll({ type: "window" }).then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.includes("/notif/daily-brief") && "focus" in client) {
+            return client.focus();
+          }
+        }
+        if (clients.openWindow) {
+          return clients.openWindow(url || "/notif/daily-brief");
+        }
+      })
+    );
+    return;
+  }
 
   if (event.action === "done") {
     fetch(`/api/reminders/${reminderId}/done`, { method: "POST" }).then(() => {
@@ -124,15 +179,16 @@ self.addEventListener("notificationclick", (event) => {
   } else if (event.action === "snooze") {
     fetch(`/api/reminders/${reminderId}/snooze`, { method: "POST" });
   } else {
+    const targetUrl = reminderId ? `/notif/reminder/${reminderId}` : (url || "/reminders");
     event.waitUntil(
       clients.matchAll({ type: "window" }).then((clientList) => {
         for (const client of clientList) {
-          if (client.url.includes(url || "/reminders") && "focus" in client) {
+          if (client.url.includes(targetUrl) && "focus" in client) {
             return client.focus();
           }
         }
         if (clients.openWindow) {
-          return clients.openWindow(url || "/reminders");
+          return clients.openWindow(targetUrl);
         }
       })
     );
@@ -152,7 +208,7 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE).then((cache) => cache.put(event.request, clone));
           return res;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/")))
     );
     return;
   }
