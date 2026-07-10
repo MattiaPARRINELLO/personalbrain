@@ -8,7 +8,7 @@ import { ChatProvider } from "@/lib/chat-context";
 
 export function ChatLayout() {
   const [activeSessionId, setActiveSessionId] = useState<string>("");
-  const [sessionKey, setSessionKey] = useState(0);
+  const [resetSignal, setResetSignal] = useState(0);
 
   const handleSelectSession = useCallback(
     (session: {
@@ -31,14 +31,13 @@ export function ChatLayout() {
       }[];
     }) => {
       setActiveSessionId(session.id);
-      setSessionKey((k) => k + 1);
     },
     []
   );
 
   const handleNewSession = useCallback(() => {
     setActiveSessionId("");
-    setSessionKey((k) => k + 1);
+    setResetSignal((k) => k + 1);
   }, []);
 
   return (
@@ -51,8 +50,8 @@ export function ChatLayout() {
         />
         <div className="flex-1 min-w-0 flex flex-col h-full min-h-0">
           <ChatView
-            key={sessionKey}
             sessionId={activeSessionId}
+            resetSignal={resetSignal}
             onSessionChange={setActiveSessionId}
           />
         </div>

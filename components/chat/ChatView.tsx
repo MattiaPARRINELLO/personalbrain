@@ -1,9 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import {
-  Send,
   Sparkles,
   Globe,
   Mail,
@@ -12,19 +11,17 @@ import {
   Brain,
   Bookmark,
   Bell,
-  Square,
   Copy,
   Check,
   ChevronDown,
   ChevronUp,
-  AtSign,
-  Plus,
 } from "lucide-react";
 import { api, type ChatStreamEvent } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/ui/Markdown";
-import { VoiceInput } from "@/components/chat/VoiceInput";
+import { ChatComposer } from "@/components/chat/ChatComposer";
 import { useChatContext } from "@/lib/chat-context";
+import { useToast } from "@/components/ui/Toast";
 
 type Role = "user" | "assistant";
 
@@ -141,20 +138,19 @@ function generateTitle(text: string): string {
 }
 
 function formatTime(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return "";
-  }
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
 interface ChatViewProps {
   sessionId?: string;
+  resetSignal?: number;
   onSessionChange?: (sessionId: string) => void;
 }
 
-export function ChatView({ sessionId: externalSessionId, onSessionChange }: ChatViewProps = {}) {
+export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSessionChange }: ChatViewProps = {}) {
   const [messages, setMessages] = useState<Message[]>(() =>
     typeof window !== "undefined"
       ? [welcomeMessage]
@@ -165,10 +161,12 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
   const [error, setError] = useState<string | null>(null);
   const [thinkingIndex, setThinkingIndex] = useState(0);
   const chatCtx = useChatContext();
+  const toast = useToast();
   const activeToolsRef = useRef<Record<string, ToolCall>>({});
   const [, forceRender] = useState(0);
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingActive, setStreamingActive] = useState(false);
+  const streamingActiveRef = useRef(false);
   const [sessionId, setSessionId] = useState<string>("");
   const [sessionTitle, setSessionTitle] = useState<string>("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -178,32 +176,68 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasTitleRef = useRef(false);
+  const prevExternalSessionIdRef = useRef<string>("");
+
+  function restoreMessages(raw: { id: string; role: "user" | "assistant"; content: string; timestamp: string; toolCalls?: { id: string; name: string; arguments?: string; result?: string; status?: string; duration?: number; resultCount?: number }[] }[]): Message[] {
+    const restored: Message[] = raw.map((m) => ({
+      ...m,
+      toolCalls: m.toolCalls?.map((tc) => ({
+        ...tc,
+        status: (tc.status as ToolCall["status"]) || "success",
+      })),
+    }));
+    return restored.length > 0 ? restored : [welcomeMessage];
+  }
 
   useEffect(() => {
-    if (externalSessionId) return;
-    import("@/app/actions/chat-history").then(({ getChatHistory }) => {
-      getChatHistory().then((history) => {
-        const sessions = history.sessions;
-        if (sessions.length > 0) {
-          const last = sessions[sessions.length - 1];
-          setSessionId(last.id);
-          setSessionTitle(last.title || "");
-          hasTitleRef.current = true;
-          const restored: Message[] = last.messages.map((m) => ({
-            ...m,
-            toolCalls: m.toolCalls?.map((tc) => ({
-              ...tc,
-              status: (tc.status as ToolCall["status"]) || "success",
-            })),
-          }));
-          setMessages(restored.length > 0 ? restored : [welcomeMessage]);
-        } else {
-          const newId = generateId();
-          setSessionId(newId);
-        }
+    if (externalSessionId && externalSessionId !== prevExternalSessionIdRef.current) {
+      prevExternalSessionIdRef.current = externalSessionId;
+      import("@/app/actions/chat-history").then(({ getChatHistory }) => {
+        getChatHistory().then((history) => {
+          const session = history.sessions.find((s) => s.id === externalSessionId);
+          if (session) {
+            setSessionId(session.id);
+            setSessionTitle(session.title || "");
+            hasTitleRef.current = true;
+            setMessages(restoreMessages(session.messages));
+            setInput("");
+            setStreamingContent("");
+            setStreamingActive(false);
+            setLoading(false);
+            setError(null);
+            activeToolsRef.current = {};
+            chatCtx.clearActiveTools();
+          }
+        });
       });
-    });
+    }
   }, [externalSessionId]);
+
+  useEffect(() => {
+    const newId = generateId();
+    setSessionId(newId);
+  }, []);
+
+  useEffect(() => {
+    if (resetSignal === 0) return;
+    const newId = generateId();
+    setSessionId(newId);
+    setSessionTitle("");
+    hasTitleRef.current = false;
+    setMessages([welcomeMessage]);
+    setInput("");
+    setStreamingContent("");
+    setStreamingActive(false);
+    setLoading(false);
+    setError(null);
+    activeToolsRef.current = {};
+    chatCtx.clearActiveTools();
+    if (abortRef.current) {
+      abortRef.current();
+      abortRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetSignal]);
 
   const saveSession = useCallback(() => {
     if (!sessionId) return;
@@ -253,9 +287,21 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
     }
   }, [loading, streamingActive]);
 
+  const prevMessagesLenRef = useRef(messages.length);
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    const len = messages.length;
+    const isNewMessage = len > prevMessagesLenRef.current;
+    prevMessagesLenRef.current = len;
+    if (isNewMessage) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    } else {
+      const threshold = 60;
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+      if (isNearBottom) {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      }
     }
   }, [messages, streamingContent]);
 
@@ -275,6 +321,7 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
         const title = generateTitle(trimmed);
         setSessionTitle(title);
         hasTitleRef.current = true;
+        prevExternalSessionIdRef.current = sessionId;
         if (onSessionChange && sessionId) onSessionChange(sessionId);
       }
 
@@ -306,9 +353,11 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
             if (event.type === "delta") {
               buffer += event.content;
               setStreamingContent(buffer);
-              setStreamingActive(true);
+              if (!streamingActiveRef.current) {
+                streamingActiveRef.current = true;
+                setStreamingActive(true);
+              }
             } else if (event.type === "tool_start") {
-              setStreamingActive(false);
               activeToolsRef.current = {
                 ...activeToolsRef.current,
                 [event.toolCallId]: {
@@ -318,12 +367,10 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
                   status: "running",
                 },
               };
-              chatCtx.registerToolStart({
-                id: event.toolCallId,
-                name: event.name,
-                arguments: event.arguments,
-              });
-              forceRender((n) => n + 1);
+              chatCtx.registerToolStart({ id: event.toolCallId, name: event.name, arguments: event.arguments });
+              if (!streamingActiveRef.current) {
+                forceRender((n) => n + 1);
+              }
             } else if (event.type === "tool_result") {
               const toolEnd = Date.now();
               const key = Object.keys(activeToolsRef.current).find(
@@ -352,36 +399,59 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
               forceRender((n) => n + 1);
             } else if (event.type === "error") {
               setError(event.message);
-            } else if (event.type === "done") {
-              if (buffer) {
-                const toolCalls = Object.values(activeToolsRef.current).filter(
-                  (t) => t.status === "success" || t.status === "error"
-                ) as ToolCall[];
-                setMessages((prev) => {
-                  const last = prev[prev.length - 1];
-                  if (last && last.role === "assistant") {
-                    return [
-                      ...prev.slice(0, -1),
-                      { ...last, content: buffer, toolCalls: toolCalls.length > 0 ? toolCalls : undefined },
-                    ];
-                  }
-                  return [
-                    ...prev,
-                    {
-                      id: generateId(),
-                      role: "assistant",
-                      content: buffer,
-                      timestamp: new Date().toISOString(),
-                      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-                    },
-                  ];
+            } else if (event.type === "memory_facts") {
+              const count = event.facts.length;
+              if (count > 0) {
+                toast.show({
+                  message: `🧠 ${count} fait${count > 1 ? "s" : ""} mémorisé${count > 1 ? "s" : ""}`,
+                  tone: "info",
+                  duration: 3000,
                 });
-                activeToolsRef.current = {};
               }
+            } else if (event.type === "done") {
+              const content = buffer || event.content || "";
+              const toolCalls = Object.values(activeToolsRef.current).filter(
+                (t) => t.status === "success" || t.status === "error"
+              ) as ToolCall[];
+              setMessages((prev) => {
+                const last = prev[prev.length - 1];
+                if (last && last.role === "assistant") {
+                  return [
+                    ...prev.slice(0, -1),
+                    { ...last, content, toolCalls: toolCalls.length > 0 ? toolCalls : undefined },
+                  ];
+                }
+                return [
+                  ...prev,
+                  {
+                    id: generateId(),
+                    role: "assistant",
+                    content,
+                    timestamp: new Date().toISOString(),
+                    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+                  },
+                ];
+              });
+              activeToolsRef.current = {};
               buffer = "";
               setStreamingContent("");
+              streamingActiveRef.current = false;
               setStreamingActive(false);
               setLoading(false);
+
+              if (hasTitleRef.current) {
+                const firstUserMsg = messages.find((m) => m.role === "user");
+                if (firstUserMsg && firstUserMsg.content) {
+                  import("@/app/actions/chat-history").then(({ generateConversationTitle }) => {
+                    const fullText = firstUserMsg.content + "\n" + content;
+                    generateConversationTitle(fullText).then((aiTitle) => {
+                      if (aiTitle && aiTitle.length > 3) {
+                        setSessionTitle(aiTitle);
+                      }
+                    });
+                  });
+                }
+              }
             }
           },
           abortRef.current ? undefined : undefined
@@ -392,6 +462,7 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
         }
       } finally {
         setLoading(false);
+        streamingActiveRef.current = false;
         setStreamingActive(false);
         setStreamingContent("");
       }
@@ -405,6 +476,7 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
       abortRef.current = null;
     }
     setLoading(false);
+    streamingActiveRef.current = false;
     setStreamingActive(false);
   }, []);
 
@@ -475,10 +547,10 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
           />
         </div>
         </div>
-        <h1 className="text-4xl sm:text-5xl font-semibold tracking-[0.15em] uppercase text-[var(--text-1)] mb-2">
+        <h1 className="text-5xl sm:text-6xl font-black tracking-[0.12em] uppercase text-[var(--text-1)] mb-2 font-mono">
           BACKSTAGE
         </h1>
-        <p className="text-[13px] sm:text-[14px] text-[var(--text-2)] max-w-md leading-relaxed mb-8 font-sans">
+        <p className="text-[13px] sm:text-[14px] text-[var(--text-2)] max-w-md leading-relaxed mb-8 font-mono tracking-wide">
           Ton espace de contrôle personnel.
         </p>
         <div className="grid grid-cols-2 gap-2 max-w-lg w-full">
@@ -498,13 +570,32 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
     );
   }
 
+  function containsEmailContent(text: string) {
+    return /@\w+\.\w+/.test(text) || /\b(email|mail|e-?mail|courriel|envoyer|écrire)\b/i.test(text);
+  }
+
+  function containsCalendarContent(text: string) {
+    return /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})\b/.test(text)
+      || /\b(calend(?:er|ar|rier|rier)|agenda|rendez-?vous|meeting|réunion|event|rdv|séance|séminaire)\b/i.test(text)
+      || /\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\b/i.test(text);
+  }
+
+  function containsReminderContent(text: string) {
+    return /\b(rappel?|remind|todo|à faire|tâche|task|noter|mémoriser|pense à|n'oublie)\b/i.test(text);
+  }
+
   function ActionChips({ message }: { message: Message }) {
     const isAssistant = message.role === "assistant" && message.id !== "welcome";
     if (!isAssistant || !message.content) return null;
 
+    const content = message.content;
+    const showMail = containsEmailContent(content);
+    const showCalendar = containsCalendarContent(content);
+    const showReminder = containsReminderContent(content);
+
     const handleCopy = async () => {
       try {
-        await navigator.clipboard.writeText(message.content);
+        await navigator.clipboard.writeText(content);
         setCopiedId(message.id);
         setTimeout(() => setCopiedId(null), 2000);
       } catch {
@@ -512,30 +603,33 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
       }
     };
 
+    const btn =
+      "inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--border-2)] hover:text-[var(--text-2)] transition-colors duration-200";
+
     return (
       <div className="mt-2 flex flex-wrap gap-1.5 fade-in-action-chips">
-        <button
-          onClick={handleCopy}
-          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--border-2)] hover:text-[var(--text-2)] transition-colors duration-200"
-        >
+        <button onClick={handleCopy} className={btn}>
           {copiedId === message.id ? <Check className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
           {copiedId === message.id ? "Copié" : "Copier"}
         </button>
-        <a
-          href={`mailto:?body=${encodeURIComponent(message.content)}`}
-          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--border-2)] hover:text-[var(--text-2)] transition-colors duration-200"
-        >
-          <Mail className="w-2.5 h-2.5" />
-          Voir le mail
-        </a>
-        <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--accent-warm)]/40 hover:text-[var(--accent-warm)] transition-colors duration-200">
-          <CalendarPlus className="w-2.5 h-2.5" />
-          Ajouter au calendrier
-        </button>
-        <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--border-2)] hover:text-[var(--text-2)] transition-colors duration-200">
-          <Bell className="w-2.5 h-2.5" />
-          Créer un rappel
-        </button>
+        {showMail && (
+          <a href={`mailto:?body=${encodeURIComponent(content)}`} className={btn}>
+            <Mail className="w-2.5 h-2.5" />
+            Voir le mail
+          </a>
+        )}
+        {showCalendar && (
+          <button className={`${btn} hover:border-[var(--accent-warm)]/40 hover:text-[var(--accent-warm)]`}>
+            <CalendarPlus className="w-2.5 h-2.5" />
+            Ajouter au calendrier
+          </button>
+        )}
+        {showReminder && (
+          <button className={btn}>
+            <Bell className="w-2.5 h-2.5" />
+            Créer un rappel
+          </button>
+        )}
       </div>
     );
   }
@@ -583,14 +677,14 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
               · {formatTime(message.timestamp)}
             </span>
           </div>
-          <div className={cn(
+            <div className={cn(
             "text-[14px] leading-relaxed",
             isUser ? "text-[var(--text-1)]" : "text-[var(--text-1)]"
           )}>
             <Markdown>{message.content}</Markdown>
           </div>
           {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
-            <div className="mt-2 space-y-1.5">
+            <div className="mt-2 space-y-1.5 fade-in-up">
               {message.toolCalls.map((tc) => (
                 <ToolCallResult key={tc.id} tool={tc} />
               ))}
@@ -703,158 +797,7 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
     );
   }
 
-  function Composer({
-    value,
-    onChange,
-    onSubmit,
-    onStop,
-    loading: isLoading,
-    inputRef: ref,
-    onKey,
-  }: {
-    value: string;
-    onChange: (v: string) => void;
-    onSubmit: () => void;
-    onStop: () => void;
-    loading: boolean;
-    inputRef: React.RefObject<HTMLTextAreaElement | null>;
-    onKey: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  }) {
-    const [dragOver, setDragOver] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [showMentionMenu, setShowMentionMenu] = useState(false);
-
-    const handleDragOver = (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(true);
-    };
-    const handleDragLeave = () => setDragOver(false);
-    const handleDrop = (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      const files = e.dataTransfer.files;
-      if (files.length > 0) {
-        onChange(value + ` [Fichier: ${files[0].name}]`);
-      }
-    };
-
-    const insertMention = (mention: string) => {
-      onChange(value + mention + " ");
-      setShowMentionMenu(false);
-      ref.current?.focus();
-    };
-
-    const handleFileUpload = () => {
-      fileInputRef.current?.click();
-    };
-
-    return (
-      <div className="relative group animate-input-glow rounded-2xl">
-        <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-[var(--accent)]/0 via-[var(--accent)]/30 to-[var(--accent)]/0 opacity-0 group-focus-within:opacity-100 transition-opacity duration-500 blur" />
-        <div
-          className={cn(
-            "relative flex items-end gap-2 p-2 rounded-2xl bg-[var(--surface-2)]/80 border transition-colors duration-200 backdrop-blur",
-            dragOver
-              ? "border-[var(--accent-cool)] bg-[var(--accent-cool)]/5"
-              : "border-[var(--border-2)] focus-within:border-[var(--accent)]/50"
-          )}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <div className="relative">
-            <button
-              onClick={() => setShowMentionMenu(!showMentionMenu)}
-              className="shrink-0 w-8 h-8 rounded-lg border border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-[var(--border-2)] flex items-center justify-center transition-colors duration-200"
-              title="Mentionner un module (@gmail, @calendar, @memory)"
-            >
-              <AtSign className="w-3.5 h-3.5" />
-            </button>
-            {showMentionMenu && (
-              <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--border-2)] bg-[var(--surface-1)] shadow-lg shadow-black/40 p-1 z-50">
-                {[
-                  { label: "@gmail", desc: "Rechercher dans les mails" },
-                  { label: "@calendar", desc: "Consulter le calendrier" },
-                  { label: "@memory", desc: "Interroger la mémoire" },
-                ].map((m) => (
-                  <button
-                    key={m.label}
-                    onClick={() => insertMention(m.label)}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-[var(--surface-2)] transition-colors duration-150"
-                  >
-                    <span className="text-[13px] text-[var(--accent-cool)] font-mono">{m.label}</span>
-                    <span className="block text-[11px] text-[var(--text-4)]">{m.desc}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <VoiceInput
-            onResult={(text) => onChange(value + text)}
-            disabled={isLoading}
-          />
-          <button
-            onClick={handleFileUpload}
-            className="shrink-0 w-8 h-8 rounded-lg border border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-[var(--border-2)] flex items-center justify-center transition-colors duration-200"
-            title="Uploader un fichier"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onChange(value + ` [Fichier: ${file.name}]`);
-              e.target.value = "";
-            }}
-          />
-
-          <textarea
-            ref={ref}
-            value={value}
-            onChange={(e) => {
-              onChange(e.target.value);
-              const el = e.target;
-              el.style.height = "auto";
-              el.style.height = Math.min(el.scrollHeight, 200) + "px";
-            }}
-            onKeyDown={onKey}
-            placeholder="Ctrl+Enter pour envoyer, Shift+Enter nouvelle ligne…"
-            rows={1}
-            className="flex-1 bg-transparent text-[14px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none resize-none font-sans px-3 py-2 max-h-[200px]"
-          />
-          {isLoading ? (
-            <button
-              onClick={onStop}
-              className="shrink-0 w-9 h-9 rounded-xl bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] flex items-center justify-center hover:bg-[var(--danger)]/15 transition-colors"
-              title="Arrêter"
-            >
-              <Square className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            <button
-              onClick={onSubmit}
-              disabled={!value.trim()}
-              className="shrink-0 w-9 h-9 rounded-xl bg-[var(--accent)] text-[#0a0a0b] flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Envoyer (Ctrl+Enter)"
-            >
-              <Send className="w-3.5 h-3.5" strokeWidth={2} />
-            </button>
-          )}
-        </div>
-        {dragOver && (
-          <div className="absolute inset-0 rounded-2xl flex items-center justify-center bg-[var(--surface-2)]/90 border-2 border-dashed border-[var(--accent-cool)] z-10">
-            <span className="text-[12px] font-mono text-[var(--accent-cool)]">
-              Déposer le fichier
-            </span>
-          </div>
-        )}
-      </div>
-    );
-  }
+  const MessageBlockMemo = useMemo(() => memo(MessageBlock), []);
 
   return (
     <div className="flex flex-col h-full min-h-0 relative">
@@ -865,10 +808,10 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
           ) : (
             <div className="space-y-6 chat-stagger">
               {messages.map((m) => (
-                <MessageBlock key={m.id} message={m} />
+                <MessageBlockMemo key={m.id} message={m} />
               ))}
               {streamingActive && streamingContent && (
-                <div className="flex justify-start">
+                <div key="streaming" className="flex justify-start scale-in">
                   <div className="relative max-w-[85%] rounded-lg p-3.5 bg-[var(--surface-1)] border-l-2 border-[var(--accent-cool)]">
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)] shrink-0" />
@@ -881,14 +824,17 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
                   </div>
                 </div>
               )}
-              {loading && !streamingActive && activeToolsList(activeToolsRef.current).length > 0 && (
-                <div className="pl-9">
-                  <ToolCallTray tools={activeToolsList(activeToolsRef.current)} />
+              {loading && !streamingActive && (activeToolsList(activeToolsRef.current).length > 0 ? (
+                <div key="loading-tools" className="fade-in-up">
+                  <div className="pl-9">
+                    <ToolCallTray tools={activeToolsList(activeToolsRef.current)} />
+                  </div>
                 </div>
-              )}
-              {loading && !streamingActive && activeToolsList(activeToolsRef.current).length === 0 && (
-                <ThinkingIndicator index={thinkingIndex} />
-              )}
+              ) : (
+                <div key="loading-thinking" className="fade-in-up">
+                  <ThinkingIndicator index={thinkingIndex} />
+                </div>
+              ))}
             </div>
           )}
 
@@ -903,7 +849,7 @@ export function ChatView({ sessionId: externalSessionId, onSessionChange }: Chat
 
       <div className="shrink-0 border-t border-[var(--border-1)] bg-gradient-to-t from-[var(--background)] via-[var(--background)]/95 to-transparent backdrop-blur">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
-          <Composer
+          <ChatComposer
             value={input}
             onChange={setInput}
             onSubmit={() => void send(input)}
