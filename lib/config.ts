@@ -6,6 +6,7 @@ export interface AppConfig {
     general: string;
     generalAlt: string;
     code: string;
+    titleModel: string;
   };
   llm: {
     temperature: number;
@@ -25,9 +26,10 @@ const CONFIG_PATH = path.join(process.cwd(), "data", CONFIG_FILENAME);
 
 const defaultConfig: AppConfig = {
   models: {
-    general: "deepseek-v4-pro",
+    general: "deepseek-v4-flash",
     generalAlt: "kimi-k2.6",
     code: "kimi-k2.7-code",
+    titleModel: "deepseek-v4-flash",
   },
   llm: {
     temperature: 0.7,
