@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState, useCallback } from "react";
 
 type BeforeInstallPromptEvent = Event & {
@@ -11,6 +12,9 @@ export function PwaLoader() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [updateWaiting, setUpdateWaiting] = useState<ServiceWorker | null>(null);
   const [installed, setInstalled] = useState(false);
+  const [dismissed, setDismissed] = useState(() =>
+    typeof window !== "undefined" && localStorage.getItem("pwa-install-dismissed") === "true"
+  );
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
@@ -62,8 +66,9 @@ export function PwaLoader() {
 
   return (
     <>
-      {installPrompt && !installed && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[90] px-4 py-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--surface)] text-[11px] font-mono text-[var(--accent)] flex items-center gap-3 animate-slide-up">
+      {installPrompt && !installed && !dismissed && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[90] px-4 py-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--surface-2)] text-[11px] font-mono text-[var(--accent)] flex items-center gap-3 animate-slide-up">
+          <Image src="/backstage-logo-simple.png" alt="" width={20} height={20} className="w-5 h-5 object-contain" />
           <span>Installer BACKSTAGE</span>
           <button
             onClick={handleInstall}
@@ -72,7 +77,10 @@ export function PwaLoader() {
             Installer
           </button>
           <button
-            onClick={() => setInstallPrompt(null)}
+            onClick={() => {
+              localStorage.setItem("pwa-install-dismissed", "true");
+              setDismissed(true);
+            }}
             className="opacity-50 hover:opacity-100 transition-opacity"
           >
             ✕
