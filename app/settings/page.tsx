@@ -8,7 +8,10 @@ import {
   Check,
   Globe,
   Smartphone,
+  Code2,
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { setLeetcodeUsername, loadLeetcode } from "@/app/actions/leetcode";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/Chrome";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
@@ -29,6 +32,29 @@ export default function SettingsPage() {
     fetchGoogleStatus,
     { ttl: 60 * 1000 }
   );
+
+  const [leetUsername, setLeetUsername] = useState("");
+  const [leetSaving, setLeetSaving] = useState(false);
+  const [leetMsg, setLeetMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    loadLeetcode().then((d) => {
+      if (d.leetcodeUsername) setLeetUsername(d.leetcodeUsername);
+    }).catch(() => {});
+  }, []);
+
+  const handleLeetSave = async () => {
+    setLeetSaving(true);
+    setLeetMsg(null);
+    try {
+      await setLeetcodeUsername(leetUsername);
+      setLeetMsg({ ok: true, text: "Synchronisé avec LeetCode ✓" });
+    } catch (e) {
+      setLeetMsg({ ok: false, text: e instanceof Error ? e.message : "Erreur" });
+    } finally {
+      setLeetSaving(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -149,6 +175,41 @@ export default function SettingsPage() {
                     </a>
                   </div>
                 </div>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="LeetCode"
+                subtitle="Ton pseudo pour synchroniser les stats automatiquement"
+                action={<Code2 className="w-4 h-4 text-[var(--text-3)]" />}
+              />
+              <CardBody>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={leetUsername}
+                    onChange={(e) => setLeetUsername(e.target.value)}
+                    placeholder="ton-pseudo-leetcode"
+                    className="flex-1 px-3 py-1.5 text-[13px] rounded-md border border-[var(--border-1)] bg-[var(--surface-2)] text-[var(--text-1)] placeholder:text-[var(--text-4)] outline-none focus:border-[var(--accent)] transition-colors"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleLeetSave}
+                    disabled={leetSaving || !leetUsername.trim()}
+                  >
+                    {leetSaving ? "..." : "Sauvegarder"}
+                  </Button>
+                </div>
+                {leetMsg && (
+                  <p
+                    className={`mt-2 text-[11px] ${
+                      leetMsg.ok ? "text-[var(--success)]" : "text-[var(--danger)]"
+                    }`}
+                  >
+                    {leetMsg.text}
+                  </p>
+                )}
               </CardBody>
             </Card>
 
