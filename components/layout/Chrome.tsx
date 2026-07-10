@@ -164,18 +164,18 @@ function GoogleStatusDot({
 
 export function MobileTopBar() {
   return (
-    <div className="lg:hidden flex items-center justify-between h-14 px-4 border-b border-[var(--border-1)] bg-[var(--surface-1)]/60 backdrop-blur">
+    <div className="lg:hidden flex items-center justify-between h-12 px-3 border-b border-[var(--border-1)] bg-[var(--surface-1)]">
       <div className="flex items-center gap-2">
-        <div className="w-7 h-7 rounded-md border border-[var(--border-2)] flex items-center justify-center bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)] overflow-hidden">
+        <div className="w-6 h-6 rounded-md border border-[var(--border-2)] flex items-center justify-center bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)] overflow-hidden">
           <Image
             src="/backstage-logo-simple.png"
             alt="BACKSTAGE"
-            width={28}
-            height={28}
-            className="w-5 h-5 object-contain"
+            width={24}
+            height={24}
+            className="w-4 h-4 object-contain"
           />
         </div>
-        <span className="text-[12px] font-semibold tracking-wide text-[var(--text-1)]">BACKSTAGE</span>
+        <span className="text-[11px] font-semibold tracking-wide text-[var(--text-1)]">BACKSTAGE</span>
       </div>
       <GoogleMobileStatus />
     </div>
@@ -189,32 +189,45 @@ function GoogleMobileStatus() {
     { ttl: 60 * 1000 }
   );
   if (!status) return null;
+  const linked = [status.gmail && "Gmail", status.calendar && "Calendrier"].filter(Boolean);
   return (
-    <div className="flex items-center gap-1.5">
-      <a
-        href="/api/auth/google?type=gmail"
-        className={cn(
-          "w-7 h-7 rounded-md flex items-center justify-center border transition-colors",
-          status.gmail
-            ? "border-[var(--success)]/30 text-[var(--success)]"
-            : "border-[var(--border-2)] text-[var(--text-3)]"
-        )}
-        title={status.gmail ? "Gmail lié" : "Lier Gmail"}
-      >
-        {status.gmail ? <Check className="w-3.5 h-3.5" /> : <Mail className="w-3.5 h-3.5" />}
-      </a>
-      <a
-        href="/api/auth/google?type=calendar"
-        className={cn(
-          "w-7 h-7 rounded-md flex items-center justify-center border transition-colors",
-          status.calendar
-            ? "border-[var(--success)]/30 text-[var(--success)]"
-            : "border-[var(--border-2)] text-[var(--text-3)]"
-        )}
-        title={status.calendar ? "Calendrier lié" : "Lier Calendrier"}
-      >
-        {status.calendar ? <Check className="w-3.5 h-3.5" /> : <CalendarRange className="w-3.5 h-3.5" />}
-      </a>
+    <div className="flex items-center gap-1">
+      {status.gmail && status.calendar ? (
+        <a
+          href="/api/auth/google?type=gmail"
+          className="w-7 h-7 rounded-md flex items-center justify-center border border-[var(--success)]/30 text-[var(--success)]"
+          title="Gmail + Calendrier liés"
+        >
+          <Check className="w-3.5 h-3.5" />
+        </a>
+      ) : (
+        <>
+          <a
+            href="/api/auth/google?type=gmail"
+            className={cn(
+              "w-7 h-7 rounded-md flex items-center justify-center border transition-colors",
+              status.gmail
+                ? "border-[var(--success)]/30 text-[var(--success)]"
+                : "border-[var(--border-2)] text-[var(--text-3)]"
+            )}
+            title={status.gmail ? "Gmail lié" : "Lier Gmail"}
+          >
+            {status.gmail ? <Check className="w-3.5 h-3.5" /> : <Mail className="w-3.5 h-3.5" />}
+          </a>
+          <a
+            href="/api/auth/google?type=calendar"
+            className={cn(
+              "w-7 h-7 rounded-md flex items-center justify-center border transition-colors",
+              status.calendar
+                ? "border-[var(--success)]/30 text-[var(--success)]"
+                : "border-[var(--border-2)] text-[var(--text-3)]"
+            )}
+            title={status.calendar ? "Calendrier lié" : "Lier Calendrier"}
+          >
+            {status.calendar ? <Check className="w-3.5 h-3.5" /> : <CalendarRange className="w-3.5 h-3.5" />}
+          </a>
+        </>
+      )}
     </div>
   );
 }
@@ -258,7 +271,7 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 mb-8 pb-6 border-b border-[var(--border-1)]">
+    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 mb-8 pb-6 border-b border-[var(--border-1)]">
       <div className="min-w-0">
         {eyebrow && (
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)] font-mono mb-2">
@@ -269,7 +282,7 @@ export function PageHeader({
           {title}
         </h1>
         {description && (
-          <p className="text-[14px] text-[var(--text-2)] mt-2 max-w-2xl text-balance leading-relaxed">
+          <p className="text-[14px] text-[var(--text-2)] mt-2 max-w-2xl leading-relaxed">
             {description}
           </p>
         )}
