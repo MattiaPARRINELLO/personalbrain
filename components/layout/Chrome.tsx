@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import {
   Brain,
   MessageSquareText,
@@ -14,7 +14,7 @@ import {
   CalendarRange,
   Check,
   X as XIcon,
-  ShieldCheck,
+  Camera,
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,10 +33,9 @@ const navItems: NavItem[] = [
   { href: "/brain", label: "Cerveau", icon: Brain },
   { href: "/reminders", label: "Rappels", icon: Bell },
   { href: "/watch-later", label: "À voir", icon: Bookmark },
-  { href: "/accreditations", label: "Accréd.", icon: ShieldCheck },
+  { href: "/photos", label: "Photos", icon: Camera },
   { href: "/calendar", label: "Calendrier", icon: CalendarRange },
   { href: "/gmail", label: "Gmail", icon: Mail },
-  { href: "/settings", label: "Paramètres", icon: Settings },
 ];
 
 const mobileNavItems: NavItem[] = navItems.slice(0, 5);
@@ -50,18 +49,6 @@ async function fetchGoogleStatus(): Promise<GoogleLinkStatus> {
 export function LeftNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { data: status } = useCachedFetch<GoogleLinkStatus>(
-    GOOGLE_STATUS_KEY,
-    fetchGoogleStatus,
-    { ttl: 60 * 1000 }
-  );
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      void refreshCache(GOOGLE_STATUS_KEY, fetchGoogleStatus);
-    }, 60_000);
-    return () => clearInterval(id);
-  }, []);
 
   const handleLogout = async () => {
     try {
@@ -75,16 +62,13 @@ export function LeftNav() {
   return (
     <aside className="hidden lg:flex flex-col w-[68px] shrink-0 h-full border-r border-[var(--border-1)] bg-[var(--surface-1)]/40" style={{ viewTransitionName: "sidebar" }}>
       <div className="flex items-center justify-center h-16 border-b border-[var(--border-1)]">
-        <div className="relative w-9 h-9 rounded-lg border border-[var(--border-2)] flex items-center justify-center bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)] overflow-hidden">
-          <Image
-            src="/backstage-logo.png"
-            alt="BACKSTAGE"
-            width={36}
-            height={36}
-            className="w-7 h-7 object-contain"
-          />
-          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--accent)] breathe" />
-        </div>
+        <Image
+          src="/backstage-logo-simple.png"
+          alt="BACKSTAGE"
+          width={40}
+          height={40}
+          className="w-10 h-10 object-contain"
+        />
       </div>
 
       <nav className="flex-1 flex flex-col items-center gap-1 py-4">
@@ -118,17 +102,18 @@ export function LeftNav() {
       </nav>
 
       <div className="flex flex-col items-center gap-2 py-4 border-t border-[var(--border-1)]">
-        <GoogleStatusDot
-          service="gmail"
-          connected={status?.gmail ?? null}
-          label="Gmail"
-        />
-        <GoogleStatusDot
-          service="calendar"
-          connected={status?.calendar ?? null}
-          label="Calendrier"
-        />
-        <div className="my-1 w-6 h-px bg-[var(--border-1)]" />
+        <Link
+          href="/settings"
+          title="Paramètres"
+          className={cn(
+            "w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200",
+            pathname === "/settings"
+              ? "text-[var(--accent)]"
+              : "text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)]"
+          )}
+        >
+          <Settings className="w-4 h-4" />
+        </Link>
         <button
           onClick={handleLogout}
           title="Déconnexion"
@@ -183,7 +168,7 @@ export function MobileTopBar() {
       <div className="flex items-center gap-2">
         <div className="w-7 h-7 rounded-md border border-[var(--border-2)] flex items-center justify-center bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)] overflow-hidden">
           <Image
-            src="/backstage-logo.png"
+            src="/backstage-logo-simple.png"
             alt="BACKSTAGE"
             width={28}
             height={28}

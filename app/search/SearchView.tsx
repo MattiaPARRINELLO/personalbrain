@@ -173,7 +173,7 @@ function getHref(item: SearchItem, type: string): string {
     case "emails": return "/";
     case "reminders": return "/reminders";
     case "watchLater": return "/watch-later";
-    case "accreditations": return "/accreditations";
+    case "accreditations": return "/photos";
     default: return "/";
   }
 }

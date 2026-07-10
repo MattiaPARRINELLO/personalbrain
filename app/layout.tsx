@@ -43,7 +43,12 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#a5b4fc" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <link rel="apple-touch-icon" href="/icons/icon-512.svg" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="application-name" content="BACKSTAGE" />
+        <link rel="icon" type="image/png" href="/backstage-logo-simple.png" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="mask-icon" href="/icons/icon-192.svg" color="#a5b4fc" />
       </head>
       <body className="min-h-full relative font-sans">
         <PwaLoader />
