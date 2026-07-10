@@ -88,6 +88,14 @@ export const api = {
         credentials: "same-origin",
         signal,
       });
+      if (!res.ok) {
+        let msg = `Erreur ${res.status}`;
+        try {
+          const body = await res.json();
+          if (body?.error) msg = body.error;
+        } catch {}
+        throw new Error(msg);
+      }
       if (!res.body) throw new Error("Reponse vide du serveur");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -119,5 +127,6 @@ export type ChatStreamEvent =
   | { type: "delta"; content: string }
   | { type: "tool_start"; toolCallId: string; name: string; arguments: string }
   | { type: "tool_result"; name: string; result: string }
+  | { type: "memory_facts"; facts: { content: string; category: string; confidence: number }[] }
   | { type: "done"; content: string }
   | { type: "error"; message: string };
