@@ -68,7 +68,7 @@ const welcomeMessage: Message = {
   id: "welcome",
   role: "assistant",
   content:
-    "Bonjour Mattia. Je suis ton second cerveau — code, photo, organisation, mémoire longue durée. Pose-moi une question, partage un lien, ou demande-moi de mémoriser quelque chose.",
+    "Bonjour Mattia. Je suis ton second cerveau — code, photo, organisation, mémoire longue durée. Pose-moi une question ou partage un lien.",
   timestamp: new Date().toISOString(),
 };
 
@@ -318,6 +318,11 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
       };
 
       if (!hasTitleRef.current) {
+        import("@/app/actions/chat-history").then(({ generateConversationTitle }) => {
+          generateConversationTitle(trimmed).then((title) => {
+            setSessionTitle(title);
+          });
+        });
         const title = generateTitle(trimmed);
         setSessionTitle(title);
         hasTitleRef.current = true;
@@ -512,26 +517,26 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
   function Hero({ onPrompt, disabled }: { onPrompt: (p: string) => void; disabled: boolean }) {
     return (
       <div className="flex flex-col items-center text-center">
-        <div className="-mx-6 -mt-10 sm:-mx-8 sm:-mt-16 relative flex items-center justify-center">
+        <div className="-mx-6 sm:-mx-8 -mt-6 sm:-mt-16 relative flex items-center justify-center">
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-[400px] h-[400px] sm:w-[500px] sm:h-[500px] rounded-full bg-[var(--accent)]/8 blur-[100px] animate-breathe" />
+            <div className="w-[200px] h-[200px] sm:w-[500px] sm:h-[500px] rounded-full bg-[var(--accent)]/8 blur-[60px] sm:blur-[100px] animate-breathe" />
           </div>
 
-          {/* Outer ring */}
-          <div className="absolute w-[340px] h-[340px] sm:w-[420px] sm:h-[420px] animate-orbit-ring pointer-events-none">
+          {/* Outer ring — hidden on mobile */}
+          <div className="hidden sm:block absolute w-[420px] h-[420px] animate-orbit-ring pointer-events-none">
             <div className="absolute inset-0 rounded-full border border-[var(--accent)]/15" />
             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[var(--accent)] shadow-[0_0_8px_rgba(165,180,252,0.6)]" />
             <div className="absolute bottom-[15%] right-[10%] w-1.5 h-1.5 rounded-full bg-[var(--accent)]/40" />
           </div>
 
-          {/* Middle ring */}
-          <div className="absolute w-[260px] h-[260px] sm:w-[320px] sm:h-[320px] animate-orbit-ring-reverse pointer-events-none">
+          {/* Middle ring — hidden on mobile */}
+          <div className="hidden sm:block absolute w-[320px] h-[320px] animate-orbit-ring-reverse pointer-events-none">
             <div className="absolute inset-0 rounded-full border border-[var(--accent-cool)]/15" />
             <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)] shadow-[0_0_6px_rgba(122,162,247,0.5)]" />
           </div>
 
-          {/* Inner ring */}
-          <div className="absolute w-[180px] h-[180px] sm:w-[220px] sm:h-[220px] animate-orbit-ring-slow pointer-events-none">
+          {/* Inner ring — hidden on mobile */}
+          <div className="hidden sm:block absolute w-[220px] h-[220px] animate-orbit-ring-slow pointer-events-none">
             <div className="absolute inset-0 rounded-full border border-[var(--accent-warm)]/15" />
             <div className="absolute top-[10%] left-[20%] w-1 h-1 rounded-full bg-[var(--accent-warm)] shadow-[0_0_6px_rgba(212,163,115,0.5)]" />
           </div>
@@ -543,17 +548,17 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
             width={500}
             height={500}
             priority
-            className="w-full max-w-[450px] sm:max-w-[500px] h-auto object-contain drop-shadow-[0_0_40px_rgba(165,180,252,0.35)]"
+            className="w-full max-w-[140px] sm:max-w-[500px] h-auto object-contain drop-shadow-[0_0_20px_rgba(165,180,252,0.25)] sm:drop-shadow-[0_0_40px_rgba(165,180,252,0.35)]"
           />
         </div>
         </div>
-        <h1 className="text-5xl sm:text-6xl font-black tracking-[0.12em] uppercase text-[var(--text-1)] mb-2 font-mono">
+        <h1 className="text-xl sm:text-6xl font-black tracking-[0.12em] uppercase text-[var(--text-1)] mb-1 sm:mb-2 font-mono">
           BACKSTAGE
         </h1>
-        <p className="text-[13px] sm:text-[14px] text-[var(--text-2)] max-w-md leading-relaxed mb-8 font-mono tracking-wide">
+        <p className="text-[11px] sm:text-[14px] text-[var(--text-2)] max-w-md leading-relaxed mb-4 sm:mb-8 font-mono tracking-wide">
           Ton espace de contrôle personnel.
         </p>
-        <div className="grid grid-cols-2 gap-2 max-w-lg w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full">
           {SUGGESTIONS.map((s) => (
             <button
               key={s.label}
@@ -609,24 +614,24 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
     return (
       <div className="mt-2 flex flex-wrap gap-1.5 fade-in-action-chips">
         <button onClick={handleCopy} className={btn}>
-          {copiedId === message.id ? <Check className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
+          {copiedId === message.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
           {copiedId === message.id ? "Copié" : "Copier"}
         </button>
         {showMail && (
           <a href={`mailto:?body=${encodeURIComponent(content)}`} className={btn}>
-            <Mail className="w-2.5 h-2.5" />
+            <Mail className="w-3 h-3" />
             Voir le mail
           </a>
         )}
         {showCalendar && (
           <button className={`${btn} hover:border-[var(--accent-warm)]/40 hover:text-[var(--accent-warm)]`}>
-            <CalendarPlus className="w-2.5 h-2.5" />
+            <CalendarPlus className="w-3 h-3" />
             Ajouter au calendrier
           </button>
         )}
         {showReminder && (
           <button className={btn}>
-            <Bell className="w-2.5 h-2.5" />
+            <Bell className="w-3 h-3" />
             Créer un rappel
           </button>
         )}
@@ -858,7 +863,7 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
             inputRef={inputRef}
             onKey={handleKey}
           />
-          <p className="text-[10px] text-[var(--text-4)] mt-2.5 text-center font-mono tracking-wide">
+          <p className="hidden sm:block text-[10px] text-[var(--text-4)] mt-2.5 text-center font-mono tracking-wide">
             Ctrl+Enter envoi · Shift+Enter nouvelle ligne · ↑ éditer · Ctrl+L effacer · Esc arrêter
           </p>
         </div>

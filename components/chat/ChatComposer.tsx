@@ -126,7 +126,7 @@ export function ChatComposer({
             el.style.height = Math.min(el.scrollHeight, 200) + "px";
           }}
           onKeyDown={onKey}
-          placeholder="Ctrl+Enter pour envoyer, Shift+Enter nouvelle ligne…"
+          placeholder="Envoyer un message…"
           rows={1}
           className="flex-1 bg-transparent text-[14px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none resize-none font-sans px-3 py-2 max-h-[200px]"
         />
