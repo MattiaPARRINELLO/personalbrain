@@ -1,5 +1,17 @@
 import { NextResponse } from "next/server";
 
+export async function GET() {
+  try {
+    const { readJsonSafe } = await import("@/lib/storage");
+    const data = await readJsonSafe<{ briefs: unknown[] }>("daily-briefs.json", { briefs: [] });
+    const brief = data.briefs[0] ?? null;
+    return NextResponse.json({ brief });
+  } catch (err) {
+    console.error("[daily-brief GET]", err);
+    return NextResponse.json({ brief: null });
+  }
+}
+
 export async function POST() {
   try {
     const { generateDailyBrief } = await import("@/lib/daily-brief");
