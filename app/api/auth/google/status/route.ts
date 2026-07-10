@@ -7,7 +7,9 @@ const GOOGLE_STATUS_TTL_MS = 60 * 1000;
 
 export async function GET() {
   try {
-    const cached = getServerCached<{ gmail: boolean; calendar: boolean }>(GOOGLE_STATUS_CACHE_KEY);
+    const cached = getServerCached<{ gmail: boolean; calendar: boolean }>(
+      GOOGLE_STATUS_CACHE_KEY,
+    );
     if (cached) {
       return NextResponse.json(cached);
     }
@@ -22,6 +24,9 @@ export async function GET() {
     return NextResponse.json(response);
   } catch (err) {
     console.error("Google status error:", err);
-    return NextResponse.json({ gmail: false, calendar: false }, { status: 500 });
+    return NextResponse.json(
+      { gmail: false, calendar: false },
+      { status: 500 },
+    );
   }
 }
