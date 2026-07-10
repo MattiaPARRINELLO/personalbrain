@@ -50,7 +50,7 @@ export async function createAccreditation(input: {
     contactEmail: data.contactEmail ? data.contactEmail : undefined,
   });
   await logActivity("accreditation_created", `Accréditation : ${acc.artist} @ ${acc.venue}`, acc.concertDate);
-  revalidatePath("/accreditations");
+  revalidatePath("/photos");
   return acc;
 }
 
@@ -69,7 +69,7 @@ export async function editAccreditation(
     contactEmail: data.contactEmail ? data.contactEmail : undefined,
   });
   if (acc) await logActivity("accreditation_updated", `Accréditation mise à jour : ${acc.artist}`, acc.status);
-  revalidatePath("/accreditations");
+  revalidatePath("/photos");
   return acc;
 }
 
@@ -77,7 +77,7 @@ export async function removeAccreditation(id: string): Promise<boolean> {
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const ok = await deleteAccreditation(id);
   if (ok) await logActivity("accreditation_deleted", "Accréditation supprimée", id);
-  revalidatePath("/accreditations");
+  revalidatePath("/photos");
   return ok;
 }
 
@@ -146,7 +146,7 @@ export async function scanAccreditationsAction(): Promise<{ message: string; cre
     await saveAccreditations(existing);
   }
 
-  revalidatePath("/accreditations");
+  revalidatePath("/photos");
   return { message: `${created} créée(s), ${updated} mise(s) à jour`, created, updated };
 }
 

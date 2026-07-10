@@ -14,3 +14,26 @@ export async function saveChatSession(session: ChatSession) {
 export async function deleteChatSession(id: string) {
   return storageDeleteChatSession(id);
 }
+
+export async function generateConversationTitle(content: string): Promise<string> {
+  const { chatCompletion } = await import("@/lib/ai-providers");
+  const { getModel } = await import("@/lib/config");
+  const { primary: model } = await getModel("general");
+
+  const prompt = `Génère un titre très court (3-6 mots) pour cette conversation. Réponds UNIQUEMENT par le titre, sans guillemets ni préambule.
+
+Message : "${content.slice(0, 500)}"`;
+
+  try {
+    const result = await chatCompletion(model, [
+      { role: "user", content: prompt },
+    ], []);
+    const title = result.content.trim().replace(/^["']|["']$/g, "");
+    if (title && title.length <= 80) return title;
+  } catch (err) {
+    console.error("Title generation failed:", err);
+  }
+
+  const cleaned = content.replace(/\s+/g, " ").trim();
+  return cleaned.length <= 50 ? cleaned : cleaned.slice(0, 50).replace(/\s\S*$/, "") + "…";
+}
