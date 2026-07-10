@@ -18,6 +18,8 @@ import type {
   WatchLaterCategory,
   Accreditation,
   AccreditationsData,
+  PhotoShoot,
+  PhotoShootsData,
   ActivityEntry,
   ActivityData,
   ActivityAction,
@@ -389,6 +391,34 @@ export async function prepareConcert(concertId: string): Promise<ConcertPrep> {
   };
 }
 
+export async function getWeather(city: string): Promise<string> {
+  const apiKey = process.env.OPENWEATHERMAP_API_KEY;
+  if (!apiKey) return "Erreur : clé API météo non configurée.";
+  try {
+    const res = await fetch(
+      `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric&lang=fr`
+    );
+    if (!res.ok) {
+      if (res.status === 404) return `Ville "${city}" introuvable.`;
+      return `Erreur API météo (${res.status}).`;
+    }
+    const data = await res.json() as {
+      main: { temp: number; feels_like: number; humidity: number };
+      weather: { description: string }[];
+      wind: { speed: number };
+      name: string;
+    };
+    return [
+      `**${data.name}** : ${data.main.temp}°C (ressenti ${data.main.feels_like}°C)`,
+      `${data.weather[0].description}`,
+      `Humidité : ${data.main.humidity}%`,
+      `Vent : ${data.wind.speed} m/s`,
+    ].join(" — ");
+  } catch (err) {
+    return `Erreur : ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+
 export async function getGallery(): Promise<GalleryData> {
   return readOrCreate("gallery.json", { items: [] });
 }
@@ -633,22 +663,29 @@ export async function searchEmails(query: string): Promise<Email[]> {
 }
 
 export async function webSearch(query: string): Promise<string> {
-  const apiKey = process.env.SEARCHAPI_API_KEY;
-  if (apiKey) {
+  const braveKey = process.env.BRAVE_SEARCH_API_KEY;
+  if (braveKey) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     try {
       const res = await fetch(
-        `https://www.searchapi.io/api/v1/search?engine=google&q=${encodeURIComponent(query)}&api_key=${apiKey}`,
-        { signal: controller.signal }
+        `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}`,
+        {
+          signal: controller.signal,
+          headers: {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "X-Subscription-Token": braveKey,
+          },
+        }
       );
       clearTimeout(timeout);
       if (res.ok) {
         const data = await res.json();
-        const results = data.organic_results ?? [];
+        const results = data.web?.results ?? [];
         if (results.length > 0) {
-          return results.slice(0, 3).map((r: { title: string; link: string; snippet: string }) =>
-            `- ${r.title}\n  ${r.snippet}\n  ${r.link}`
+          return results.slice(0, 3).map((r: { title: string; url: string; description: string }) =>
+            `- ${r.title}\n  ${r.description}\n  ${r.url}`
           ).join("\n\n");
         }
         return `Aucun résultat web pour "${query}".`;
@@ -1072,5 +1109,62 @@ export async function deleteChatSession(id: string): Promise<boolean> {
   data.sessions = data.sessions.filter((s) => s.id !== id);
   if (data.sessions.length === before) return false;
   await saveChatHistory(data);
+  return true;
+}
+
+/* ───── Photo Shoots ───── */
+
+const defaultPhotoShoots: PhotoShootsData = { shoots: [] };
+
+export async function getPhotoShoots(): Promise<PhotoShootsData> {
+  return readOrCreate("photo-shoots.json", defaultPhotoShoots);
+}
+
+export async function savePhotoShoots(data: PhotoShootsData): Promise<void> {
+  await maybeBackup("photo-shoots.json");
+  return writeJsonAtomic("photo-shoots.json", data);
+}
+
+export async function addPhotoShoot(input: {
+  title: string;
+  date: string;
+  client: string;
+  notes?: string;
+}): Promise<PhotoShoot> {
+  const data = await getPhotoShoots();
+  const now = new Date().toISOString();
+  const shoot: PhotoShoot = {
+    id: crypto.randomUUID?.() ?? String(Date.now()),
+    title: input.title,
+    date: input.date,
+    client: input.client,
+    status: "upcoming",
+    notes: input.notes,
+    createdAt: now,
+    updatedAt: now,
+  };
+  data.shoots.unshift(shoot);
+  await savePhotoShoots(data);
+  return shoot;
+}
+
+export async function updatePhotoShoot(
+  id: string,
+  updates: Partial<Pick<PhotoShoot, "status" | "notes" | "galleryLink" | "photosSent" | "title" | "date" | "client">>
+): Promise<PhotoShoot | null> {
+  const data = await getPhotoShoots();
+  const idx = data.shoots.findIndex((s) => s.id === id);
+  if (idx < 0) return null;
+  data.shoots[idx] = { ...data.shoots[idx], ...updates, updatedAt: new Date().toISOString() };
+  await savePhotoShoots(data);
+  return data.shoots[idx];
+}
+
+export async function deletePhotoShoot(id: string): Promise<boolean> {
+  const data = await getPhotoShoots();
+  const before = data.shoots.length;
+  data.shoots = data.shoots.filter((s) => s.id !== id);
+  if (data.shoots.length === before) return false;
+  await savePhotoShoots(data);
   return true;
 }
