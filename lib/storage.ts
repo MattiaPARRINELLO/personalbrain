@@ -19,6 +19,7 @@ import type {
   Accreditation,
   AccreditationsData,
   PhotoShoot,
+  PhotoShootStatus,
   PhotoShootsData,
   ActivityEntry,
   ActivityData,
@@ -1130,15 +1131,21 @@ export async function addPhotoShoot(input: {
   date: string;
   client: string;
   notes?: string;
+  status?: PhotoShootStatus;
 }): Promise<PhotoShoot> {
   const data = await getPhotoShoots();
   const now = new Date().toISOString();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const shootDate = new Date(input.date + "T00:00:00");
+  const isPast = shootDate <= today;
+  const defaultStatus: PhotoShootStatus = isPast ? "done" : "upcoming";
   const shoot: PhotoShoot = {
     id: crypto.randomUUID?.() ?? String(Date.now()),
     title: input.title,
     date: input.date,
     client: input.client,
-    status: "upcoming",
+    status: input.status ?? defaultStatus,
     notes: input.notes,
     createdAt: now,
     updatedAt: now,

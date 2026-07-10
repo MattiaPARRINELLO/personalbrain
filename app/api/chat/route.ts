@@ -6,6 +6,7 @@ import {
   type StreamEvent,
 } from "@/lib/ai-providers";
 import { getMemory, webSearch, addReminder, addWatchLaterItem, fetchPageMeta, getConcerts, getAccreditations, getReminders, getCalendar, addMemoryRelationship, getMemoryRelationships, addAccreditation, searchAccreditations, autoSummarize, saveAccreditations, prepareConcert, getWeather, getPhotoShoots, addPhotoShoot, updatePhotoShoot } from "@/lib/storage";
+import type { PhotoShootStatus } from "@/lib/types";
 import { fetchGmailMessages, sendGmailReply, createGoogleCalendarEvent, fetchGoogleCalendarEvents } from "@/lib/google-actions";
 import { getModel } from "@/lib/config";
 import type { ChatMessage, MemoryCategory, Accreditation } from "@/lib/types";
@@ -209,7 +210,7 @@ const tools: UnifiedTool[] = [
   },
   {
     name: "add_photo_shoot",
-    description: "Ajoute un nouveau shooting photo au suivi. Statuts possibles: upcoming (à venir), done (fait), on_pc (sur PC), sorted (trié), edited (retouché), exported (exporté), sent (envoyé).",
+    description: "Ajoute un nouveau shooting photo au suivi. Si l'utilisateur ne precise pas de statut, il est automatique : 'done' si la date est passee/aujourd'hui, 'upcoming' si future. Deduis le statut des paroles de l'utilisateur : ex. 'deja sur mon PC' -> 'on_pc', 'photos deja envoyees' -> 'sent', 'retouche' -> 'edited', 'exporte' -> 'exported', 'trie' -> 'sorted', 'fait/termine' -> 'done'. Statuts: upcoming, done, on_pc, sorted, edited, exported, sent.",
     parameters: {
       type: "object",
       properties: {
@@ -217,6 +218,7 @@ const tools: UnifiedTool[] = [
         date: { type: "string", description: "Date du shooting au format YYYY-MM-DD" },
         client: { type: "string", description: "Nom du client/artiste" },
         notes: { type: "string", description: "Notes optionnelles" },
+        status: { type: "string", enum: ["upcoming", "done", "on_pc", "sorted", "edited", "exported", "sent"], description: "Statut si l'utilisateur le precise, sinon laisse vide pour le comportement automatique" },
       },
       required: ["title", "date", "client"],
     },
@@ -539,8 +541,9 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       const date = String(args.date ?? "").trim();
       const client = String(args.client ?? "").trim();
       const notes = String(args.notes ?? "").trim() || undefined;
+      const status = args.status as PhotoShootStatus | undefined;
       if (!title || !date || !client) return "Erreur : titre, date et client requis.";
-      const shoot = await addPhotoShoot({ title, date, client, notes });
+      const shoot = await addPhotoShoot({ title, date, client, notes, status });
       return `Shooting ajouté : ${shoot.title} (${shoot.client}) le ${new Date(shoot.date).toLocaleDateString("fr-FR")} [${shoot.status}]`;
     }
     case "update_photo_shoot": {
