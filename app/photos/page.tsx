@@ -57,6 +57,7 @@ export default function PhotoShootsPage() {
   const [detailShootId, setDetailShootId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<PhotoShootStatus | null>(null);
+  const [mobileStatus, setMobileStatus] = useState<PhotoShootStatus | "all">("all");
 
   useEffect(() => {
     loadPhotoShoots()
@@ -74,6 +75,12 @@ export default function PhotoShootsPage() {
     }
     return map;
   }, [data]);
+
+  const displayedShoots = useMemo(() => {
+    if (!data) return [];
+    if (mobileStatus === "all") return data.shoots;
+    return data.shoots.filter((s) => s.status === mobileStatus);
+  }, [data, mobileStatus]);
 
   const detailShoot = useMemo(
     () => data?.shoots.find((s) => s.id === detailShootId) ?? null,
@@ -164,19 +171,21 @@ export default function PhotoShootsPage() {
 
   return (
     <AppShell>
-      <div className="flex flex-col h-full">
-        <PageHeader
-          eyebrow="Photographie"
-          title="Photos"
-          description="Suivi des shootings — du tournage à la livraison"
-          actions={
-            !showAdd && (
-              <Button variant="primary" size="sm" onClick={() => setShowAdd(true)} leftIcon={<Plus className="w-3 h-3" />}>
-                Nouveau shooting
-              </Button>
-            )
-          }
-        />
+      <div className="flex flex-col h-full min-w-0">
+        <div className="px-6 pt-6">
+          <PageHeader
+            eyebrow="Photographie"
+            title="Photos"
+            description="Suivi des shootings"
+            actions={
+              !showAdd && (
+                <Button variant="primary" size="sm" onClick={() => setShowAdd(true)} leftIcon={<Plus className="w-3 h-3" />}>
+                  Nouveau shooting
+                </Button>
+              )
+            }
+          />
+        </div>
 
         {showAdd && (
           <div className="px-6 pb-4">
@@ -188,9 +197,9 @@ export default function PhotoShootsPage() {
         )}
 
         {loading ? (
-          <div className="flex gap-4 px-6 overflow-hidden flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-6 pb-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="flex flex-col gap-3 flex-1 min-w-[200px]">
+              <div key={i} className="flex flex-col gap-3">
                 <Skeleton className="h-6 w-24" />
                 <Skeleton className="h-32 w-full" />
                 <Skeleton className="h-32 w-full" />
@@ -198,7 +207,7 @@ export default function PhotoShootsPage() {
             ))}
           </div>
         ) : !data || data.shoots.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center px-6">
             <EmptyState
               icon={<Camera className="w-6 h-6" />}
               title="Aucun shooting"
@@ -211,66 +220,108 @@ export default function PhotoShootsPage() {
             />
           </div>
         ) : (
-          <div className="flex-1 overflow-x-auto pb-4">
-            <div className="flex gap-0 h-full px-6">
-              {STATUS_FLOW.map((col) => {
-                const items = byStatus[col.key];
-                const isOver = dragOverCol === col.key;
-                return (
-                  <div
-                    key={col.key}
-                    className={cn(
-                      "flex flex-col flex-1 min-w-[200px] border-r border-[var(--border-1)] last:border-r-0",
-                      "transition-colors duration-150",
-                      isOver && "bg-[var(--accent)]/5"
-                    )}
-                    onDragOver={(e) => handleDragOver(e, col.key)}
-                    onDragLeave={() => handleDragLeave(col.key)}
-                    onDrop={(e) => handleDrop(e, col.key)}
-                  >
-                    <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border-1)]">
-                      <span
-                        className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                        style={{ backgroundColor: col.color }}
-                      />
-                      <h3 className="text-[11px] font-mono uppercase tracking-widest text-[var(--text-2)]">
-                        {col.label}
-                      </h3>
-                      <span className="text-[10px] text-[var(--text-4)] font-mono ml-auto">{items.length}</span>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                      {items.length === 0 && (
-                        <div className="flex items-center justify-center h-24 border-2 border-dashed border-[var(--border-1)] rounded-lg text-[11px] text-[var(--text-4)] font-mono uppercase tracking-wider">
-                          Déposer ici
-                        </div>
+          <>
+            {/* Desktop: kanban board */}
+            <div className="hidden md:flex flex-1 overflow-x-auto pb-4">
+              <div className="flex gap-0 h-full px-6">
+                {STATUS_FLOW.map((col) => {
+                  const items = byStatus[col.key];
+                  const isOver = dragOverCol === col.key;
+                  return (
+                    <div
+                      key={col.key}
+                      className={cn(
+                        "flex flex-col flex-1 min-w-[200px] border-r border-[var(--border-1)] last:border-r-0",
+                        "transition-colors duration-150",
+                        isOver && "bg-[var(--accent)]/5"
                       )}
-                      {items.map((shoot) => (
-                        <div
-                          key={shoot.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, shoot.id)}
-                          onDragEnd={handleDragEnd}
-                          className={cn(
-                            "transition-opacity duration-150",
-                            draggedId === shoot.id && "opacity-30"
-                          )}
-                        >
-                          <ShootCard
-                            shoot={shoot}
-                            onStatusChange={(s) => handleStatusChange(shoot.id, s)}
-                            onDelete={() => handleDelete(shoot.id)}
-                            onUpdateSent={(link, count) => handleUpdateSent(shoot.id, link, count)}
-                            onDetail={() => setDetailShootId(shoot.id)}
-                          />
-                        </div>
-                      ))}
+                      onDragOver={(e) => handleDragOver(e, col.key)}
+                      onDragLeave={() => handleDragLeave(col.key)}
+                      onDrop={(e) => handleDrop(e, col.key)}
+                    >
+                      <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border-1)]">
+                        <span
+                          className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                          style={{ backgroundColor: col.color }}
+                        />
+                        <h3 className="text-[11px] font-mono uppercase tracking-widest text-[var(--text-2)]">
+                          {col.label}
+                        </h3>
+                        <span className="text-[10px] text-[var(--text-4)] font-mono ml-auto">{items.length}</span>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                        {items.length === 0 && (
+                          <div className="flex items-center justify-center h-24 border-2 border-dashed border-[var(--border-1)] rounded-lg text-[11px] text-[var(--text-4)] font-mono uppercase tracking-wider">
+                            Déposer ici
+                          </div>
+                        )}
+                        {items.map((shoot) => (
+                          <div
+                            key={shoot.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, shoot.id)}
+                            onDragEnd={handleDragEnd}
+                            className={cn(
+                              "transition-opacity duration-150",
+                              draggedId === shoot.id && "opacity-30"
+                            )}
+                          >
+                            <ShootCard
+                              shoot={shoot}
+                              onStatusChange={(s) => handleStatusChange(shoot.id, s)}
+                              onDelete={() => handleDelete(shoot.id)}
+                              onUpdateSent={(link, count) => handleUpdateSent(shoot.id, link, count)}
+                              onDetail={() => setDetailShootId(shoot.id)}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
+
+            {/* Mobile: filter pills + card list */}
+            <div className="md:hidden flex-1 flex flex-col min-h-0">
+              <div className="flex gap-1.5 px-4 py-3 overflow-x-auto flex-shrink-0">
+                <Pill
+                  tone={mobileStatus === "all" ? "accent" : "neutral"}
+                  onClick={() => setMobileStatus("all")}
+                >
+                  Tous
+                </Pill>
+                {STATUS_FLOW.map((col) => (
+                  <Pill
+                    key={col.key}
+                    tone={mobileStatus === col.key ? "accent" : "neutral"}
+                    onClick={() => setMobileStatus(col.key)}
+                  >
+                    {col.label}
+                  </Pill>
+                ))}
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
+                {displayedShoots.map((shoot) => (
+                  <ShootCard
+                    key={shoot.id}
+                    shoot={shoot}
+                    onStatusChange={(s) => handleStatusChange(shoot.id, s)}
+                    onDelete={() => handleDelete(shoot.id)}
+                    onUpdateSent={(link, count) => handleUpdateSent(shoot.id, link, count)}
+                    onDetail={() => setDetailShootId(shoot.id)}
+                  />
+                ))}
+                {displayedShoots.length === 0 && (
+                  <div className="flex items-center justify-center h-32 text-[12px] text-[var(--text-4)] font-mono">
+                    Aucun shooting dans ce statut
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -326,13 +377,13 @@ function ShootCard({
 
   return (
     <div
-      className="group border border-[var(--border-1)] rounded-lg bg-[var(--surface)] hover:border-[var(--border-3)] transition-colors duration-150 cursor-grab active:cursor-grabbing"
+      className="group border border-[var(--border-1)] rounded-lg bg-[var(--surface-1)] hover:border-[var(--border-3)] transition-colors duration-150 cursor-grab active:cursor-grabbing"
     >
       <div className="p-3 space-y-2" onClick={onDetail}>
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <GripVertical
-              className="w-3 h-3 text-[var(--text-4)] flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab"
+              className="hidden sm:block w-3 h-3 text-[var(--text-4)] flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab"
               onMouseDown={(e) => e.stopPropagation()}
             />
             <h4 className="text-[13px] font-medium text-[var(--text-1)] truncate">{shoot.title}</h4>
@@ -340,7 +391,7 @@ function ShootCard({
           <Pill tone={STATUS_PILL_TONE[shoot.status]}>{STATUS_FLOW[statusIndex(shoot.status)].label}</Pill>
         </div>
 
-        <div className="flex items-center gap-3 text-[11px] text-[var(--text-3)] font-mono">
+        <div className="flex items-center gap-3 text-[11px] text-[var(--text-3)] font-mono flex-wrap">
           <span>{formatDate(shoot.date)}</span>
           <span>{shoot.client}</span>
         </div>
@@ -490,13 +541,13 @@ function DetailModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg mx-4 border border-[var(--border-1)] rounded-lg bg-[var(--surface)]"
+        className="w-full max-w-lg mx-4 border border-[var(--border-1)] rounded-lg bg-[var(--surface-1)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-1)]">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: STATUS_FLOW[statusIndex(shoot.status)].color }} />
-            <h2 className="text-[15px] font-semibold text-[var(--text-1)]">{shoot.title}</h2>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: STATUS_FLOW[statusIndex(shoot.status)].color }} />
+            <h2 className="text-[15px] font-semibold text-[var(--text-1)] truncate">{shoot.title}</h2>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors">
             <X className="w-4 h-4" />
@@ -522,7 +573,7 @@ function DetailModal({
             <div className="flex items-center gap-3 text-[12px] font-mono text-[var(--accent)] p-3 border border-[var(--border-1)] rounded-md bg-[var(--surface-2)]">
               <span>{shoot.photosSent ?? "?"} photos envoyées</span>
               <a href={shoot.galleryLink} target="_blank" rel="noopener noreferrer" className="underline hover:no-underline inline-flex items-center gap-1">
-                Voir la galerie <ExternalLink className="w-3 h-3" />
+                Voir la galerie <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
           )}
@@ -536,18 +587,18 @@ function DetailModal({
                 className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
                 placeholder="Titre"
               />
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <input
                   type="date"
                   value={editDate}
                   onChange={(e) => setEditDate(e.target.value)}
-                  className="flex-1 bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
+                  className="w-full sm:flex-1 bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
                 />
                 <input
                   type="text"
                   value={editClient}
                   onChange={(e) => setEditClient(e.target.value)}
-                  className="flex-1 bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
+                  className="w-full sm:flex-1 bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
                   placeholder="Client"
                 />
               </div>
@@ -638,7 +689,7 @@ function AddShootForm({
         placeholder="Titre du shooting"
         className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--accent)]/50"
       />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <input
           type="date"
           value={date}
@@ -662,7 +713,7 @@ function AddShootForm({
       />
       <div className="flex items-center justify-end gap-1.5">
         <Button variant="ghost" size="sm" onClick={onCancel}>Annuler</Button>
-        <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!title.trim() || !date.trim() || !client.trim()} leftIcon={<Plus className="w-3 h-3" />}>
+        <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!title.trim() || !date.trim() || !client.trim()} leftIcon={<Plus className="w-3.5 h-3.5" />}>
           Ajouter
         </Button>
       </div>
