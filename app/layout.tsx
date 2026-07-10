@@ -48,7 +48,7 @@ export default function RootLayout({
         <meta name="application-name" content="BACKSTAGE" />
         <link rel="icon" type="image/png" href="/backstage-logo-simple.png" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-        <link rel="mask-icon" href="/icons/icon-192.svg" color="#a5b4fc" />
+
       </head>
       <body className="min-h-full relative font-sans">
         <PwaLoader />
