@@ -5,7 +5,7 @@ import {
   type UnifiedTool,
   type StreamEvent,
 } from "@/lib/ai-providers";
-import { getMemory, webSearch, addReminder, addWatchLaterItem, fetchPageMeta, getConcerts, getAccreditations, getReminders, getCalendar, addMemoryRelationship, getMemoryRelationships, addAccreditation, searchAccreditations, autoSummarize, saveAccreditations, prepareConcert, getWeather, getPhotoShoots, addPhotoShoot, updatePhotoShoot } from "@/lib/storage";
+import { getMemory, webSearch, addReminder, updateReminder, addWatchLaterItem, fetchPageMeta, getConcerts, getAccreditations, getReminders, getCalendar, addMemoryRelationship, getMemoryRelationships, addAccreditation, searchAccreditations, autoSummarize, saveAccreditations, prepareConcert, getWeather, getPhotoShoots, addPhotoShoot, updatePhotoShoot } from "@/lib/storage";
 import type { PhotoShootStatus } from "@/lib/types";
 import { fetchGmailMessages, sendGmailReply, createGoogleCalendarEvent, fetchGoogleCalendarEvents } from "@/lib/google-actions";
 import { getModel } from "@/lib/config";
@@ -149,6 +149,30 @@ const tools: UnifiedTool[] = [
         due_at: { type: "string", description: "Date d'echeance ISO 8601" },
       },
       required: ["title", "due_at"],
+    },
+  },
+  {
+    name: "list_reminders",
+    description: "Liste tous les rappels existants avec leur ID, titre et date.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "update_reminder",
+    description: "Modifie un rappel existant (titre, notes, date, statut). Necessite l'ID du rappel (utilise list_reminders d'abord pour trouver l'ID).",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "ID du rappel a modifier" },
+        title: { type: "string", description: "Nouveau titre (optionnel)" },
+        notes: { type: "string", description: "Nouvelles notes (optionnel)" },
+        due_at: { type: "string", description: "Nouvelle date ISO 8601 (optionnel)" },
+        status: { type: "string", enum: ["pending", "done", "snoozed"], description: "Nouveau statut (optionnel)" },
+      },
+      required: ["id"],
     },
   },
   {
@@ -336,7 +360,7 @@ ${factsBlock || "- Aucun fait memorise"}`;
     }
   } catch {}
 
-  return `${base}\n\n${memoryBlock}\n\nAujourd'hui nous sommes le ${dateStr}, il est ${timeStr}.${eventsBlock}${photoBlock}${remindersBlock}${briefBlock}\n\nTu as acces a ces outils : ${toolList}. Utilise-les quand c'est pertinent.\n\nSi l'utilisateur partage un lien, utilise d'abord fetch_page_meta puis add_watch_later.\n${codeBlock}`.trim();
+  return `${base}\n\n${memoryBlock}\n\nAujourd'hui nous sommes le ${dateStr}, il est ${timeStr}.${eventsBlock}${photoBlock}${remindersBlock}${briefBlock}\n\nTu as acces a ces outils : ${toolList}. Utilise-les quand c'est pertinent.\n\nSi l'utilisateur partage un lien, utilise d'abord fetch_page_meta puis add_watch_later.\nQuand l'utilisateur demande plusieurs rappels/taches a faire, cree UN rappel par tache (plusieurs appels add_reminder). Ne regroupe jamais plusieurs taches dans un seul rappel.\nNe supprime ou ne modifie JAMAIS les donnees de l'utilisateur sans son consentement explicite.\n${codeBlock}`.trim();
 }
 
 async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
@@ -422,6 +446,25 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       if (!title || !dueAt) return "Erreur : title et due_at requis.";
       const r = await addReminder({ title, notes, dueAt });
       return `Rappel cree : "${r.title}" pour le ${new Date(r.dueAt).toLocaleString("fr-FR")}.`;
+    }
+    case "list_reminders": {
+      const data = await getReminders();
+      if (data.reminders.length === 0) return "Aucun rappel pour le moment.";
+      return data.reminders
+        .map((r) => `- [${r.id}] "${r.title}" → ${new Date(r.dueAt).toLocaleString("fr-FR")} (${r.status})`)
+        .join("\n");
+    }
+    case "update_reminder": {
+      const id = String(args.id ?? "");
+      if (!id) return "Erreur : id requis. Utilise list_reminders pour trouver l'ID.";
+      const updates: Record<string, unknown> = {};
+      if (args.title !== undefined) updates.title = String(args.title);
+      if (args.notes !== undefined) updates.notes = String(args.notes);
+      if (args.due_at !== undefined) updates.dueAt = String(args.due_at);
+      if (args.status !== undefined) updates.status = String(args.status);
+      const r = await updateReminder(id, updates as Parameters<typeof updateReminder>[1]);
+      if (!r) return "Rappel introuvable.";
+      return `Rappel modifie : "${r.title}" → ${new Date(r.dueAt).toLocaleString("fr-FR")} (${r.status}).`;
     }
     case "add_watch_later": {
       const url = String(args.url ?? "");
