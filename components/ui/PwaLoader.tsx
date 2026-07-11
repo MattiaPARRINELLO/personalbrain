@@ -8,10 +8,84 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray as Uint8Array;
+}
+
+async function subscribeToPush(): Promise<void> {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    console.log("[push] PushManager non supporté sur ce navigateur");
+    return;
+  }
+
+  const registration = await navigator.serviceWorker.ready;
+  if (!registration || !registration.pushManager) {
+    console.log("[push] pushManager indisponible");
+    return;
+  }
+
+  if (Notification.permission !== "granted") {
+    console.log("[push] Demande de permission notification...");
+    const result = await Notification.requestPermission();
+    if (result !== "granted") {
+      console.log("[push] Permission refusée:", result);
+      return;
+    }
+    console.log("[push] Permission accordée");
+  }
+
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  if (!vapidPublicKey) {
+    console.log("[push] VAPID_PUBLIC_KEY manquante");
+    return;
+  }
+
+  const existing = await registration.pushManager.getSubscription();
+  if (existing) {
+    console.log("[push] Ancienne souscription détectée, révocation...");
+    try {
+      await existing.unsubscribe();
+      console.log("[push] Ancienne souscription révoquée");
+    } catch (err) {
+      console.error("[push] Échec révocation:", err);
+    }
+  }
+
+  try {
+    const sub = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as any,
+    });
+    console.log("[push] Nouvelle souscription créée:", sub.endpoint.slice(0, 60) + "...");
+    const res = await fetch("/api/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sub.toJSON()),
+    });
+    if (res.ok) {
+      console.log("[push] Souscription envoyée au serveur OK");
+    } else {
+      console.error("[push] Erreur serveur:", res.status, await res.text());
+    }
+  } catch (err) {
+    console.error("[push] Échec souscription:", err);
+  }
+}
+
 export function PwaLoader() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [updateWaiting, setUpdateWaiting] = useState<ServiceWorker | null>(null);
-  const [installed, setInstalled] = useState(false);
+  const [installed, setInstalled] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches
+  );
   const [dismissed, setDismissed] = useState(() =>
     typeof window !== "undefined" && localStorage.getItem("pwa-install-dismissed") === "true"
   );
@@ -29,6 +103,7 @@ export function PwaLoader() {
             });
           }
         });
+        subscribeToPush();
       });
     }
   }, []);
@@ -43,9 +118,10 @@ export function PwaLoader() {
   }, []);
 
   useEffect(() => {
-    if (window.matchMedia("(display-mode: standalone)").matches) {
-      setInstalled(true);
-    }
+    const mm = window.matchMedia("(display-mode: standalone)");
+    function handler(e: MediaQueryListEvent) { if (e.matches) setInstalled(true); }
+    mm.addEventListener("change", handler);
+    return () => mm.removeEventListener("change", handler);
   }, []);
 
   const handleInstall = useCallback(async () => {

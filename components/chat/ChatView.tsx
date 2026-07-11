@@ -159,6 +159,7 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionCards, setActionCards] = useState<{ id: string; toolName: string; result: string; timestamp: string; insertedAfterMessageId: string }[]>([]);
   const [thinkingIndex, setThinkingIndex] = useState(0);
   const chatCtx = useChatContext();
   const toast = useToast();
@@ -401,6 +402,19 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
                 if (key) delete activeToolsRef.current[key];
               }
               chatCtx.registerToolResult(event.name, event.result, isError, duration);
+              if (!isError) {
+                const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+                setActionCards((prev) => [
+                  ...prev,
+                  {
+                    id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                    toolName: event.name,
+                    result: event.result,
+                    timestamp: new Date().toISOString(),
+                    insertedAfterMessageId: lastUserMsg?.id || "",
+                  },
+                ]);
+              }
               forceRender((n) => n + 1);
             } else if (event.type === "error") {
               setError(event.message);
@@ -812,9 +826,31 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
             <Hero onPrompt={(p) => void send(p)} disabled={loading} />
           ) : (
             <div className="space-y-6 chat-stagger">
-              {messages.map((m) => (
-                <MessageBlockMemo key={m.id} message={m} />
-              ))}
+              {messages.map((m) => {
+                const cardsAfter = actionCards.filter((ac) => ac.insertedAfterMessageId === m.id);
+                return (
+                  <div key={m.id}>
+                    <MessageBlockMemo message={m} />
+                    {cardsAfter.map((ac) => (
+                      <div key={ac.id} className="flex justify-center my-3 fade-in-up">
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border-2)] bg-[var(--surface-2)]/60 text-[11px] font-mono">
+                          <span className={cn(
+                            "w-1.5 h-1.5 rounded-full shrink-0",
+                            ac.toolName === "add_reminder" || ac.toolName === "update_reminder"
+                              ? "bg-[var(--warm)]"
+                              : ac.toolName === "add_watch_later"
+                              ? "bg-[var(--accent-cool)]"
+                              : "bg-[var(--success)]"
+                          )} />
+                          <span className="text-[var(--text-3)] uppercase tracking-wider">{toolMeta[ac.toolName]?.label || ac.toolName}</span>
+                          <span className="text-[var(--text-2)] max-w-[260px] truncate">{ac.result}</span>
+                          <span className="text-[var(--text-4)]">{formatTime(ac.timestamp)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
               {streamingActive && streamingContent && (
                 <div key="streaming" className="flex justify-start scale-in">
                   <div className="relative max-w-[85%] rounded-lg p-3.5 bg-[var(--surface-1)] border-l-2 border-[var(--accent-cool)]">
