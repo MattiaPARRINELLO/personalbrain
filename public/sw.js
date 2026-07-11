@@ -1,18 +1,41 @@
-const CACHE = "backstage-v1";
+const VAPID_PUBLIC_KEY = "BMmFNNXqVHLnhyokND2qq1ga3n1lq_4w1eTEhuU0Q-3f6wZUOMgQ0jeT03CkwsobgmRnxrmDPCGpj6FmLjP7bl0";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    }).then((newSub) => {
+      return fetch("/api/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newSub.toJSON()),
+      });
+    }).catch((err) => {
+      console.error("[SW] pushsubscriptionchange error:", err);
+    })
+  );
+});
+const CACHE = "backstage-v2";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
   "/backstage-logo-simple.png",
-  "/icons/icon-192.svg",
-  "/icons/icon-512.svg",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/apple-touch-icon.png",
 ];
-const REMINDER_CHECK_INTERVAL = 60000;
-const DAILY_BRIEF_HOUR = 7;
-
-const shownReminders = new Set();
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -25,11 +48,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    ).then(() => {
-      resetDailyBriefFlag();
-      startReminderPolling();
-      scheduleDailyBrief();
-    })
+    )
   );
   self.clients.claim();
 });
@@ -40,115 +59,27 @@ self.addEventListener("message", (event) => {
   }
 });
 
-function scheduleDailyBrief() {
-  const now = new Date();
-  const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), DAILY_BRIEF_HOUR, 0, 0);
-  if (now.getTime() >= target.getTime()) {
-    target.setDate(target.getDate() + 1);
-  }
-  const msUntilTarget = target.getTime() - now.getTime();
-  setTimeout(() => {
-    triggerDailyBrief();
-    setInterval(() => {
-      const h = new Date().getHours();
-      if (h === DAILY_BRIEF_HOUR) triggerDailyBrief();
-    }, 3600000);
-  }, msUntilTarget);
-}
-
-let dailyBriefFiredToday = false;
-
-function resetDailyBriefFlag() {
-  const now = new Date();
-  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
-  setTimeout(() => {
-    dailyBriefFiredToday = false;
-    resetDailyBriefFlag();
-  }, nextMidnight.getTime() - now.getTime());
-}
-
-async function triggerDailyBrief() {
-  if (dailyBriefFiredToday) return;
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
   try {
-    const res = await fetch("/api/daily-brief", { method: "POST" });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.brief) {
-        dailyBriefFiredToday = true;
-        const clientsList = await self.clients.matchAll({ type: "window" });
-        for (const client of clientsList) {
-          client.postMessage({ type: "daily-brief", brief: data.brief });
-        }
-        self.registration.showNotification("Brief du jour", {
-          body: data.brief.slice(0, 120) + (data.brief.length > 120 ? "…" : ""),
-          icon: "/icons/icon-192.png",
-          badge: "/icons/icon-192.png",
-          tag: "daily-brief",
-          data: { type: "daily-brief", url: "/notif/daily-brief" },
-          vibrate: [100, 50, 100],
-          requireInteraction: false,
-        });
-      }
-    }
+    const payload = event.data.json();
+    const options = {
+      body: payload.body || "",
+      icon: payload.icon || "/icons/icon-192.png",
+      badge: payload.badge || "/icons/icon-192.png",
+      tag: payload.tag,
+      data: payload.data,
+      requireInteraction: payload.requireInteraction ?? false,
+      vibrate: payload.vibrate || [200, 100, 200],
+      actions: payload.actions || [],
+    };
+    event.waitUntil(
+      self.registration.showNotification(payload.title, options)
+    );
   } catch (err) {
-    console.error("[SW] Daily brief failed:", err);
+    console.error("[SW] push event error:", err);
   }
-}
-
-let reminderInterval = null;
-
-function startReminderPolling() {
-  if (reminderInterval) return;
-  getPendingReminders();
-  reminderInterval = setInterval(async () => {
-    try {
-      const reminders = await getPendingReminders();
-      for (const r of reminders) {
-        if (shownReminders.has(r.id)) continue;
-        shownReminders.add(r.id);
-        self.registration.showNotification(r.title, {
-          body: r.description || "Rappel",
-          icon: "/icons/icon-192.png",
-          badge: "/icons/icon-192.png",
-          tag: "reminder-" + r.id,
-          data: { type: "reminder", reminderId: r.id, url: r.link || "/reminders", recurrence: r.recurrence },
-          requireInteraction: true,
-          actions: [
-            { action: "done", title: "✓ Fait" },
-            { action: "snooze", title: "⏰ +15 min" },
-          ],
-          vibrate: [200, 100, 200],
-        });
-      }
-    } catch (err) {
-      console.error("[SW] Reminder check failed:", err);
-    }
-  }, REMINDER_CHECK_INTERVAL);
-}
-
-async function getPendingReminders() {
-  const cache = await caches.open("reminders-v1");
-  const cached = await cache.match("/api/reminders/pending");
-  if (cached) {
-    const data = await cached.json();
-    const cachedAt = new Date(cached.headers.get("sw-cached-at") || 0);
-    if (Date.now() - cachedAt.getTime() < 30000) {
-      return data.reminders;
-    }
-  }
-  try {
-    const res = await fetch("/api/reminders/pending");
-    if (res.ok) {
-      const clone = res.clone();
-      const cacheResp = new Response(clone.body, clone);
-      cacheResp.headers.set("sw-cached-at", new Date().toISOString());
-      cache.put("/api/reminders/pending", cacheResp);
-      const data = await res.json();
-      return data.reminders;
-    }
-  } catch {}
-  return [];
-}
+});
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
@@ -200,31 +131,40 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.protocol !== "http:" && url.protocol !== "https:") return;
 
+  if (url.pathname.startsWith("/api/")) return;
+
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request)
-        .then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, clone));
-          return res;
-        })
-        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/")))
+      fetch(event.request).catch(() =>
+        caches.match(event.request).then((cached) => cached || caches.match("/"))
+      )
     );
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetched = fetch(event.request)
-        .then((res) => {
-          if (res.ok && res.type === "basic") {
+  if (
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/fonts/") ||
+    url.pathname.endsWith(".png") ||
+    url.pathname.endsWith(".svg") ||
+    url.pathname.endsWith(".ico") ||
+    url.pathname.endsWith(".woff2")
+  ) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        const networkFetch = fetch(event.request).then((res) => {
+          if (res.ok) {
             const clone = res.clone();
             caches.open(CACHE).then((cache) => cache.put(event.request, clone));
           }
           return res;
-        })
-        .catch(() => cached);
-      return cached || fetched;
-    })
-  );
+        });
+        return cached || networkFetch;
+      })
+    );
+    return;
+  }
+
+  event.respondWith(fetch(event.request));
 });
