@@ -177,7 +177,16 @@ export function MobileTopBar() {
         </div>
         <span className="text-[11px] font-semibold tracking-wide text-[var(--text-1)]">BACKSTAGE</span>
       </div>
-      <GoogleMobileStatus />
+      <div className="flex items-center gap-1">
+        <Link
+          href="/settings"
+          className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] transition-colors"
+          title="Paramètres"
+        >
+          <Settings className="w-4 h-4" />
+        </Link>
+        <GoogleMobileStatus />
+      </div>
     </div>
   );
 }
