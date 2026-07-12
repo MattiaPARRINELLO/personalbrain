@@ -5,11 +5,39 @@ import {
   type UnifiedTool,
   type StreamEvent,
 } from "@/lib/ai-providers";
-import { getMemory, webSearch, addReminder, updateReminder, addWatchLaterItem, fetchPageMeta, getConcerts, getAccreditations, getReminders, getCalendar, addMemoryRelationship, getMemoryRelationships, addAccreditation, searchAccreditations, autoSummarize, saveAccreditations, prepareConcert, getWeather, getPhotoShoots, addPhotoShoot, updatePhotoShoot } from "@/lib/storage";
-import type { PhotoShootStatus } from "@/lib/types";
-import { fetchGmailMessages, sendGmailReply, createGoogleCalendarEvent, fetchGoogleCalendarEvents } from "@/lib/google-actions";
+import {
+  getMemory,
+  webSearch,
+  addReminder,
+  updateReminder,
+  addWatchLaterItem,
+  fetchPageMeta,
+  getConcerts,
+  getAccreditations,
+  getReminders,
+  getCalendar,
+  addMemoryRelationship,
+  getMemoryRelationships,
+  addAccreditation,
+  searchAccreditations,
+  autoSummarize,
+  saveAccreditations,
+  prepareConcert,
+  getWeather,
+  getPhotoShoots,
+  addPhotoShoot,
+  updatePhotoShoot,
+} from "@/lib/storage";
+import {
+  fetchGmailMessages,
+  sendGmailReply,
+  createGoogleCalendarEvent,
+  fetchGoogleCalendarEvents,
+  updateGoogleCalendarEvent,
+} from "@/lib/google-actions";
 import { getModel } from "@/lib/config";
-import type { ChatMessage, MemoryCategory, Accreditation } from "@/lib/types";
+import { getSession } from "@/lib/session";
+import type { ChatMessage, MemoryCategory, Accreditation, PhotoShootStatus } from "@/lib/types";
 import { autoExtractMemoryFacts } from "@/app/actions/brain";
 
 const rateLimitMap = new Map<string, { tokens: number; lastRefill: number }>();
@@ -91,8 +119,24 @@ const tools: UnifiedTool[] = [
         start_time: { type: "string", description: "Date/heure debut ISO 8601. Pour un evenement toute la journee, utiliser le format date simple YYYY-MM-DD (ex: 2024-01-15)." },
         end_time: { type: "string", description: "Date/heure fin ISO 8601. Pour un evenement toute la journee, utiliser le format date simple YYYY-MM-DD (ex: 2024-01-16 pour un evenement le 15)." },
         location: { type: "string", description: "Lieu (optionnel)" },
+        color_id: { type: "string", description: "Couleur Google Calendar (optionnel). Valeurs : 1=Lavande, 2=Sauge, 3=Raisin, 4=Flamant, 5=Banane, 6=Mandarine, 7=Paon, 8=Graphite, 9=Myrtille, 10=Basilic, 11=Tomate." },
       },
       required: ["title", "start_time", "end_time"],
+    },
+  },
+  {
+    name: "update_calendar_event",
+    description: "Modifie un evenement existant dans Google Calendar (titre, description, lieu, couleur). Utilise d'abord search_calendar_events pour trouver l'ID de l'evenement.",
+    parameters: {
+      type: "object",
+      properties: {
+        event_id: { type: "string", description: "ID Google Calendar de l'evenement a modifier" },
+        title: { type: "string", description: "Nouveau titre (optionnel)" },
+        description: { type: "string", description: "Nouvelle description (optionnel)" },
+        location: { type: "string", description: "Nouveau lieu (optionnel)" },
+        color_id: { type: "string", description: "Nouvelle couleur Google Calendar (optionnel). Valeurs : 1=Lavande, 2=Sauge, 3=Raisin, 4=Flamant, 5=Banane, 6=Mandarine, 7=Paon, 8=Graphite, 9=Myrtille, 10=Basilic, 11=Tomate." },
+      },
+      required: ["event_id"],
     },
   },
   {
@@ -360,7 +404,7 @@ ${factsBlock || "- Aucun fait memorise"}`;
     }
   } catch {}
 
-  return `${base}\n\n${memoryBlock}\n\nAujourd'hui nous sommes le ${dateStr}, il est ${timeStr}.${eventsBlock}${photoBlock}${remindersBlock}${briefBlock}\n\nTu as acces a ces outils : ${toolList}. Utilise-les quand c'est pertinent.\n\nSi l'utilisateur partage un lien, utilise d'abord fetch_page_meta puis add_watch_later.\nQuand l'utilisateur demande plusieurs rappels/taches a faire, cree UN rappel par tache (plusieurs appels add_reminder). Ne regroupe jamais plusieurs taches dans un seul rappel.\nNe supprime ou ne modifie JAMAIS les donnees de l'utilisateur sans son consentement explicite.\n${codeBlock}`.trim();
+  return `${base}\n\n${memoryBlock}\n\nAujourd'hui nous sommes le ${dateStr}, il est ${timeStr}.${eventsBlock}${photoBlock}${remindersBlock}${briefBlock}\n\nTu as acces a ces outils : ${toolList}. Quand l'utilisateur te demande une action concrete (creer un evenement, envoyer un email, ajouter un rappel, etc.), tu DOIS utiliser l'outil correspondant — ne te contente JAMAIS de dire que tu vas le faire sans l'appeler. Tu peux appeler plusieurs outils dans le meme message pour creer des evenements en lot.\n\nSi l'utilisateur partage un lien, utilise d'abord fetch_page_meta puis add_watch_later.\nQuand l'utilisateur demande plusieurs rappels/taches a faire, cree UN rappel par tache (plusieurs appels add_reminder). Ne regroupe jamais plusieurs taches dans un seul rappel.\nNe supprime ou ne modifie JAMAIS les donnees de l'utilisateur sans son consentement explicite.\nPrefere les tirets courts (-) aux tirets longs (—, em-dash).\n${codeBlock}`.trim();
 }
 
 async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
@@ -391,9 +435,23 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       const start = String(args.start_time ?? "");
       const end = String(args.end_time ?? "");
       const location = args.location ? String(args.location) : undefined;
+      const colorId = args.color_id ? String(args.color_id) : undefined;
       if (!title || !start || !end) return "Erreur : title, start_time et end_time requis.";
-      const eventId = await createGoogleCalendarEvent(title, start, end, location);
-      return `Evenement "${title}" cree dans Google Calendar (id: ${eventId}).`;
+      const eventId = await createGoogleCalendarEvent(title, start, end, location, undefined, colorId);
+      let msg = `Evenement "${title}" cree dans Google Calendar (id: ${eventId}).`;
+      if (colorId) msg += ` Couleur appliquee.`;
+      return msg;
+    }
+    case "update_calendar_event": {
+      const eventId = String(args.event_id ?? "");
+      if (!eventId) return "Erreur : event_id requis.";
+      const updates: { summary?: string; description?: string; location?: string; colorId?: string } = {};
+      if (args.title) updates.summary = String(args.title);
+      if (args.description) updates.description = String(args.description);
+      if (args.location) updates.location = String(args.location);
+      if (args.color_id) updates.colorId = String(args.color_id);
+      await updateGoogleCalendarEvent(eventId, updates);
+      return `Evenement mis a jour (id: ${eventId}).`;
     }
     case "search_calendar_events": {
       const days = typeof args.days === "number" ? args.days : 30;
@@ -694,6 +752,14 @@ async function runMemoryExtraction(
 }
 
 export async function POST(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return new Response(JSON.stringify({ error: "Non authentifie" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
   if (!checkRateLimit(ip)) {
     return new Response(JSON.stringify({ error: "Trop de requêtes. Réessaie dans une minute." }), {
@@ -718,6 +784,31 @@ export async function POST(request: NextRequest) {
         const { summary, tags } = await autoSummarize(urls[0], meta.title);
         lastUserMsg.content += `\n\n[Ce message contient un lien. Resume : ${summary}. Tags suggeres : ${tags.join(", ")}.`;
       } catch {}
+    }
+  }
+
+  // Résumé automatique des messages utilisateur très longs (itinéraires, etc.)
+  // pour éviter la saturation du contexte sans perdre d'information
+  const SUMMARY_THRESHOLD = 3000;
+  for (const m of body.messages) {
+    if (m.role === "user" && typeof m.content === "string" && m.content.length > SUMMARY_THRESHOLD) {
+      try {
+        const { chatCompletion } = await import("@/lib/ai-providers");
+        const result = await chatCompletion(
+          "deepseek-v4-flash",
+          [
+            { role: "system", content: "Tu résumes des messages en conservant TOUTES les informations utiles : dates, horaires, lieux, noms, actions demandées, numéros. Sois concis mais complet. Ne liste pas — raconte de façon fluide." },
+            { role: "user", content: "Résumé conservant tous les détails pratiques :\n\n" + m.content },
+          ],
+          []
+        );
+        const summary = result.content.trim();
+        if (summary) {
+          m.content = summary;
+        }
+      } catch (err) {
+        console.error("[chat] Auto-summary failed, keeping original:", err);
+      }
     }
   }
 
@@ -749,7 +840,7 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
       }
 
-      const maxIterations = 5;
+      const maxIterations = 20;
 
       async function runModel(model: string): Promise<boolean> {
         const generator = streamChatCompletion(model, messages, tools);
