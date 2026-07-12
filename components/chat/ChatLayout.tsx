@@ -52,6 +52,12 @@ export function ChatLayout() {
           activeSessionId={activeSessionId}
           onSelectSession={handleSelectSession}
           onNewSession={handleNewSession}
+          onDeleteSession={(id) => {
+            if (id === activeSessionId) {
+              setActiveSessionId("");
+              setResetSignal((k) => k + 1);
+            }
+          }}
           mobileOpen={mobileSessionsOpen}
           onMobileClose={() => setMobileSessionsOpen(false)}
         />

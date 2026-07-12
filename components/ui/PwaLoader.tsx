@@ -3,6 +3,10 @@
 import Image from "next/image";
 import { useEffect, useState, useCallback } from "react";
 
+function isCapacitor(): boolean {
+  return typeof window !== "undefined" && !!(window as unknown as Record<string, unknown>).Capacitor;
+}
+
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
@@ -91,21 +95,23 @@ export function PwaLoader() {
   );
 
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").then((reg) => {
-        reg.addEventListener("updatefound", () => {
-          const sw = reg.installing;
-          if (sw) {
-            sw.addEventListener("statechange", () => {
-              if (sw.state === "installed" && navigator.serviceWorker.controller) {
-                setUpdateWaiting(reg.waiting);
-              }
-            });
-          }
-        });
+    if (!("serviceWorker" in navigator)) return;
+
+    navigator.serviceWorker.register("/sw.js").then((reg) => {
+      if (!isCapacitor()) {
         subscribeToPush();
+      }
+      reg.addEventListener("updatefound", () => {
+        const sw = reg.installing;
+        if (sw) {
+          sw.addEventListener("statechange", () => {
+            if (sw.state === "installed" && navigator.serviceWorker.controller) {
+              setUpdateWaiting(reg.waiting);
+            }
+          });
+        }
       });
-    }
+    });
   }, []);
 
   useEffect(() => {

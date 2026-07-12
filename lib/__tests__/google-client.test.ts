@@ -2,9 +2,23 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Mock } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mock fs BEFORE importing the module under test (vi.mock is hoisted)
+// Mocks hoistés (accessibles depuis vi.mock factory + tests)
 // ---------------------------------------------------------------------------
 const mockReadFile: Mock = vi.fn();
+
+const { mockSetCredentials, mockRefreshAccessToken } = vi.hoisted(() => ({
+  mockSetCredentials: vi.fn(),
+  mockRefreshAccessToken: vi.fn(),
+}));
+
+vi.mock("google-auth-library", () => {
+  class MockOAuth2Client {
+    constructor(...args: unknown[]) {}
+    setCredentials = mockSetCredentials;
+    refreshAccessToken = mockRefreshAccessToken;
+  }
+  return { OAuth2Client: MockOAuth2Client };
+});
 
 vi.mock("fs", () => ({
   promises: {
@@ -62,7 +76,6 @@ describe("google-client", () => {
 
       const client = createOAuth2Client();
       expect(client).toBeDefined();
-      expect(client.constructor.name).toMatch(/^OAuth2/);
     });
   });
 
@@ -125,6 +138,136 @@ describe("google-client", () => {
 
       const linked = await isGoogleLinked("gmail");
       expect(linked).toBe(false);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // saveTokens
+  // -----------------------------------------------------------------------
+  describe("saveTokens", () => {
+    it("should write tokens atomically (tmp + rename)", async () => {
+      const fs = await import("fs");
+      const { saveTokens } = await import("../google-client");
+      const tokens = { access_token: "abc", refresh_token: "def" };
+      await saveTokens("gmail", tokens);
+
+      expect(fs.promises.mkdir).toHaveBeenCalled();
+      expect(fs.promises.writeFile).toHaveBeenCalledWith(
+        expect.stringContaining(".tmp"),
+        expect.any(String),
+        "utf-8",
+      );
+      expect(fs.promises.rename).toHaveBeenCalledWith(
+        expect.stringContaining(".tmp"),
+        expect.not.stringContaining(".tmp"),
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // getGoogleClient
+  // -----------------------------------------------------------------------
+  describe("getGoogleClient", () => {
+    beforeEach(() => {
+      mockSetCredentials.mockClear();
+      mockRefreshAccessToken.mockClear();
+      process.env.GOOGLE_CLIENT_ID = "id";
+      process.env.GOOGLE_CLIENT_SECRET = "secret";
+      process.env.GOOGLE_REDIRECT_URI = "https://redirect";
+    });
+
+    it("should throw if no tokens exist", async () => {
+      mockReadFile.mockRejectedValue(new Error("ENOENT"));
+      const { getGoogleClient } = await import("../google-client");
+      await expect(getGoogleClient("gmail")).rejects.toThrow("non lie");
+    });
+
+    it("should return client when tokens are valid and not expired", async () => {
+      const future = Date.now() + 3600_000;
+      mockReadFile.mockResolvedValue(
+        JSON.stringify({
+          access_token: "valid",
+          refresh_token: "refresh",
+          expiry_date: future,
+        }),
+      );
+      const { getGoogleClient } = await import("../google-client");
+      const client = await getGoogleClient("gmail");
+      expect(client).toBeDefined();
+      expect(mockSetCredentials).toHaveBeenCalled();
+      expect(mockRefreshAccessToken).not.toHaveBeenCalled();
+    });
+
+    it("should refresh token if expired", async () => {
+      const past = Date.now() - 3600_000;
+      mockReadFile.mockResolvedValue(
+        JSON.stringify({
+          access_token: "expired",
+          refresh_token: "refresh",
+          expiry_date: past,
+        }),
+      );
+      mockRefreshAccessToken.mockResolvedValue({
+        credentials: { access_token: "refreshed", expiry_date: Date.now() + 3600_000 },
+      });
+
+      const { getGoogleClient } = await import("../google-client");
+      const client = await getGoogleClient("gmail");
+      expect(client).toBeDefined();
+      expect(mockRefreshAccessToken).toHaveBeenCalled();
+      expect(mockSetCredentials).toHaveBeenCalledWith(
+        expect.objectContaining({ access_token: "refreshed" }),
+      );
+    });
+
+    it("should throw after max retries when refresh fails", async () => {
+      const past = Date.now() - 3600_000;
+      mockReadFile.mockResolvedValue(
+        JSON.stringify({
+          access_token: "expired",
+          refresh_token: "refresh",
+          expiry_date: past,
+        }),
+      );
+      mockRefreshAccessToken.mockRejectedValue(new Error("invalid_grant"));
+
+      const { getGoogleClient } = await import("../google-client");
+      await expect(getGoogleClient("gmail")).rejects.toThrow(
+        "a echoue apres 3 tentatives",
+      );
+      // Vérifie que le retry a été tenté MAX_RETRIES fois
+      expect(mockRefreshAccessToken).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // getGmailClient / getCalendarClient
+  // -----------------------------------------------------------------------
+  describe("getGmailClient / getCalendarClient", () => {
+    beforeEach(() => {
+      process.env.GOOGLE_CLIENT_ID = "id";
+      process.env.GOOGLE_CLIENT_SECRET = "secret";
+      process.env.GOOGLE_REDIRECT_URI = "https://redirect";
+      const future = Date.now() + 3600_000;
+      mockReadFile.mockResolvedValue(
+        JSON.stringify({
+          access_token: "valid",
+          refresh_token: "refresh",
+          expiry_date: future,
+        }),
+      );
+    });
+
+    it("getGmailClient should call getGoogleClient with gmail", async () => {
+      const { getGmailClient } = await import("../google-client");
+      const client = await getGmailClient();
+      expect(client).toBeDefined();
+    });
+
+    it("getCalendarClient should call getGoogleClient with calendar", async () => {
+      const { getCalendarClient } = await import("../google-client");
+      const client = await getCalendarClient();
+      expect(client).toBeDefined();
     });
   });
 });

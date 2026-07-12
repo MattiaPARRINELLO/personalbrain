@@ -1,5 +1,6 @@
 import { getGmailClient, getCalendarClient } from "./google-client";
-import type { Email as GmailMessage, GoogleCalendarEvent as CalendarEventItem } from "@/lib/types";
+import type { GmailMessage } from "@/app/api/gmail/route";
+import type { CalendarEventItem } from "@/app/api/calendar/route";
 import type { OAuth2Client } from "google-auth-library";
 
 type GmailHeader = { name?: string; value?: string };

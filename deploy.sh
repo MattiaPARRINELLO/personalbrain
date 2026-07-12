@@ -97,11 +97,19 @@ echo -e "${CYAN}→ Déploiement vers ${SSH_USER}@${SSH_HOST}:${SSH_TARGET_DIR}$
 rsync -avz --delete \
   -e "ssh -p ${SSH_PORT}" \
   --exclude 'node_modules' \
+  --include 'data/firebase-service-account.json' \
   --exclude 'data/*.json' \
   --exclude 'data/backups' \
   --exclude '.htaccess' \
   "$DEPLOY_TMP/" \
   "${SSH_USER}@${SSH_HOST}:${SSH_TARGET_DIR}/"
+
+# ─── 3.5 Install dependencies ──────────────────────────
+echo -e "\n${CYAN}→ Installation des dépendances sur le serveur…${NC}"
+ssh -p "$SSH_PORT" "${SSH_USER}@${SSH_HOST}" \
+  "source /home/mattiapa/nodevenv/brain.mprnl.fr/22/bin/activate && cd ${SSH_TARGET_DIR} && npm install --production 2>&1" \
+  && echo -e "${GREEN}  ✓ Dépendances installées${NC}" \
+  || echo -e "${YELLOW}  ⚠  Impossible d'installer les dépendances — à faire manuellement :${NC}"
 
 # ─── 4. Restart ────────────────────────────────────────
 echo -e "\n${CYAN}→ Redémarrage de l'App Node.js…${NC}"

@@ -1,17 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchGmailMessages, sendGmailReply } from "@/lib/google-actions";
 import { getServerCached, setServerCached, invalidateServerCachePattern } from "@/lib/server-cache";
-import { getSession } from "@/lib/session";
-import type { Email as GmailMessage } from "@/lib/types";
+
+export interface GmailMessage {
+  id: string;
+  threadId: string;
+  from: string;
+  subject: string;
+  date: string;
+  snippet: string;
+  body: string;
+  unread: boolean;
+  messageId?: string;
+}
 
 const GMAIL_LIST_CACHE_KEY = "gmail:list";
 const GMAIL_LIST_TTL_MS = 2 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Non authentifie" }, { status: 401 });
-  }
   try {
     const query = request.nextUrl.searchParams.get("q") ?? undefined;
     const cacheKey = query ? `${GMAIL_LIST_CACHE_KEY}:${query}` : GMAIL_LIST_CACHE_KEY;
@@ -33,10 +39,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Non authentifie" }, { status: 401 });
-  }
   try {
     const body = (await request.json()) as {
       emailId: string;

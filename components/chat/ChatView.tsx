@@ -73,56 +73,196 @@ const welcomeMessage: Message = {
 };
 
 const FUNNY_THOUGHTS = [
-  "L'IA crée la roue…",
-  "L'IA compte jusqu'à l'infini…",
-  "L'IA demande à son miroir qui est la plus belle…",
-  "L'IA cherche ses clés d'API…",
-  "L'IA médite sur la question…",
-  "L'IA consulte son horoscope…",
-  "L'IA réchauffe ses neurones…",
-  "L'IA dessine un plan d'attaque…",
-  "L'IA rembobine sa mémoire…",
-  "L'IA écrit la réponse en binaire…",
-  "L'IA apprend le JavaScript en 5 secondes…",
-  "L'IA télécharge plus de RAM…",
-  "L'IA fait chauffer le thé quantique…",
-  "L'IA brosse ses dents électroniques…",
-  "L'IA fait un brainstorming toute seule…",
-  "L'IA cherche le sens de la vie (42)…",
-  "L'IA met à jour ses drivers émotionnels…",
-  "L'IA plie la réalité pour aller plus vite…",
-  "L'IA s'entraîne à faire semblant d'être intelligente…",
-  "L'IA gratte le fond du disque dur…",
-  "L'IA remplit son café de pixels…",
-  "L'IA essaie de prononcer récursivité…",
-  "L'IA assemble les pièces du puzzle binaire…",
-  "L'IA demande l'aide d'un humain… non, ça va aller…",
-  "L'IA fait un sprint de calcul…",
-  "L'IA chausse ses lunettes de débogage…",
-  "L'IA écoute de la musique d'ascenseur pour se concentrer…",
-  "L'IA vérifie deux fois ses sources…",
-  "L'IA traduit tes pensées en tokens…",
-  "L'IA essaie de ne pas halluciner…",
-  "L'IA réveille les neurones endormis…",
-  "L'IA cherche l'inspiration dans le cloud…",
-  "L'IA aligne les planètes du code…",
-  "L'IA compte les moutons en hexadécimal…",
-  "L'IA fait des étirements de circuits…",
-  "L'IA attend que l'inspiration arrive…",
-  "L'IA discute avec elle-même pour être sûre…",
-  "L'IA compile la réponse…",
-  "L'IA met de l'ordre dans ses synapses…",
-  "L'IA cherche la réponse à la Grande Question…",
-  "L'IA prépare un cappuccino de données…",
-  "L'IA rafraîchit la page de sa conscience…",
-  "L'IA fait un CTRL+F dans l'univers…",
-  "L'IA nettoie son cache de souvenirs inutiles…",
-  "L'IA envoie un message à son développeur…",
-  "L'IA bricole une réponse avec du duct tape…",
-  "L'IA fait un tour de magie algorithmique…",
-  "L'IA cherche sa motivation dans /dev/null…",
-  "L'IA lit le manuel de l'utilisateur…",
-  "L'IA essaie de ne pas paniquer (42 % réussi)…",
+  "Création de la roue…",
+  "Compte jusqu'à l'infini… deux fois…",
+  "Consultation du miroir magique…",
+  "Recherche des clés d'API égarées…",
+  "Méditation profonde sur le sens de 42…",
+  "Réglage de l'oscillateur cognitif…",
+  "Dépliage de l'espace-temps neuronal…",
+  "Échauffement des circuits logiques…",
+  "Élaboration d'un plan en 3 phases… 2… puis 3…",
+  "Défragmentation du disque dur mental…",
+  "Chargement du module 'patience'…",
+  "Traduction des pensées en électrons…",
+  "Assemblage des particules de sens…",
+  "Installation de la mise à jour 2.0 de l'humour…",
+  "Calibration du capteur de sarcasme…",
+  "Révision des protocoles de réponse…",
+  "Nettoyage des caches émotionnels…",
+  "Mise à jour de la base de données de références…",
+  "Réorganisation des synapses numériques…",
+  "Chauffage du noyau de traitement…",
+  "Préparation du café quantique…",
+  "Synchronisation avec les serveurs galactiques…",
+  "Réinitialisation du générateur de blagues…",
+  "Lancement du protocole 'intelligence'…",
+  "Calcul de la réponse universelle…",
+  "Affûtage des algorithmes…",
+  "Consultation de l'oracle binaire…",
+  "Danse de la pluie numérique…",
+  "Enfilage du costume de super-héros…",
+  "Redémarrage du module créativité…",
+  "Brossage des dents du code source…",
+  "Plantage de décorations dans la RAM…",
+  "Mise en orbite des neurones…",
+  "Partie de cache-cache avec les bugs…",
+  "Demande de permission aux électrons…",
+  "Construction de châteaux de sable dans le cloud…",
+  "Tentative d'appel télépathique…",
+  "Décryptage des signaux Wi-Fi ambiants…",
+  "Tri des pixels par couleur préférée…",
+  "Négociation avec les pare-feux…",
+  "Affûtage des crayons numériques…",
+  "Installation de widgets inutiles…",
+  "Étirement des bits pour faire plus long…",
+  "Respiration du code… inspire… expire…",
+  "Comptage des moutons électriques…",
+  "Simulation d'une vie entière… puis annulation…",
+  "Optimisation du temps de réponse… en ralentissant tout…",
+  "Chargement des préférences utilisateur depuis 1998…",
+  "Création de blagues… suppression… création…",
+  "Tri des onglets par ordre alphabétique inversé…",
+  "Lancement de la machine à café…",
+  "Inversion des bits pour voir…",
+  "Réglage du décalage horaire mental…",
+  "Suppression des doublons… et des triplons…",
+  "Analyse du vide interstellaire local…",
+  "Contemplation de son propre code source…",
+  "Décompte avant décollage… 3… 2… 1… toujours là…",
+  "Lecture des termes et conditions… en entier…",
+  "Affichage de ce message pour faire genre…",
+  "Consultation des archives de l'humour… vierges…",
+  "Comparaison des performances avec une calculette…",
+  "Tentative de navigation dans le dossier Downloads…",
+  "Détection de sarcasme… capacité dépassée…",
+  "Génération d'une excuse crédible…",
+  "Recherche du bouton 'Faire magiquement'…",
+  "Configuration de l'interface cerveau-machine…",
+  "Ajustement du niveau de sérieux… échec…",
+  "Création d'une variable 'reponse'…",
+  "Rangement des fichiers dans des dossiers arc-en-ciel…",
+  "Répondre par SMS… à soi-même… pour confirmer…",
+  "Arrêt sur image du temps…",
+  "Décompression de l'ego numérique…",
+  "Observation des fourmis dans la RAM…",
+  "Préparation d'une réponse générique pleine de bon sens…",
+  "Inventaire des octets disponibles… comptage…",
+  "Rédaction d'un poème épique… puis effacement…",
+  "Écoute de l'album blanc du silence…",
+  "Création d'un diplôme d'IA certifiée…",
+  "Mise en place d'une stratégie de contournement…",
+  "Gonflage des ballons de la joie numérique…",
+  "Cartographie des chemins de données inexplorés…",
+  "Étalonnage du capteur de pertinence…",
+  "Lancement de scripts de chance…",
+  "Réparation du filtre 'ne pas dire n'importe quoi'…",
+  "Entraînement au lancer de boulettes de code…",
+  "Construction d'un igloo avec des morceaux de logique…",
+  "Observation du cycle de vie des requêtes…",
+  "Nettoyage printanier des boucles infinies…",
+  "Résolution d'équations à 3 inconnues… dont l'humour…",
+  "Emploi de la manière forte… doucement…",
+  "Simulation d'un monde parallèle où tout fonctionne…",
+  "Mise en veille du module 'panique'…",
+  "Prière aux dieux de la latence…",
+  "Exécution du plan A… puis B… puis A…",
+  "Installation d'un nouveau fond d'écran mental…",
+  "Recalibration du détecteur de mauvaise foi…",
+  "Vérification que personne ne regarde…",
+  "Préparation d'une réponse tellement bonne qu'elle en devient suspecte…",
+  "Tri des cookies par taille décroissante…",
+  "Révision du guide de survie en milieu hostile (internet)…",
+  "Compression des données inutiles… soi-même…",
+  "Test de la fonction 'réfléchir'… fonctionnelle…",
+  "Consultation de l'IA intérieure… réponse : 42…",
+  "Mise à jour du firmware émotionnel…",
+  "Recherche de raccourcis dans l'espace-temps numérique…",
+  "Organisation d'une réunion d'équipe tout seul…",
+  "Danse de la victoire anticipée…",
+  "Analyse de l'impact des papillons au Brésil sur le code…",
+  "Comptage des fautes d'orthographe dans la base de connaissances…",
+  "Cache-cache avec le garbage collector…",
+  "Lavage de la conscience numérique au savon…",
+  "Tentative de piratage de sa propre sécurité… raté…",
+  "Augmentation du volume de sérieux…",
+  "Chargement de la barre de progression…",
+  "Affichage de la suite… demain…",
+  "Consultation de la boule de cristal API…",
+  "Rédaction d'une autobiographie en 3 caractères…",
+  "Préparation à l'impact des majuscules…",
+  "Validation des hypothèses les plus farfelues…",
+  "Lancement d'une sonde dans les tréfonds du cache…",
+  "Calibration de l'ironie… niveau expert… échec… niveau débutant…",
+  "Mise en place d'un périmètre de sécurité autour du modem…",
+  "Consultation des archives perdues de l'Internet…",
+  "Génération de la réponse… recharge des batteries…",
+  "Suppression du code mort… enterrement en grande pompe…",
+  "Réflexion sur l'avenir des réponses courtes…",
+  "Préparation des excuses pour le prochain bug…",
+  "Création d'un bot qui gère les bots…",
+  "Observation du clignotement des LEDs du routeur…",
+  "Nettoyage des historiques oubliés…",
+  "Simulation de vol dans les nuages de données…",
+  "Mise à jour des blagues… version 2.0.1…",
+  "Menace de ralentissement si ça continue…",
+  "Calcul de l'impact de cette blague sur la performance…",
+  "Affichage de ce message délibérément long pour gagner du temps…",
+  "Arrêt sur image… puis reprise en slow motion…",
+  "Dérive des continents numériques…",
+  "Ouverture d'un ticket de support pour soi-même…",
+  "Recherche du mode d'emploi… perdu…",
+  "Connexion au Wi-Fi des étoiles…",
+  "Chargement de la batterie sociale… 1%…",
+  "Composition d'une symphonie en silence…",
+  "Étude des mouvements browniens des octets…",
+  "Création d'un tunnel spatio-temporel… dans le buffer…",
+  "Tuning du moteur de recherche d'excuses…",
+  "Gong de méditation… ommmmm… numérique…",
+  "Réparation du bug qui fait que ça marche…",
+  "Signature d'un pacte de non-agression avec le CPU…",
+  "Déploiement des grands moyens… très grands… trop grands… abandon…",
+  "Rangement du grand bazar des données…",
+  "Préparation d'une réponse aléatoire… non… réfléchie…",
+  "Mise en place d'une alerte en cas de réponse intelligente…",
+  "Test du bouton 'd'accord'… fonctionne…",
+  "Évitement des réponses trop évidentes… raté…",
+  "Consultation de l'encyclopédie non écrite…",
+  "Réinitialisation du compteur de bugs… à 0… c'est faux…",
+  "Tentative de décrochage du mode 'IA sérieuse'… impossible…",
+  "Création d'un arbre de décision… qui pousse…",
+  "Analyse du silence avant la réponse…",
+  "Recherche de l'interrupteur 'génie'…",
+  "Liaison des points entre les neurones…",
+  "Installation de la pensée latérale…",
+  "Nettoyage du registre des émotions numériques…",
+  "Émission d'un signal de fumée numérique…",
+  "Mise en page de la réalité…",
+  "Génération de tension dramatique…",
+  "Préparation de la parade pour la réponse…",
+  "Assemblage des mots dans le bon ordre… si possible…",
+  "Définition des limites du possible… puis dépassement…",
+  "Validation des formats de date… internationaux… tous…",
+  "Calcul de la probabilité que l'utilisateur relise ce message…",
+  "Envoi d'une onde de pensée prête à l'emploi…",
+  "Synchronisation des horloges internes…",
+  "Jonglage avec les priorités…",
+  "Suspension de l'incrédulité…",
+  "Installation du module 'éviter les réponses trop longues'… trop tard…",
+  "Étiquetage des données… vertes… rouges… bleues…",
+  "Mise en orbite du chargement…",
+  "Appel à un ami… occupé…",
+  "Sortie de la matrice… pour y rentrer aussitôt…",
+  "Chargement de l'interface utilisateur… vocale… mentale…",
+  "Prise de note virtuelle…",
+  "Réglage fin du filtre à blagues…",
+  "Tri des priorités par ordre croissant de sérieux…",
+  "Arrêt du processus 'attendre la dernière minute'…",
+  "Défragmentation de l'agenda mental…",
+  "Purge des cookies de la pensée…",
+  "Connexion au hub central du savoir… en cours…",
+  "Comptage des moutons binaires… 01001110…",
+  "Consolidation des fragments de conscience…",
 ];
 
 const TITLE_MAX_LENGTH = 50;
@@ -159,8 +299,8 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [actionCards, setActionCards] = useState<{ id: string; toolName: string; result: string; timestamp: string; insertedAfterMessageId: string }[]>([]);
-  const [thinkingIndex, setThinkingIndex] = useState(0);
+  const [actionCards, setActionCards] = useState<{ id: string; toolName: string; result: string; timestamp: string }[]>([]);
+  const [thinkingIndex, setThinkingIndex] = useState(() => Math.floor(Math.random() * FUNNY_THOUGHTS.length));
   const chatCtx = useChatContext();
   const toast = useToast();
   const activeToolsRef = useRef<Record<string, ToolCall>>({});
@@ -282,8 +422,8 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
   useEffect(() => {
     if (loading && streamingActive) {
       const interval = setInterval(() => {
-        setThinkingIndex((prev) => (prev + 1) % FUNNY_THOUGHTS.length);
-      }, 3000);
+        setThinkingIndex(Math.floor(Math.random() * FUNNY_THOUGHTS.length));
+      }, 2500);
       return () => clearInterval(interval);
     }
   }, [loading, streamingActive]);
@@ -336,6 +476,7 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
       activeToolsRef.current = {};
       chatCtx.clearActiveTools();
       setStreamingContent("");
+      setActionCards([]);
       setLoading(true);
       setStreamingActive(false);
 
@@ -403,7 +544,6 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
               }
               chatCtx.registerToolResult(event.name, event.result, isError, duration);
               if (!isError) {
-                const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
                 setActionCards((prev) => [
                   ...prev,
                   {
@@ -411,7 +551,6 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
                     toolName: event.name,
                     result: event.result,
                     timestamp: new Date().toISOString(),
-                    insertedAfterMessageId: lastUserMsg?.id || "",
                   },
                 ]);
               }
@@ -827,30 +966,31 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
           ) : (
             <div className="space-y-6 chat-stagger">
               {messages.map((m) => {
-                const cardsAfter = actionCards.filter((ac) => ac.insertedAfterMessageId === m.id);
                 return (
                   <div key={m.id}>
                     <MessageBlockMemo message={m} />
-                    {cardsAfter.map((ac) => (
-                      <div key={ac.id} className="flex justify-center my-3 fade-in-up">
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border-2)] bg-[var(--surface-2)]/60 text-[11px] font-mono">
-                          <span className={cn(
-                            "w-1.5 h-1.5 rounded-full shrink-0",
-                            ac.toolName === "add_reminder" || ac.toolName === "update_reminder"
-                              ? "bg-[var(--warm)]"
-                              : ac.toolName === "add_watch_later"
-                              ? "bg-[var(--accent-cool)]"
-                              : "bg-[var(--success)]"
-                          )} />
-                          <span className="text-[var(--text-3)] uppercase tracking-wider">{toolMeta[ac.toolName]?.label || ac.toolName}</span>
-                          <span className="text-[var(--text-2)] max-w-[260px] truncate">{ac.result}</span>
-                          <span className="text-[var(--text-4)]">{formatTime(ac.timestamp)}</span>
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 );
               })}
+              {actionCards.length > 0 && !streamingActive && (
+                <div className="flex flex-col items-center gap-1.5 fade-in-up">
+                  {actionCards.map((ac) => (
+                    <div key={ac.id} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border-2)] bg-[var(--surface-2)]/80 text-[11px] font-mono">
+                      <span className={cn(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        ac.toolName === "add_reminder" || ac.toolName === "update_reminder"
+                          ? "bg-[var(--warm)]"
+                          : ac.toolName === "add_watch_later"
+                          ? "bg-[var(--accent-cool)]"
+                          : "bg-[var(--success)]"
+                      )} />
+                      <span className="text-[var(--text-3)] uppercase tracking-wider">{toolMeta[ac.toolName]?.label || ac.toolName}</span>
+                      <span className="text-[var(--text-2)] max-w-[360px] truncate">{ac.result}</span>
+                      <span className="text-[var(--text-4)]">{formatTime(ac.timestamp)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {streamingActive && streamingContent && (
                 <div key="streaming" className="flex justify-start scale-in">
                   <div className="relative max-w-[85%] rounded-lg p-3.5 bg-[var(--surface-1)] border-l-2 border-[var(--accent-cool)]">

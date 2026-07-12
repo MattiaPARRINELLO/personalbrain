@@ -11,9 +11,14 @@ interface SubInfo {
   endpoints: string[];
 }
 
+interface FcmInfo {
+  count: number;
+}
+
 export default function NotifTestPage() {
   const { show: toast } = useToast();
   const [subs, setSubs] = useState<SubInfo | null>(null);
+  const [fcm, setFcm] = useState<FcmInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [browserPerm, setBrowserPerm] = useState<string>("...");
@@ -21,6 +26,7 @@ export default function NotifTestPage() {
   useEffect(() => {
     setBrowserPerm(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
     fetchSubs();
+    fetchFcm();
   }, []);
 
   async function fetchSubs() {
@@ -33,6 +39,18 @@ export default function NotifTestPage() {
     }
   }
 
+  async function fetchFcm() {
+    try {
+      const res = await fetch("/api/push/register-capacitor");
+      if (res.ok) {
+        const data = (await res.json()) as FcmInfo;
+        setFcm(data);
+      }
+    } catch {
+      setFcm(null);
+    }
+  }
+
   async function sendTest() {
     setLoading(true);
     setResult(null);
@@ -42,8 +60,9 @@ export default function NotifTestPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: "Test BACKSTAGE", message: "Notification de test depuis la page debug" }),
       });
-      const data = (await res.json()) as { sent: number; failed: number; count: number };
-      setResult(`Envoyé à ${data.sent}/${data.count} appareil(s), ${data.failed} échec(s)`);
+      const data = (await res.json()) as { sent: number; failed: number; count: number; fcm?: { sent?: number; failed?: number } };
+      const fcmStatus = data.fcm?.sent ? "FCM:✅" : data.fcm?.failed ? "FCM:❌" : "FCM:—";
+      setResult(`Envoyé à ${data.sent}/${data.count} appareil(s), ${data.failed} échec(s) — ${fcmStatus}`);
       toast({ message: `Test envoyé à ${data.sent} appareil(s)` });
     } catch {
       setResult("Erreur réseau");
@@ -70,6 +89,25 @@ export default function NotifTestPage() {
     });
     setResult("Notification navigateur affichée");
     setBrowserPerm(Notification.permission);
+  }
+
+  async function clearAll() {
+    if (!confirm("Supprimer TOUTES les souscriptions push (web + Android) ?")) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/push", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+      const data = (await res.json()) as { cleared?: string; error?: string };
+      toast({ message: data.cleared ? `Supprimé : ${data.cleared}` : "Erreur" });
+      await fetchSubs();
+      await fetchFcm();
+    } catch {
+      toast({ message: "Erreur réseau" });
+    }
+    setLoading(false);
   }
 
   return (
@@ -107,6 +145,26 @@ export default function NotifTestPage() {
               {loading ? "Envoi..." : "Envoyer test push à tous"}
             </Button>
           </div>
+        </section>
+
+        <section className="rounded-xl border border-[var(--border-1)] p-4 space-y-3">
+          <h2 className="text-xs font-mono text-[var(--text-3)]">FCM TOKENS (Android)</h2>
+          <p className="text-sm font-mono">
+            {fcm ? `${fcm.count} appareil(s) enregistré(s)` : "Chargement..."}
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={fetchFcm} variant="ghost">
+              Rafraîchir
+            </Button>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-[var(--danger)]/30 p-4 space-y-3">
+          <h2 className="text-xs font-mono text-[var(--danger)]">DANGER ZONE</h2>
+          <p className="text-xs text-[var(--text-3)]">Supprime toutes les souscriptions push (Web + Android).</p>
+          <Button size="sm" onClick={clearAll} disabled={loading}>
+            {loading ? "Suppression..." : "Tout supprimer"}
+          </Button>
         </section>
 
         {result && (

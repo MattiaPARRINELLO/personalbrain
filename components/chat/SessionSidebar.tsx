@@ -49,11 +49,12 @@ interface SessionSidebarProps {
   activeSessionId?: string;
   onSelectSession: (session: { id: string; title: string; messages: { id: string; role: "user" | "assistant"; content: string; timestamp: string; toolCalls?: { id: string; name: string; arguments?: string; result?: string; status: "running" | "success" | "error"; duration?: number; resultCount?: number }[] }[] }) => void;
   onNewSession: () => void;
+  onDeleteSession?: (id: string) => void;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 }
 
-export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession, mobileOpen, onMobileClose }: SessionSidebarProps) {
+export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession, onDeleteSession, mobileOpen, onMobileClose }: SessionSidebarProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [search, setSearch] = useState("");
 
@@ -110,6 +111,7 @@ export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession,
     const { deleteChatSession } = await import("@/app/actions/chat-history");
     await deleteChatSession(id);
     setSessions((prev) => prev.filter((s) => s.id !== id));
+    onDeleteSession?.(id);
   };
 
   const getDotColor = (ctx?: string) => {
