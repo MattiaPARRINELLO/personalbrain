@@ -71,13 +71,26 @@ export interface CalendarEvent {
   type: "concert" | "meeting" | "other";
 }
 
+export interface GoogleCalendarEvent {
+  id: string;
+  summary: string;
+  start: string;
+  end: string;
+  location?: string;
+  description?: string;
+  colorId?: string;
+}
+
 export interface Email {
   id: string;
+  threadId?: string;
   from: string;
   subject: string;
+  snippet?: string;
   body: string;
   date: string;
   unread: boolean;
+  messageId?: string;
   triage?: {
     priority: "urgent" | "normal" | "low";
     needsReply: boolean;

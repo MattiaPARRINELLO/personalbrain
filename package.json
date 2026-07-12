@@ -10,14 +10,29 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "analyze": "ANALYZE=true bun run build"
+    "analyze": "ANALYZE=true bun run build",
+    "cap:sync": "bunx cap sync",
+    "cap:open": "bunx cap open android",
+    "cap:run": "bun run build && bunx cap sync && bunx cap run android",
+    "cap:dev:sync": "CAP_DEV=true bunx cap sync",
+    "cron:reminders": "bun scripts/cron-scheduler.ts reminders",
+    "cron:daily-brief": "bun scripts/cron-scheduler.ts daily-brief"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.109.1",
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/browser": "^8.0.3",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/local-notifications": "^8.2.0",
+    "@capacitor/push-notifications": "^8.1.1",
+    "@capacitor/splash-screen": "^8.0.1",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.2",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
+    "firebase-admin": "^14.1.0",
     "google-auth-library": "^10.9.0",
     "lucide-react": "^1.23.0",
     "next": "16.2.10",
@@ -27,9 +42,11 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.6.0",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@next/bundle-analyzer": "^16.2.10",
     "@playwright/test": "^1.52.0",
     "@tailwindcss/postcss": "^4",
@@ -40,6 +57,7 @@
     "@vitest/coverage-v8": "^4.1.9",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.9"

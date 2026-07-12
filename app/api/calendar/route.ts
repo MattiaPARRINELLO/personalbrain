@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, updateGoogleCalendarEvent } from "@/lib/google-actions";
 import { getServerCached, setServerCached, invalidateServerCache } from "@/lib/server-cache";
-
-export interface CalendarEventItem {
-  id: string;
-  summary: string;
-  start: string;
-  end: string;
-  location?: string;
-  description?: string;
-  colorId?: string;
-}
+import { getSession } from "@/lib/session";
+import type { GoogleCalendarEvent as CalendarEventItem } from "@/lib/types";
 
 const CALENDAR_LIST_CACHE_KEY = "calendar:list";
 const CALENDAR_LIST_TTL_MS = 2 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Non authentifie" }, { status: 401 });
+  }
   try {
     const timeMin = request.nextUrl.searchParams.get("timeMin");
     const timeMax = request.nextUrl.searchParams.get("timeMax");
@@ -41,6 +37,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Non authentifie" }, { status: 401 });
+  }
   try {
     const body = (await request.json()) as {
       summary: string;
@@ -48,9 +48,10 @@ export async function POST(request: NextRequest) {
       end: string;
       description?: string;
       location?: string;
+      colorId?: string;
     };
 
-    const id = await createGoogleCalendarEvent(body.summary, body.start, body.end, body.location, body.description);
+    const id = await createGoogleCalendarEvent(body.summary, body.start, body.end, body.location, body.description, body.colorId);
     invalidateServerCache(CALENDAR_LIST_CACHE_KEY);
     return NextResponse.json({ success: true, id });
   } catch (err) {
@@ -61,6 +62,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Non authentifie" }, { status: 401 });
+  }
   try {
     const body = (await request.json()) as {
       eventId: string;

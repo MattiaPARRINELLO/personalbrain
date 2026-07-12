@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { addMemoryFact, findSimilarMemoryFacts, getMemory, logActivity } from "@/lib/storage";
+import { getSession } from "@/lib/session";
 
 const bodySchema = z.object({
   content: z.string().trim().min(1, "Le contenu est requis").max(500),
@@ -9,6 +10,10 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Non authentifie" }, { status: 401 });
+  }
   try {
     const raw = await request.json();
     const parsed = bodySchema.safeParse(raw);

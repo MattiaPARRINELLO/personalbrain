@@ -1,4 +1,4 @@
-const VAPID_PUBLIC_KEY = "BMmFNNXqVHLnhyokND2qq1ga3n1lq_4w1eTEhuU0Q-3f6wZUOMgQ0jeT03CkwsobgmRnxrmDPCGpj6FmLjP7bl0";
+let VAPID_PUBLIC_KEY = "BMmFNNXqVHLnhyokND2qq1ga3n1lq_4w1eTEhuU0Q-3f6wZUOMgQ0jeT03CkwsobgmRnxrmDPCGpj6FmLjP7bl0";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -56,6 +56,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") {
     self.skipWaiting();
+  }
+  if (event.data?.type === "VAPID_KEY" && event.data?.key) {
+    VAPID_PUBLIC_KEY = event.data.key;
   }
 });
 
@@ -135,9 +138,16 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(() =>
-        caches.match(event.request).then((cached) => cached || caches.match("/"))
-      )
+      caches.match(event.request).then((cached) => {
+        const networkFetch = fetch(event.request).then((res) => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(event.request, clone));
+          }
+          return res;
+        }).catch(() => caches.match("/"));
+        return cached || networkFetch;
+      })
     );
     return;
   }

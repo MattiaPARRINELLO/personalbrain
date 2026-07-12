@@ -1,6 +1,5 @@
 import { getGmailClient, getCalendarClient } from "./google-client";
-import type { GmailMessage } from "@/app/api/gmail/route";
-import type { CalendarEventItem } from "@/app/api/calendar/route";
+import type { Email as GmailMessage, GoogleCalendarEvent as CalendarEventItem } from "@/lib/types";
 import type { OAuth2Client } from "google-auth-library";
 
 type GmailHeader = { name?: string; value?: string };
@@ -178,7 +177,8 @@ export async function createGoogleCalendarEvent(
   start: string,
   end: string,
   location?: string,
-  description?: string
+  description?: string,
+  colorId?: string
 ): Promise<string> {
   const auth = await getCalendarClient();
 
@@ -195,6 +195,7 @@ export async function createGoogleCalendarEvent(
         end: isAllDay ? { date: end } : { dateTime: end },
         location,
         description,
+        colorId,
       }),
     }
   );
