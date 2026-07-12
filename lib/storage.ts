@@ -539,13 +539,48 @@ export async function touchMemoryFact(id: string): Promise<void> {
 
 export async function findSimilarMemoryFacts(content: string, category: MemoryFact["category"]): Promise<MemoryFact | null> {
   const data = await getMemory();
+  const categoryFacts = data.facts.filter((f) => f.category === category);
+  if (categoryFacts.length === 0) return null;
+
+  // Try AI semantic matching
+  try {
+    const { chatCompletion } = await import("./ai-providers");
+    const { getConfig } = await import("./config");
+    const config = await getConfig();
+    const model = config.models.generalAlt;
+
+    const factsList = categoryFacts
+      .map((f) => `- id=${f.id}: ${f.content}`)
+      .join("\n");
+    const result = await chatCompletion(
+      model,
+      [
+        {
+          role: "system",
+          content:
+            "Tu compares un nouveau texte avec une liste de faits existants. Retourne UNIQUEMENT l'id du fait le plus similaire sémantiquement, ou 'null' si aucun ne correspond. Ne retourne rien d'autre.",
+        },
+        {
+          role: "user",
+          content: `Nouveau texte: "${content}"\nFaits existants:\n${factsList}`,
+        },
+      ],
+      []
+    );
+
+    const id = result.content.trim();
+    if (id && id !== "null") {
+      const found = categoryFacts.find((f) => f.id === id);
+      if (found) return found;
+    }
+  } catch {
+    // Fall back to exact match below
+  }
+
+  // Fallback: exact match (normalisé)
   const norm = (s: string) => s.toLowerCase().trim();
   const target = norm(content);
-  return (
-    data.facts.find(
-      (f) => f.category === category && norm(f.content) === target
-    ) ?? null
-  );
+  return categoryFacts.find((f) => norm(f.content) === target) ?? null;
 }
 
 export async function deleteMemoryFact(id: string): Promise<boolean> {
@@ -617,13 +652,17 @@ export async function markEmailRead(id: string): Promise<void> {
 
 export async function getCalendar(): Promise<CalendarEvent[]> {
   const concerts = await getConcerts();
-  return concerts.events.map((evt) => ({
-    id: evt.id,
-    title: `Concert : ${evt.artist}`,
-    date: evt.date,
-    venue: evt.venue,
-    type: "concert" as const,
-  }));
+  const calendarData = await readJsonSafe<{ events: CalendarEvent[] }>("calendar.json", { events: [] });
+  return [
+    ...concerts.events.map((evt) => ({
+      id: evt.id,
+      title: `Concert : ${evt.artist}`,
+      date: evt.date,
+      venue: evt.venue,
+      type: "concert" as const,
+    })),
+    ...calendarData.events,
+  ];
 }
 
 export async function addCalendarEvent(event: Omit<CalendarEvent, "id">): Promise<CalendarEvent> {
@@ -860,6 +899,7 @@ export async function addWatchLaterItem(input: {
     title: input.title,
     description: input.description,
     thumbnail: input.thumbnail,
+    read: false,
     source: input.source || detectSource(input.url),
     category: input.category || detectCategory(input.url),
     createdAt: new Date().toISOString(),

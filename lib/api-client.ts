@@ -1,6 +1,24 @@
-import type { Email as GmailMessage, GoogleCalendarEvent as CalendarEvent } from "@/lib/types";
+export type GmailMessage = {
+  id: string;
+  threadId: string;
+  from: string;
+  subject: string;
+  date: string;
+  snippet: string;
+  body: string;
+  unread: boolean;
+  messageId?: string;
+};
 
-export type { GmailMessage, CalendarEvent };
+export type CalendarEvent = {
+  id: string;
+  summary: string;
+  start: string;
+  end: string;
+  location?: string;
+  description?: string;
+  colorId?: string;
+};
 
 export type GoogleLinkStatus = {
   gmail: boolean;

@@ -1,26 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/browser";
-import { Fingerprint, Loader2, ShieldCheck, AlertCircle, Sparkles } from "lucide-react";
+import { Fingerprint, Loader2, ShieldCheck, AlertCircle, Sparkles, Smartphone, ExternalLink } from "lucide-react";
+import { isCapacitor, isWebAuthnSupported } from "@/lib/capacitor";
+import { openAuthInBrowser, onCapTokenReceived, setCapSessionCookie, parseTokenFromFragment } from "@/lib/capacitor-auth";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isCapMode = searchParams?.get("cap") === "1";
+
   const [status, setStatus] = useState<"idle" | "loading" | "registering" | "authenticating">("idle");
   const [needsRegistration, setNeedsRegistration] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isCapacitorApp] = useState(() => isCapacitor() && !isWebAuthnSupported());
 
   useEffect(() => {
     void fetch("/api/auth/session", { credentials: "same-origin" })
       .then((res) => res.json() as Promise<{ authenticated: boolean }>)
       .then((data) => {
         if (data.authenticated) {
-          router.replace("/");
+          if (isCapMode) {
+            exchangeTokenAndClose();
+          } else {
+            router.replace("/");
+          }
           return;
         }
         return fetch("/api/auth/passkey/register-options", { credentials: "same-origin" })
@@ -28,9 +38,27 @@ export default function LoginPage() {
           .then((regData) => setNeedsRegistration(regData.isFirstRegistration));
       })
       .catch(() => setNeedsRegistration(false));
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, isCapMode]);
+
+  const exchangeTokenAndClose = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/token-exchange", { credentials: "same-origin" });
+      const data = (await res.json()) as { token: string | null };
+      if (data.token) {
+        window.location.replace(`backstage://auth?token=${encodeURIComponent(data.token)}`);
+      }
+    } catch {
+      // fallback: try to close the tab
+      window.close();
+    }
+  }, []);
 
   async function handleRegister() {
+    if (isCapacitorApp) {
+      return openAuthInBrowser();
+    }
+
     setStatus("registering");
     setError(null);
     try {
@@ -45,7 +73,11 @@ export default function LoginPage() {
       });
       const verifyData = (await verifyRes.json()) as { verified?: boolean; error?: string };
       if (verifyData.verified) {
-        router.replace("/");
+        if (isCapMode) {
+          await exchangeTokenAndClose();
+        } else {
+          router.replace("/");
+        }
       } else {
         setError(verifyData.error ?? "L'enregistrement a échoué.");
         setStatus("idle");
@@ -57,6 +89,10 @@ export default function LoginPage() {
   }
 
   async function handleAuthenticate() {
+    if (isCapacitorApp) {
+      return openAuthInBrowser();
+    }
+
     setStatus("authenticating");
     setError(null);
     try {
@@ -76,7 +112,11 @@ export default function LoginPage() {
       });
       const verifyData = (await verifyRes.json()) as { verified?: boolean; error?: string };
       if (verifyData.verified) {
-        router.replace("/");
+        if (isCapMode) {
+          await exchangeTokenAndClose();
+        } else {
+          router.replace("/");
+        }
       } else {
         setError(verifyData.error ?? "L'authentification a échoué.");
         setStatus("idle");
@@ -88,12 +128,13 @@ export default function LoginPage() {
   }
 
   const isBusy = status !== "idle";
-  const label =
-    needsRegistration === null
+  const label = isCapacitorApp
+    ? "Ouvrir l'authentification"
+    : needsRegistration === null
       ? "Chargement…"
       : needsRegistration
-      ? "Configurer Face ID / Touch ID"
-      : "Se connecter avec Face ID / Touch ID";
+        ? "Configurer Face ID / Touch ID"
+        : "Se connecter avec Face ID / Touch ID";
 
   return (
     <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
@@ -119,6 +160,8 @@ export default function LoginPage() {
           >
             {isBusy ? (
               <Loader2 className="w-4 h-4 animate-spin" />
+            ) : isCapacitorApp ? (
+              <ExternalLink className="w-4 h-4" />
             ) : (
               <Fingerprint className="w-4 h-4" />
             )}
@@ -131,13 +174,28 @@ export default function LoginPage() {
               <span>{error}</span>
             </div>
           )}
+
+          {isCapacitorApp && (
+            <div className="mt-4 flex items-start gap-2 text-[11.5px] text-[var(--text-3)] leading-relaxed">
+              <Smartphone className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--accent-cool)]" />
+              <span>L&apos;authentification s&apos;ouvre dans ton navigateur, reviens ensuite dans l&apos;app.</span>
+            </div>
+          )}
         </div>
 
         <p className="text-[10px] text-[var(--text-4)] mt-6 text-center font-mono uppercase tracking-wider">
           <ShieldCheck className="w-3 h-3 inline-block mr-1 -mt-0.5" />
-          Authentification par clé d’accès
+          Authentification par clé d&apos;accès
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

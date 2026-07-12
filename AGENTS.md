@@ -53,6 +53,36 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - FS-dependent tests must dynamic-import storage modules after mocking `process.cwd()`
 - Test helpers in `lib/__tests__/__fs-mock-helper.ts`
 
+## Android (Capacitor)
+
+- **App wrapper** — `capacitor.config.ts` (prod URL: `brain.mprnl.fr`, dev: `http://10.0.2.2:3000`)
+- **Android project** — `android/` (generated, build artifacts gitignored)
+- **JDK** — Java 21 (Java 26 incompatible avec AGP)
+- **ANDROID_HOME** — `/opt/android-sdk`
+- **Plugins** — `@capacitor/browser`, `@capacitor/push-notifications`, `@capacitor/app`
+
+### Commandes Capacitor
+
+| Usage | Commande |
+|---|---|
+| Sync prod | `bunx cap sync` |
+| Sync dev | `CAP_DEV=true bunx cap sync` |
+| Ouvrir Android Studio | `bunx cap open android` |
+| Build APK debug | `cd android && ./gradlew assembleDebug` |
+| Run on device (dev) | `bun run build && CAP_DEV=true bunx cap run android` |
+
+### Build APK
+```bash
+cd android
+ANDROID_HOME=/opt/android-sdk JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew assembleDebug
+# APK → android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+### Limitations WebView
+
+- **WebAuthn/Passkey** — non supporté dans un WebView Android. L'utilisateur doit s'authentifier d'abord sur un navigateur desktop (la session cookie persiste dans le WebView). `lib/capacitor.ts` détecte l'environnement et affiche une notice.
+- **Google OAuth** — le redirect OAuth peut ne pas fonctionner en WebView. À terme, utiliser `@capacitor/browser` pour ouvrir l'auth dans un Custom Tab.
+
 ## Env vars
 
 Required: `NEXT_PUBLIC_API_URL`, `IA_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `AUTH_SECRET`.

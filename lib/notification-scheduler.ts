@@ -10,10 +10,32 @@ let dailyBriefInterval: ReturnType<typeof setInterval> | null = null;
 
 const REMINDER_INTERVAL_MS = 60_000;
 const DAILY_BRIEF_HOUR = 7;
+const NOTIFIED_FILE = "notified-reminders.json";
 
-const notifiedReminders = new Set<string>();
+async function getNotifiedReminders(): Promise<Set<string>> {
+  try {
+    const { readJsonSafe } = await import("./storage");
+    const data = await readJsonSafe<{ ids: string[] }>(NOTIFIED_FILE, { ids: [] });
+    return new Set(data.ids);
+  } catch {
+    return new Set();
+  }
+}
 
-async function sendPushToAll(payload: string, tag?: string) {
+async function markReminderNotified(id: string): Promise<void> {
+  try {
+    const { readJsonSafe, writeJsonAtomic } = await import("./storage");
+    const data = await readJsonSafe<{ ids: string[] }>(NOTIFIED_FILE, { ids: [] });
+    if (!data.ids.includes(id)) {
+      data.ids.push(id);
+      await writeJsonAtomic(NOTIFIED_FILE, data);
+    }
+  } catch (err) {
+    console.error("[scheduler] Erreur persistance notification:", err);
+  }
+}
+
+export async function sendPushToAll(payload: string, tag?: string) {
   const subs = await getSubscriptions();
   if (subs.length === 0) return;
 
@@ -48,9 +70,16 @@ async function sendPushToAll(payload: string, tag?: string) {
   } else {
     console.log(`[scheduler] ${subs.length}/${subs.length} push envoyés avec succès`);
   }
+
+  try {
+    const { sendFcmPushToAll } = await import("./fcm");
+    await sendFcmPushToAll(payload);
+  } catch (err) {
+    console.error("[scheduler] Erreur FCM:", err);
+  }
 }
 
-async function checkReminders() {
+export async function checkReminders() {
   try {
     const data = await getReminders();
     const now = Date.now();
@@ -58,9 +87,12 @@ async function checkReminders() {
       (r) => r.status === "pending" && new Date(r.dueAt).getTime() <= now + 60_000
     );
 
+    const notifiedReminders = await getNotifiedReminders();
+
     for (const r of pending) {
       if (notifiedReminders.has(r.id)) continue;
       notifiedReminders.add(r.id);
+      await markReminderNotified(r.id);
 
       const payload = JSON.stringify({
         title: r.title,
@@ -84,7 +116,7 @@ async function checkReminders() {
   }
 }
 
-async function triggerDailyBrief() {
+export async function triggerDailyBrief() {
   try {
     const config = await getConfig();
     if (!config.features.dailyBrief) return;
@@ -92,9 +124,23 @@ async function triggerDailyBrief() {
     const { readJsonSafe } = await import("./storage");
     const data = await readJsonSafe<{ briefs: { date: string; summary: string }[] }>("daily-briefs.json", { briefs: [] });
     const today = new Date().toISOString().slice(0, 10);
-    const todayBrief = data.briefs.find((b) => b.date === today);
+    let todayBrief = data.briefs.find((b) => b.date === today);
 
-    if (!todayBrief) return;
+    if (!todayBrief) {
+      console.log("[scheduler] Pas de brief pour aujourd'hui, génération automatique...");
+      const { generateDailyBrief } = await import("./daily-brief");
+      const summary = await generateDailyBrief();
+      if (!summary) {
+        console.log("[scheduler] Échec génération brief");
+        return;
+      }
+      const updated = await readJsonSafe<{ briefs: { date: string; summary: string }[] }>("daily-briefs.json", { briefs: [] });
+      todayBrief = updated.briefs.find((b) => b.date === today);
+      if (!todayBrief) {
+        console.log("[scheduler] Brief généré mais introuvable après sauvegarde");
+        return;
+      }
+    }
 
     const payload = JSON.stringify({
       title: "Brief du jour",

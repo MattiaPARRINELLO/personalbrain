@@ -5,39 +5,11 @@ import {
   type UnifiedTool,
   type StreamEvent,
 } from "@/lib/ai-providers";
-import {
-  getMemory,
-  webSearch,
-  addReminder,
-  updateReminder,
-  addWatchLaterItem,
-  fetchPageMeta,
-  getConcerts,
-  getAccreditations,
-  getReminders,
-  getCalendar,
-  addMemoryRelationship,
-  getMemoryRelationships,
-  addAccreditation,
-  searchAccreditations,
-  autoSummarize,
-  saveAccreditations,
-  prepareConcert,
-  getWeather,
-  getPhotoShoots,
-  addPhotoShoot,
-  updatePhotoShoot,
-} from "@/lib/storage";
-import {
-  fetchGmailMessages,
-  sendGmailReply,
-  createGoogleCalendarEvent,
-  fetchGoogleCalendarEvents,
-  updateGoogleCalendarEvent,
-} from "@/lib/google-actions";
+import { getMemory, webSearch, addReminder, updateReminder, addWatchLaterItem, fetchPageMeta, getConcerts, getAccreditations, getReminders, getCalendar, addMemoryRelationship, getMemoryRelationships, addAccreditation, searchAccreditations, autoSummarize, saveAccreditations, prepareConcert, getWeather, getPhotoShoots, addPhotoShoot, updatePhotoShoot } from "@/lib/storage";
+import type { PhotoShootStatus } from "@/lib/types";
+import { fetchGmailMessages, sendGmailReply, createGoogleCalendarEvent, fetchGoogleCalendarEvents, updateGoogleCalendarEvent } from "@/lib/google-actions";
 import { getModel } from "@/lib/config";
-import { getSession } from "@/lib/session";
-import type { ChatMessage, MemoryCategory, Accreditation, PhotoShootStatus } from "@/lib/types";
+import type { ChatMessage, MemoryCategory, Accreditation } from "@/lib/types";
 import { autoExtractMemoryFacts } from "@/app/actions/brain";
 
 const rateLimitMap = new Map<string, { tokens: number; lastRefill: number }>();
@@ -752,14 +724,6 @@ async function runMemoryExtraction(
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return new Response(JSON.stringify({ error: "Non authentifie" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
   if (!checkRateLimit(ip)) {
     return new Response(JSON.stringify({ error: "Trop de requêtes. Réessaie dans une minute." }), {

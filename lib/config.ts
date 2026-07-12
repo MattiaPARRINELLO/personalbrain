@@ -26,8 +26,8 @@ const CONFIG_PATH = path.join(process.cwd(), "data", CONFIG_FILENAME);
 
 const defaultConfig: AppConfig = {
   models: {
-    general: "deepseek-v4-flash",
-    generalAlt: "kimi-k2.6",
+    general: "kimi-k2.6",
+    generalAlt: "deepseek-v4-flash",
     code: "kimi-k2.7-code",
     titleModel: "deepseek-v4-flash",
   },
@@ -58,7 +58,14 @@ export async function getConfig(): Promise<AppConfig> {
   }
 
   const parsed = await readJsonSafe<Partial<AppConfig>>(CONFIG_FILENAME, defaultConfig);
-  const merged: AppConfig = { ...defaultConfig, ...parsed };
+  const merged: AppConfig = {
+    ...defaultConfig,
+    ...parsed,
+    models: { ...defaultConfig.models, ...parsed.models },
+    llm: { ...defaultConfig.llm, ...parsed.llm },
+    features: { ...defaultConfig.features, ...parsed.features },
+    theme: { ...defaultConfig.theme, ...parsed.theme },
+  };
   cachedConfig = { data: merged, ts: Date.now() };
   return merged;
 }
