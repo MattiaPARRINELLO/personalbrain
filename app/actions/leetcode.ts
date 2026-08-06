@@ -1,11 +1,14 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
+
 import { getLeetcode, saveLeetcode, addLeetcodeExercise, logActivity, getCalendar } from "@/lib/storage";
 import { fetchLeetCodeProfile } from "@/lib/leetcode-api";
 import type { LeetcodeData, LeetcodeExercise, CalendarEvent } from "@/lib/types";
 import { findFreeSlots } from "@/lib/leetcode-utils";
 
 export async function loadLeetcode(): Promise<LeetcodeData> {
+  await requireSession();
   const data = await getLeetcode();
   // Si un username est configuré mais que les données sont vides, tenter un sync auto
   if (data.leetcodeUsername && data.streak === 0) {
@@ -29,15 +32,18 @@ export async function loadLeetcode(): Promise<LeetcodeData> {
 }
 
 export async function saveLeetcodeData(data: LeetcodeData): Promise<void> {
+  await requireSession();
   await saveLeetcode(data);
 }
 
 export async function storeExercise(exercise: LeetcodeExercise): Promise<void> {
+  await requireSession();
   await addLeetcodeExercise(exercise);
   await logActivity("leetcode_solved", `Exercice LeetCode : ${exercise.title}`);
 }
 
 export async function syncLeetcode(): Promise<LeetcodeData> {
+  await requireSession();
   const data = await getLeetcode();
   const username = data.leetcodeUsername;
   if (!username) throw new Error("Aucun username LeetCode configuré");
@@ -57,6 +63,7 @@ export async function syncLeetcode(): Promise<LeetcodeData> {
 }
 
 export async function getSmartSuggestion(): Promise<string> {
+  await requireSession();
   const lec = await getLeetcode();
   const calendarEvents = await getCalendar().catch(() => []);
   const now = new Date();
@@ -86,6 +93,7 @@ export async function getSmartSuggestion(): Promise<string> {
 }
 
 export async function setLeetcodeUsername(username: string): Promise<LeetcodeData> {
+  await requireSession();
   const cleaned = username.trim();
   if (!cleaned) throw new Error("Username requis");
 

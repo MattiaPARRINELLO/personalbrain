@@ -9,6 +9,7 @@ const mockStorage = {
 };
 
 vi.mock("@/lib/storage", () => mockStorage);
+vi.mock("@/lib/session", () => ({ requireSession: vi.fn().mockResolvedValue({ userId: "test-user" }) }));
 
 const { loadCalendar, createCalendarEvent, loadEmails, findEmails, searchWeb } = await import("@/app/actions/ai-tools");
 

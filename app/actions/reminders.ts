@@ -1,5 +1,7 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
+
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
@@ -33,6 +35,7 @@ const updateReminderSchema = z
   .strict();
 
 export async function loadReminders(): Promise<RemindersData> {
+  await requireSession();
   return getReminders();
 }
 
@@ -42,6 +45,7 @@ export async function createReminder(input: {
   dueAt: string;
   recurrence?: Reminder["recurrence"];
 }): Promise<Reminder> {
+  await requireSession();
   const parsed = createReminderSchema.safeParse(input);
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Payload invalide");
@@ -56,6 +60,7 @@ export async function editReminder(
   id: string,
   updates: Partial<Pick<Reminder, "title" | "notes" | "dueAt" | "status" | "recurrence">>
 ): Promise<Reminder | null> {
+  await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const parsed = updateReminderSchema.safeParse(updates);
   if (!parsed.success) {
@@ -68,6 +73,7 @@ export async function editReminder(
 }
 
 export async function removeReminder(id: string): Promise<boolean> {
+  await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const ok = await deleteReminder(id);
   if (ok) await logActivity("reminder_deleted", "Rappel supprimé", id);
@@ -79,6 +85,7 @@ export async function markReminderStatus(
   id: string,
   status: Reminder["status"]
 ): Promise<Reminder | null> {
+  await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const parsedStatus = reminderStatusSchema.safeParse(status);
   if (!parsedStatus.success) throw new Error("Statut invalide");

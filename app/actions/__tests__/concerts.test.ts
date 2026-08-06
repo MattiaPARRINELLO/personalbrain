@@ -7,6 +7,7 @@ const mockStorage = {
 };
 
 vi.mock("@/lib/storage", () => mockStorage);
+vi.mock("@/lib/session", () => ({ requireSession: vi.fn().mockResolvedValue({ userId: "test-user" }) }));
 
 const { loadConcerts, saveConcertEvents } = await import("@/app/actions/concerts");
 

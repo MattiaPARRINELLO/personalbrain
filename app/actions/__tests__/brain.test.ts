@@ -14,6 +14,7 @@ const mockStorage = {
 
 vi.mock("@/lib/storage", () => mockStorage);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/session", () => ({ requireSession: vi.fn().mockResolvedValue({ userId: "test-user" }) }));
 
 const { loadBrain, rememberFact, autoExtractMemoryFacts, editMemoryFact, forgetFact, loadMemoryRelationships, updateProfile } = await import("@/app/actions/brain");
 

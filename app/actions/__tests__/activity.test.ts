@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 const mockGetActivity = vi.fn();
 
 vi.mock("@/lib/storage", () => ({ getActivity: mockGetActivity }));
+vi.mock("@/lib/session", () => ({ requireSession: vi.fn().mockResolvedValue({ userId: "test-user" }) }));
 
 const { loadActivity } = await import("@/app/actions/activity");
 

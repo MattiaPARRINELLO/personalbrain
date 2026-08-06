@@ -1,21 +1,27 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
+
 import { getChatHistory as storageGetChatHistory, saveChatSession as storageSaveChatSession, deleteChatSession as storageDeleteChatSession } from "@/lib/storage";
 import type { ChatSession } from "@/lib/types";
 
 export async function getChatHistory() {
+  await requireSession();
   return storageGetChatHistory();
 }
 
 export async function saveChatSession(session: ChatSession) {
+  await requireSession();
   return storageSaveChatSession(session);
 }
 
 export async function deleteChatSession(id: string) {
+  await requireSession();
   return storageDeleteChatSession(id);
 }
 
 export async function generateConversationTitle(content: string): Promise<string> {
+  await requireSession();
   const { chatCompletion } = await import("@/lib/ai-providers");
   const { getConfig } = await import("@/lib/config");
   const config = await getConfig();

@@ -25,6 +25,7 @@ vi.mock("@/lib/config", () => ({
   getModel: vi.fn().mockResolvedValue({ primary: "deepseek-v4-flash", alt: "deepseek-v4-flash" }),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/session", () => ({ requireSession: vi.fn().mockResolvedValue({ userId: "test-user" }) }));
 
 const {
   loadAccreditations,

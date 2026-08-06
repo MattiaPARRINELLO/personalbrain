@@ -1,5 +1,7 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
+
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
@@ -51,6 +53,7 @@ const updateProfileSchema = z
   .strict();
 
 export async function loadBrain(): Promise<MemoryData> {
+  await requireSession();
   return getMemory();
 }
 
@@ -59,6 +62,7 @@ export async function rememberFact(
   category: MemoryCategory,
   options?: { source?: MemorySource; confidence?: number }
 ): Promise<MemoryFact> {
+  await requireSession();
   const parsed = rememberFactSchema.safeParse({ content, category, ...options });
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Payload invalide");
@@ -81,6 +85,7 @@ export async function rememberFact(
 export async function autoExtractMemoryFacts(
   raw: { facts: { content: string; category: MemoryCategory; confidence: number }[] }
 ): Promise<MemoryFact[]> {
+  await requireSession();
   const parsed = autoExtractSchema.safeParse(raw);
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Payload invalide");
@@ -109,6 +114,7 @@ export async function editMemoryFact(
   id: string,
   updates: Partial<Pick<MemoryFact, "content" | "category">>
 ): Promise<MemoryFact | null> {
+  await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const parsed = updateMemorySchema.safeParse(updates);
   if (!parsed.success) {
@@ -121,6 +127,7 @@ export async function editMemoryFact(
 }
 
 export async function forgetFact(id: string): Promise<boolean> {
+  await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const ok = await deleteMemoryFact(id);
   if (ok) await logActivity("memory_deleted", "Fait supprimé", id);
@@ -129,10 +136,12 @@ export async function forgetFact(id: string): Promise<boolean> {
 }
 
 export async function loadMemoryRelationships(): Promise<MemoryRelationship[]> {
+  await requireSession();
   return getMemoryRelationships();
 }
 
 export async function updateProfile(input: { name?: string; preferences?: string[] }): Promise<MemoryData> {
+  await requireSession();
   const parsed = updateProfileSchema.safeParse(input);
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Payload invalide");

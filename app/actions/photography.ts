@@ -1,5 +1,7 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
+
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
@@ -35,6 +37,7 @@ const updatePhotoShootSchema = z
   .strict();
 
 export async function loadPhotoShoots() {
+  await requireSession();
   return getPhotoShoots();
 }
 
@@ -44,6 +47,7 @@ export async function createPhotoShoot(input: {
   client: string;
   notes?: string;
 }) {
+  await requireSession();
   const parsed = createPhotoShootSchema.safeParse(input);
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Payload invalide");
@@ -67,6 +71,7 @@ export async function editPhotoShoot(
     photosSent: number;
   }>
 ) {
+  await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const parsed = updatePhotoShootSchema.safeParse(updates);
   if (!parsed.success) {
@@ -83,6 +88,7 @@ export async function editPhotoShoot(
 }
 
 export async function removePhotoShoot(id: string): Promise<boolean> {
+  await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const ok = await deletePhotoShoot(id);
   if (ok) await logActivity("shoot_deleted", "Shooting supprimé", id);
