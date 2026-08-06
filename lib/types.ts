@@ -71,6 +71,30 @@ export interface CalendarEvent {
   type: "concert" | "meeting" | "other";
 }
 
+// Événement du Google Calendar (type d'API, distinct de CalendarEvent local)
+export interface GoogleCalendarEvent {
+  id: string;
+  summary: string;
+  start: string;
+  end: string;
+  location?: string;
+  description?: string;
+  colorId?: string;
+}
+
+// Message Gmail (type d'API, distinct de Email local)
+export interface GmailMessage {
+  id: string;
+  threadId: string;
+  from: string;
+  subject: string;
+  date: string;
+  snippet: string;
+  body: string;
+  unread: boolean;
+  messageId?: string;
+}
+
 export interface Email {
   id: string;
   from: string;
@@ -276,4 +300,22 @@ export interface ChatSession {
 
 export interface ChatHistory {
   sessions: ChatSession[];
+}
+
+/* ───── Intentions (relances programmées) ───── */
+
+export type IntentionStatus = "pending" | "done" | "cancelled";
+
+export interface Intention {
+  id: string;
+  subject: string;
+  message?: string;
+  dueAt: string;
+  status: IntentionStatus;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface IntentionsData {
+  intentions: Intention[];
 }

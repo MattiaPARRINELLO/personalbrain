@@ -12,6 +12,11 @@ vi.mock("@/lib/config", () => ({
     llm: { temperature: 0, maxTokens: 128 },
   }),
 }));
+// isSafeFetchUrl fait un lookup DNS réel : mocké pour garder les tests
+// déterministes et hors réseau.
+vi.mock("dns/promises", () => ({
+  lookup: vi.fn().mockResolvedValue([{ address: "93.184.216.34", family: 4 }]),
+}));
 
 import { chatCompletion } from "@/lib/ai-providers";
 
