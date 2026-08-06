@@ -40,7 +40,7 @@ export function KeyboardShortcuts() {
         const handler = (e2: KeyboardEvent) => {
           window.removeEventListener("keydown", handler);
           switch (e2.key) {
-            case "c": router.push("/"); break;
+            case "c": router.push("/chat"); break;
             case "r": router.push("/reminders"); break;
             case "w": router.push("/watch-later"); break;
             case "a": router.push("/photos"); break;

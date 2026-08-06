@@ -12,6 +12,8 @@ import {
   LogOut,
   Mail,
   CalendarRange,
+  CalendarDays,
+  Timer,
   Check,
   X as XIcon,
   Camera,
@@ -29,9 +31,11 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/", label: "Console IA", icon: MessageSquareText, exact: true },
+  { href: "/chat", label: "Console IA", icon: MessageSquareText, exact: true },
   { href: "/brain", label: "Cerveau", icon: Brain },
   { href: "/reminders", label: "Rappels", icon: Bell },
+  { href: "/week", label: "Semaine", icon: CalendarDays },
+  { href: "/focus", label: "Focus", icon: Timer },
   { href: "/watch-later", label: "À voir", icon: Bookmark },
   { href: "/photos", label: "Photos", icon: Camera },
   { href: "/calendar", label: "Calendrier", icon: CalendarRange },
