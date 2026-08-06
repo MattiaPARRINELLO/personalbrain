@@ -1,24 +1,6 @@
-export type GmailMessage = {
-  id: string;
-  threadId: string;
-  from: string;
-  subject: string;
-  date: string;
-  snippet: string;
-  body: string;
-  unread: boolean;
-  messageId?: string;
-};
+import type { GmailMessage, GoogleCalendarEvent as CalendarEvent } from "./types";
 
-export type CalendarEvent = {
-  id: string;
-  summary: string;
-  start: string;
-  end: string;
-  location?: string;
-  description?: string;
-  colorId?: string;
-};
+export type { GmailMessage, CalendarEvent };
 
 export type GoogleLinkStatus = {
   gmail: boolean;
@@ -31,16 +13,21 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     credentials: "same-origin",
   });
-  const text = await res.text();
-  const data = text ? (JSON.parse(text) as unknown) : null;
   if (!res.ok) {
-    const message =
-      (data && typeof data === "object" && "error" in data && typeof (data as { error: unknown }).error === "string")
-        ? (data as { error: string }).error
-        : `Erreur ${res.status}`;
+    // On vérifie res.ok AVANT de parser : une réponse d'erreur non JSON
+    // (page HTML 500) ne doit pas lever un SyntaxError qui masque le message.
+    let message = `Erreur ${res.status}`;
+    try {
+      const data = (await res.json()) as { error?: unknown };
+      if (typeof data?.error === "string") message = data.error;
+    } catch {
+      // Corps non JSON : on garde le message par défaut.
+    }
     throw new Error(message);
   }
-  return data as T;
+  const text = await res.text();
+  if (!text) return null as T;
+  return JSON.parse(text) as T;
 }
 
 export const api = {

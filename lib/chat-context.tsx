@@ -4,7 +4,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -39,44 +41,51 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [streamingActive, setStreamingActive] = useState(false);
   const [lastFinishedTool, setLastFinishedTool] = useState<ContextTool | null>(null);
 
+  // Ref miroir : les mutations d'outils ne doivent PAS faire de side-effect
+  // dans l'updater de setState (fonction censée être pure en React concurrent).
+  // On calcule l'état suivant à partir du ref, puis on publie via setState.
+  const activeToolsRef = useRef<Record<string, ContextTool>>({});
+  useEffect(() => {
+    activeToolsRef.current = activeTools;
+  }, [activeTools]);
+
   const registerToolStart = useCallback<ChatContextValue["registerToolStart"]>((tool) => {
-    setActiveTools((prev) => ({
-      ...prev,
+    const next: Record<string, ContextTool> = {
+      ...activeToolsRef.current,
       [tool.id]: {
         ...tool,
         status: tool.status ?? "running",
         startedAt: Date.now(),
       },
-    }));
+    };
+    activeToolsRef.current = next;
+    setActiveTools(next);
   }, []);
 
   const registerToolResult = useCallback<ChatContextValue["registerToolResult"]>(
     (name, result, isError, duration) => {
-      let finished: ContextTool | null = null;
-      setActiveTools((prev) => {
-        const key = Object.keys(prev).find((k) => prev[k].name === name);
-        if (!key) return prev;
-        const existing = prev[key];
-        const updated: ContextTool = {
-          ...existing,
-          result,
-          status: isError ? "error" : "success",
-          duration: duration ?? existing.duration,
-          resultCount: result ? result.split("\n").filter(Boolean).length || 1 : 1,
-        };
-        finished = updated;
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-      if (finished) {
-        setLastFinishedTool(finished);
-      }
+      const prev = activeToolsRef.current;
+      const key = Object.keys(prev).find((k) => prev[k].name === name);
+      if (!key) return;
+      const existing = prev[key];
+      const updated: ContextTool = {
+        ...existing,
+        result,
+        status: isError ? "error" : "success",
+        duration: duration ?? existing.duration,
+        resultCount: result ? result.split("\n").filter(Boolean).length || 1 : 1,
+      };
+      const next = { ...prev };
+      delete next[key];
+      activeToolsRef.current = next;
+      setActiveTools(next);
+      setLastFinishedTool(updated);
     },
     []
   );
 
   const clearActiveTools = useCallback(() => {
+    activeToolsRef.current = {};
     setActiveTools({});
   }, []);
 

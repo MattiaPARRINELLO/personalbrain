@@ -27,6 +27,11 @@ export function ChatComposer({
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showMentionMenu, setShowMentionMenu] = useState(false);
+  const [voiceLive, setVoiceLive] = useState("");
+  const [voiceActive, setVoiceActive] = useState(false);
+
+  // Texte affiché : saisie + dictée vocale en cours (résultats intermédiaires).
+  const displayValue = voiceLive ? (value ? value + " " : "") + voiceLive : value;
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -95,7 +100,12 @@ export function ChatComposer({
         </div>
 
         <VoiceInput
-          onResult={(text) => onChange(value + text)}
+          onResult={(text) => {
+            onChange(value + (voiceLive ? " " : "") + text);
+            setVoiceLive("");
+          }}
+          onInterim={setVoiceLive}
+          onListeningChange={setVoiceActive}
           disabled={isLoading}
         />
         <button
@@ -118,15 +128,16 @@ export function ChatComposer({
 
         <textarea
           ref={ref}
-          value={value}
+          value={displayValue}
           onChange={(e) => {
             onChange(e.target.value);
+            setVoiceLive("");
             const el = e.target;
             el.style.height = "auto";
             el.style.height = Math.min(el.scrollHeight, 200) + "px";
           }}
           onKeyDown={onKey}
-          placeholder="Envoyer un message…"
+          placeholder={voiceActive ? "Parle maintenant…" : "Envoyer un message…"}
           rows={1}
           className="flex-1 bg-transparent text-[14px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none resize-none font-sans px-3 py-2 max-h-[200px]"
         />
@@ -141,7 +152,7 @@ export function ChatComposer({
         ) : (
           <button
             onClick={onSubmit}
-            disabled={!value.trim()}
+            disabled={!displayValue.trim()}
             className="shrink-0 w-9 h-9 rounded-xl bg-[var(--accent)] text-[#0a0a0b] flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             title="Envoyer (Ctrl+Enter)"
           >

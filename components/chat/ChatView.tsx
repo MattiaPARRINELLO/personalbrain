@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Sparkles,
   Globe,
@@ -313,11 +313,44 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const abortRef = useRef<(() => void) | null>(null);
+  const loadSeqRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasTitleRef = useRef(false);
   const prevExternalSessionIdRef = useRef<string>("");
+
+  // Consentement IA : rien n'est envoyé au provider tant que l'utilisateur
+  // n'a pas accepté l'écran de consentement (voir /privacy).
+  const [consent, setConsent] = useState<{ loaded: boolean; accepted: boolean }>({
+    loaded: false,
+    accepted: false,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    import("@/app/actions/consent")
+      .then(({ loadAiConsent }) => loadAiConsent())
+      .then((state) => {
+        if (!cancelled) setConsent({ loaded: true, accepted: state.aiConsent });
+      })
+      .catch(() => {
+        if (!cancelled) setConsent({ loaded: true, accepted: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const acceptConsent = async () => {
+    try {
+      const { acceptAiConsent } = await import("@/app/actions/consent");
+      await acceptAiConsent(true);
+      setConsent({ loaded: true, accepted: true });
+    } catch {
+      setConsent({ loaded: true, accepted: false });
+    }
+  };
 
   function restoreMessages(raw: { id: string; role: "user" | "assistant"; content: string; timestamp: string; toolCalls?: { id: string; name: string; arguments?: string; result?: string; status?: string; duration?: number; resultCount?: number }[] }[]): Message[] {
     const restored: Message[] = raw.map((m) => ({
@@ -331,10 +364,21 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
   }
 
   useEffect(() => {
+    // Abort du streaming en cours si le composant est démonté (navigation).
+    return () => {
+      if (abortRef.current) abortRef.current();
+    };
+  }, []);
+
+  useEffect(() => {
     if (externalSessionId && externalSessionId !== prevExternalSessionIdRef.current) {
       prevExternalSessionIdRef.current = externalSessionId;
+      // Garde anti-race : si l'utilisateur change rapidement de session, seule
+      // la dernière demande de chargement doit appliquer son résultat.
+      const seq = ++loadSeqRef.current;
       import("@/app/actions/chat-history").then(({ getChatHistory }) => {
         getChatHistory().then((history) => {
+          if (seq !== loadSeqRef.current) return;
           const session = history.sessions.find((s) => s.id === externalSessionId);
           if (session) {
             setSessionId(session.id);
@@ -451,6 +495,13 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
       const trimmed = text.trim();
       if (!trimmed || loading) return;
 
+      if (consent.loaded && !consent.accepted) {
+        setError(
+          "Accepte l'utilisation de l'IA pour envoyer des messages (bannière ci-dessus ou page Vie privée)."
+        );
+        return;
+      }
+
       const userMsg: Message = {
         id: generateId(),
         role: "user",
@@ -492,6 +543,11 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
 
       const startTime = Date.now();
       let buffer = "";
+
+      // Le bouton Stop / Esc / reset / unmount appelle abortRef.current(),
+      // ce qui annule le fetch SSE ET la requête IA côté serveur.
+      const controller = new AbortController();
+      abortRef.current = () => controller.abort();
 
       try {
         await api.chat.stream(
@@ -612,20 +668,21 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
               }
             }
           },
-          abortRef.current ? undefined : undefined
+          controller.signal
         );
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
           setError(err instanceof Error ? err.message : "Erreur réseau");
         }
       } finally {
+        abortRef.current = null;
         setLoading(false);
         streamingActiveRef.current = false;
         setStreamingActive(false);
         setStreamingContent("");
       }
     },
-    [loading, messages, sessionId, onSessionChange, chatCtx]
+    [loading, messages, sessionId, onSessionChange, chatCtx, consent]
   );
 
   const stop = useCallback(() => {
@@ -761,6 +818,40 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
       }
     };
 
+    const handleAddReminder = async () => {
+      try {
+        const { createReminder } = await import("@/app/actions/reminders");
+        await createReminder({
+          title: content.slice(0, 120),
+          notes: content.slice(0, 2000),
+          dueAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        });
+        toast.show({ message: "Rappel créé", tone: "success", duration: 2500 });
+      } catch {
+        toast.show({ message: "Impossible de créer le rappel", tone: "danger", duration: 3000 });
+      }
+    };
+
+    const handleAddCalendar = async () => {
+      try {
+        const start = new Date(Date.now() + 60 * 60 * 1000);
+        const end = new Date(start.getTime() + 60 * 60 * 1000);
+        const res = await api.calendar.create({
+          summary: content.slice(0, 80),
+          start: start.toISOString(),
+          end: end.toISOString(),
+        });
+        if (!res.success) throw new Error("Échec de l'ajout");
+        toast.show({ message: "Événement ajouté au calendrier", tone: "success", duration: 2500 });
+      } catch (err) {
+        toast.show({
+          message: err instanceof Error ? err.message : "Impossible d'ajouter au calendrier",
+          tone: "danger",
+          duration: 3000,
+        });
+      }
+    };
+
     const btn =
       "inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--border-2)] hover:text-[var(--text-2)] transition-colors duration-200";
 
@@ -777,13 +868,13 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
           </a>
         )}
         {showCalendar && (
-          <button className={`${btn} hover:border-[var(--accent-warm)]/40 hover:text-[var(--accent-warm)]`}>
+          <button onClick={() => void handleAddCalendar()} className={`${btn} hover:border-[var(--accent-warm)]/40 hover:text-[var(--accent-warm)]`}>
             <CalendarPlus className="w-3 h-3" />
             Ajouter au calendrier
           </button>
         )}
         {showReminder && (
-          <button className={btn}>
+          <button onClick={() => void handleAddReminder()} className={btn}>
             <Bell className="w-3 h-3" />
             Créer un rappel
           </button>
@@ -955,10 +1046,37 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
     );
   }
 
-  const MessageBlockMemo = useMemo(() => memo(MessageBlock), []);
-
   return (
     <div className="flex flex-col h-full min-h-0 relative">
+      {consent.loaded && !consent.accepted && (
+        <div className="shrink-0 px-4 py-3 border-b border-[var(--border-1)] bg-[var(--surface-2)]/80 backdrop-blur fade-in">
+          <div className="max-w-3xl mx-auto flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-medium text-[var(--text-1)]">
+                Tes messages seront envoyés à une IA
+              </p>
+              <p className="text-[11px] text-[var(--text-3)] mt-0.5 leading-relaxed">
+                Ils servent uniquement à te répondre, jamais à entraîner un modèle.
+                Tu peux tout exporter ou tout supprimer à tout moment.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href="/privacy"
+                className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] hover:text-[var(--text-1)] transition-colors duration-200"
+              >
+                Vie privée
+              </a>
+              <button
+                onClick={() => void acceptConsent()}
+                className="px-3.5 py-2 rounded-lg bg-[var(--accent)] text-[#0a0a0b] font-medium text-[12px] hover:brightness-110 active:brightness-95 transition-all duration-200"
+              >
+                J&apos;accepte
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
           {messages.length <= 1 && messages[0]?.id === "welcome" ? (
@@ -968,7 +1086,7 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
               {messages.map((m) => {
                 return (
                   <div key={m.id}>
-                    <MessageBlockMemo message={m} />
+                    <MessageBlock message={m} />
                   </div>
                 );
               })}

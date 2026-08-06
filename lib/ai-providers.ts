@@ -60,29 +60,36 @@ function isAnthropicModel(model: string): boolean {
 export async function chatCompletion(
   model: string,
   messages: UnifiedMessage[],
-  tools: UnifiedTool[]
+  tools: UnifiedTool[],
+  signal?: AbortSignal
 ): Promise<ChatCompletionResult> {
   if (isAnthropicModel(model)) {
-    return chatAnthropic(model, messages, tools);
+    return chatAnthropic(model, messages, tools, signal);
   }
-  return chatOpenAI(model, messages, tools);
+  return chatOpenAI(model, messages, tools, signal);
 }
 
 export async function* streamChatCompletion(
   model: string,
   messages: UnifiedMessage[],
-  tools: UnifiedTool[]
+  tools: UnifiedTool[],
+  signal?: AbortSignal
 ): AsyncGenerator<StreamEvent> {
   if (isAnthropicModel(model)) {
-    return yield* streamAnthropic(model, messages, tools);
+    return yield* streamAnthropic(model, messages, tools, signal);
   }
-  return yield* streamOpenAI(model, messages, tools);
+  return yield* streamOpenAI(model, messages, tools, signal);
 }
+
+// Timeout de sécurité sur les appels IA (les SDK par défaut peuvent pendre
+// jusqu'à 10 minutes sans réponse du provider).
+const REQUEST_TIMEOUT_MS = 120_000;
 
 async function chatOpenAI(
   model: string,
   messages: UnifiedMessage[],
-  tools: UnifiedTool[]
+  tools: UnifiedTool[],
+  signal?: AbortSignal
 ): Promise<ChatCompletionResult> {
   const client = new OpenAI(getClientConfig());
 
@@ -113,14 +120,17 @@ async function chatOpenAI(
     return { role: m.role, content: m.content ?? "" };
   });
 
-  const completion = await client.chat.completions.create({
-    model,
-    messages: openaiMessages,
-    tools: openaiTools,
-    tool_choice: "auto",
-    temperature: 0.7,
-    max_tokens: 2048,
-  });
+  const completion = await client.chat.completions.create(
+    {
+      model,
+      messages: openaiMessages,
+      tools: openaiTools,
+      tool_choice: "auto",
+      temperature: 0.7,
+      max_tokens: 2048,
+    },
+    { signal, timeout: REQUEST_TIMEOUT_MS }
+  );
 
   const message = completion.choices[0]?.message;
   const content = message?.content ?? "";
@@ -138,7 +148,8 @@ async function chatOpenAI(
 async function* streamOpenAI(
   model: string,
   messages: UnifiedMessage[],
-  tools: UnifiedTool[]
+  tools: UnifiedTool[],
+  signal?: AbortSignal
 ): AsyncGenerator<StreamEvent> {
   const client = new OpenAI(getClientConfig());
 
@@ -171,15 +182,18 @@ async function* streamOpenAI(
 
   let stream;
   try {
-    stream = await client.chat.completions.create({
-      model,
-      messages: openaiMessages,
-      tools: openaiTools.length > 0 ? openaiTools : undefined,
-      tool_choice: "auto",
-      temperature: 0.7,
-      max_tokens: 2048,
-      stream: true,
-    });
+    stream = await client.chat.completions.create(
+      {
+        model,
+        messages: openaiMessages,
+        tools: openaiTools.length > 0 ? openaiTools : undefined,
+        tool_choice: "auto",
+        temperature: 0.7,
+        max_tokens: 2048,
+        stream: true,
+      },
+      { signal, timeout: REQUEST_TIMEOUT_MS }
+    );
   } catch (err: unknown) {
     const detail = err instanceof Object && "status" in (err as object)
       ? `status=${(err as { status: unknown }).status} message=${err instanceof Error ? err.message : String(err)}`
@@ -257,7 +271,8 @@ async function* streamOpenAI(
 async function* streamAnthropic(
   model: string,
   messages: UnifiedMessage[],
-  tools: UnifiedTool[]
+  tools: UnifiedTool[],
+  signal?: AbortSignal
 ): AsyncGenerator<StreamEvent> {
   const client = new Anthropic(getClientConfig());
 
@@ -286,21 +301,40 @@ async function* streamAnthropic(
       });
       continue;
     }
+    if (m.role === "assistant" && m.tool_calls && m.tool_calls.length > 0) {
+      const blocks: Anthropic.Messages.ContentBlockParam[] = [];
+      if (m.content) blocks.push({ type: "text", text: m.content });
+      for (const tc of m.tool_calls) {
+        let args: Record<string, unknown> = {};
+        try { args = JSON.parse(tc.function.arguments); } catch { /* keep empty */ }
+        blocks.push({
+          type: "tool_use",
+          id: tc.id,
+          name: tc.function.name,
+          input: args,
+        });
+      }
+      conversation.push({ role: "assistant", content: blocks });
+      continue;
+    }
     conversation.push({ role: m.role, content: m.content ?? "" });
   }
 
   let stream;
   try {
-    stream = await client.messages.create({
-      model,
-      system: systemParts.join("\n\n"),
-      messages: conversation,
-      tools: anthropicTools,
-      tool_choice: { type: "auto" },
-      max_tokens: 2048,
-      temperature: 0.7,
-      stream: true,
-    });
+    stream = await client.messages.create(
+      {
+        model,
+        system: systemParts.join("\n\n"),
+        messages: conversation,
+        tools: anthropicTools,
+        tool_choice: { type: "auto" },
+        max_tokens: 2048,
+        temperature: 0.7,
+        stream: true,
+      },
+      { signal, timeout: REQUEST_TIMEOUT_MS }
+    );
   } catch (err: unknown) {
     const detail = err instanceof Object && "status" in (err as object)
       ? `status=${(err as { status: unknown }).status} message=${err instanceof Error ? err.message : String(err)}`
@@ -374,7 +408,8 @@ async function* streamAnthropic(
 async function chatAnthropic(
   model: string,
   messages: UnifiedMessage[],
-  tools: UnifiedTool[]
+  tools: UnifiedTool[],
+  signal?: AbortSignal
 ): Promise<ChatCompletionResult> {
   const client = new Anthropic(getClientConfig());
 
@@ -403,18 +438,37 @@ async function chatAnthropic(
       });
       continue;
     }
+    if (m.role === "assistant" && m.tool_calls && m.tool_calls.length > 0) {
+      const blocks: Anthropic.Messages.ContentBlockParam[] = [];
+      if (m.content) blocks.push({ type: "text", text: m.content });
+      for (const tc of m.tool_calls) {
+        let args: Record<string, unknown> = {};
+        try { args = JSON.parse(tc.function.arguments); } catch { /* keep empty */ }
+        blocks.push({
+          type: "tool_use",
+          id: tc.id,
+          name: tc.function.name,
+          input: args,
+        });
+      }
+      conversation.push({ role: "assistant", content: blocks });
+      continue;
+    }
     conversation.push({ role: m.role, content: m.content ?? "" });
   }
 
-  const response = await client.messages.create({
-    model,
-    system: systemParts.join("\n\n"),
-    messages: conversation,
-    tools: anthropicTools,
-    tool_choice: { type: "auto" },
-    max_tokens: 2048,
-    temperature: 0.7,
-  });
+  const response = await client.messages.create(
+    {
+      model,
+      system: systemParts.join("\n\n"),
+      messages: conversation,
+      tools: anthropicTools,
+      tool_choice: { type: "auto" },
+      max_tokens: 2048,
+      temperature: 0.7,
+    },
+    { signal, timeout: REQUEST_TIMEOUT_MS }
+  );
 
   const textBlocks = response.content.filter((c) => c.type === "text") as Anthropic.TextBlock[];
   const toolBlocks = response.content.filter((c) => c.type === "tool_use") as Anthropic.ToolUseBlock[];

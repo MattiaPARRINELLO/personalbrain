@@ -1,16 +1,18 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import {
   streamChatCompletion,
   type UnifiedMessage,
   type UnifiedTool,
   type StreamEvent,
 } from "@/lib/ai-providers";
-import { getMemory, webSearch, addReminder, updateReminder, addWatchLaterItem, fetchPageMeta, getConcerts, getAccreditations, getReminders, getCalendar, addMemoryRelationship, getMemoryRelationships, addAccreditation, searchAccreditations, autoSummarize, saveAccreditations, prepareConcert, getWeather, getPhotoShoots, addPhotoShoot, updatePhotoShoot } from "@/lib/storage";
+import { getMemory, webSearch, addReminder, updateReminder, addWatchLaterItem, fetchPageMeta, getConcerts, getAccreditations, getReminders, getCalendar, addAccreditation, autoSummarize, saveAccreditations, prepareConcert, getWeather, getPhotoShoots, addPhotoShoot, updatePhotoShoot, addIntention, getChatHistory } from "@/lib/storage";
 import type { PhotoShootStatus } from "@/lib/types";
 import { fetchGmailMessages, sendGmailReply, createGoogleCalendarEvent, fetchGoogleCalendarEvents, updateGoogleCalendarEvent } from "@/lib/google-actions";
 import { getModel } from "@/lib/config";
 import type { ChatMessage, MemoryCategory, Accreditation } from "@/lib/types";
 import { autoExtractMemoryFacts } from "@/app/actions/brain";
+import { getSession } from "@/lib/session";
 
 const rateLimitMap = new Map<string, { tokens: number; lastRefill: number }>();
 const RATE_LIMIT_MAX = 30;
@@ -192,6 +194,20 @@ const tools: UnifiedTool[] = [
     },
   },
   {
+    name: "schedule_followup",
+    description:
+      "Programme une relance future : l'application t'enverra une notification push a la date indiquee pour revenir sur un sujet. Utilise quand l'utilisateur dit 'relance-moi', 'rappelle-moi de faire X', 'reviens vers moi sur Y'.",
+    parameters: {
+      type: "object",
+      properties: {
+        subject: { type: "string", description: "Sujet court de la relance (ex: 'le dossier UX')" },
+        due_at: { type: "string", description: "Moment de la relance en ISO 8601 (ex: '2026-08-08T18:00:00' pour vendredi 18h)" },
+        message: { type: "string", description: "Message de relance affiche dans la notification (optionnel)" },
+      },
+      required: ["subject", "due_at"],
+    },
+  },
+  {
     name: "add_watch_later",
     description: "Ajoute un lien a la liste 'A voir plus tard'.",
     parameters: {
@@ -288,7 +304,89 @@ const tools: UnifiedTool[] = [
   },
 ];
 
-async function buildSystemPrompt(context: "general" | "code"): Promise<string> {
+// Mémoire de ton (légère) : adapte le ton de l'assistant à l'usage récent et
+// à l'humeur détectée dans les derniers messages. Aucun état persistant :
+// c'est une analyse statique de la conversation en cours + de l'historique.
+async function buildToneBlock(messages: ChatMessage[]): Promise<string> {
+  const userMessages = messages
+    .filter((m) => m.role === "user")
+    .map((m) => (typeof m.content === "string" ? m.content : ""))
+    .filter((s) => s.length > 0);
+
+  // 1. Humeur détectée dans la conversation courante
+  let mood: { label: string; instruction: string } | null = null;
+  if (userMessages.length > 0) {
+    const last = userMessages[userMessages.length - 1] ?? "";
+    const all = userMessages.join(" ").toLowerCase();
+    if (/(fatigu|crev|epuis|épuis|galere|galère|stress|énerve|énerv|relou|saoule)/.test(all)) {
+      mood = {
+        label: "tu sembles fatigue ou sous pression",
+        instruction: "Sois empathique et tres concis. Pas de blabla, propose directement l'action qui aide.",
+      };
+    } else if (last.length > 0 && last.length < 60 && !/[?!]/.test(last)) {
+      mood = {
+        label: "tu es tres concis",
+        instruction: "Reponds court et direct, sans introduction ni question ouverte inutile.",
+      };
+    } else if (/(super|genial|génial|merci|trop bien|parfait|bravo|excellent)/.test(all)) {
+      mood = {
+        label: "l'echange est positif",
+        instruction: "Ton chaleureux, garde une pointe d'enthousiasme.",
+      };
+    }
+  }
+
+  // 2. Usage sur les 14 derniers jours (chat-history)
+  let usage: { label: string; instruction: string } | null = null;
+  try {
+    const history = await getChatHistory();
+    const cutoff = Date.now() - 14 * 86400000;
+    const recentUserMsgs = history.sessions
+      .flatMap((s) => s.messages)
+      .filter((m) => m.role === "user" && new Date(m.timestamp).getTime() >= cutoff);
+    const count = recentUserMsgs.length;
+    const lastTs = recentUserMsgs.reduce((max, m) => Math.max(max, new Date(m.timestamp).getTime()), 0);
+    const daysSinceLast = lastTs > 0 ? (Date.now() - lastTs) / 86400000 : 0;
+
+    if (count === 0) {
+      usage = {
+        label: "premier contact recent",
+        instruction: "Ton factuel et sobre, tu fais connaissance.",
+      };
+    } else if (daysSinceLast > 3) {
+      usage = {
+        label: `pas de discussion depuis ${Math.round(daysSinceLast)} jour(s)`,
+        instruction: "Ton factuel, va droit au but, pas de familiarite excessive.",
+      };
+    } else if (count >= 10) {
+      usage = {
+        label: "usage regulier",
+        instruction: "Ton chaleureux et complice.",
+      };
+    } else {
+      usage = {
+        label: "usage occasionnel",
+        instruction: "Ton cordial et efficace.",
+      };
+    }
+  } catch {
+    // Historique illisible : pas de bloc de ton.
+  }
+
+  // 3. Heure tardive
+  const hour = new Date().getHours();
+  const late = hour >= 22 || hour < 6;
+
+  const parts: string[] = [];
+  if (mood) parts.push(`Humeur recente : ${mood.label}. ${mood.instruction}`);
+  if (usage) parts.push(`Relation : ${usage.label}. ${usage.instruction}`);
+  if (late) parts.push("Il est tard : sois concis, evite les questions ouvertes.");
+
+  if (parts.length === 0) return "";
+  return `\nÉtat relationnel : ${parts.join(" ")}`;
+}
+
+async function buildSystemPrompt(context: "general" | "code", recentMessages: ChatMessage[] = []): Promise<string> {
   const memory = await getMemory();
   const prefs = memory.profile.preferences.join(", ");
 
@@ -376,8 +474,29 @@ ${factsBlock || "- Aucun fait memorise"}`;
     }
   } catch {}
 
-  return `${base}\n\n${memoryBlock}\n\nAujourd'hui nous sommes le ${dateStr}, il est ${timeStr}.${eventsBlock}${photoBlock}${remindersBlock}${briefBlock}\n\nTu as acces a ces outils : ${toolList}. Quand l'utilisateur te demande une action concrete (creer un evenement, envoyer un email, ajouter un rappel, etc.), tu DOIS utiliser l'outil correspondant — ne te contente JAMAIS de dire que tu vas le faire sans l'appeler. Tu peux appeler plusieurs outils dans le meme message pour creer des evenements en lot.\n\nSi l'utilisateur partage un lien, utilise d'abord fetch_page_meta puis add_watch_later.\nQuand l'utilisateur demande plusieurs rappels/taches a faire, cree UN rappel par tache (plusieurs appels add_reminder). Ne regroupe jamais plusieurs taches dans un seul rappel.\nNe supprime ou ne modifie JAMAIS les donnees de l'utilisateur sans son consentement explicite.\nPrefere les tirets courts (-) aux tirets longs (—, em-dash).\n${codeBlock}`.trim();
+  return `${base}\n\n${memoryBlock}\n\nAujourd'hui nous sommes le ${dateStr}, il est ${timeStr}.${eventsBlock}${photoBlock}${remindersBlock}${briefBlock}${await buildToneBlock(recentMessages)}\n\nTu as acces a ces outils : ${toolList}. Quand l'utilisateur te demande une action concrete (creer un evenement, envoyer un email, ajouter un rappel, etc.), tu DOIS utiliser l'outil correspondant — ne te contente JAMAIS de dire que tu vas le faire sans l'appeler. Tu peux appeler plusieurs outils dans le meme message pour creer des evenements en lot.\n\nSi l'utilisateur partage un lien, utilise d'abord fetch_page_meta puis add_watch_later.\nQuand l'utilisateur demande plusieurs rappels/taches a faire, cree UN rappel par tache (plusieurs appels add_reminder). Ne regroupe jamais plusieurs taches dans un seul rappel.\nSi l'utilisateur demande d'etre relance ou rappele plus tard ('relance-moi', 'rappelle-moi de faire X', 'reviens vers moi sur Y'), utilise schedule_followup pour programmer la relance plutot qu'un simple add_reminder.\nNe supprime ou ne modifie JAMAIS les donnees de l'utilisateur sans son consentement explicite.\nPrefere les tirets courts (-) aux tirets longs (—, em-dash).\n${codeBlock}`.trim();
 }
+
+const chatBodySchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["system", "user", "assistant"]),
+        content: z.string().optional(),
+        toolCalls: z
+          .array(
+            z.object({
+              id: z.string(),
+              name: z.string(),
+              arguments: z.string(),
+            })
+          )
+          .optional(),
+      })
+    )
+    .min(1, "Au moins un message est requis"),
+  model: z.enum(["general", "code"]).optional(),
+});
 
 async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
   switch (name) {
@@ -495,6 +614,17 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       const r = await updateReminder(id, updates as Parameters<typeof updateReminder>[1]);
       if (!r) return "Rappel introuvable.";
       return `Rappel modifie : "${r.title}" → ${new Date(r.dueAt).toLocaleString("fr-FR")} (${r.status}).`;
+    }
+    case "schedule_followup": {
+      const subject = String(args.subject ?? "");
+      const dueAt = String(args.due_at ?? "");
+      const message = args.message ? String(args.message) : undefined;
+      if (!subject || !dueAt) return "Erreur : subject et due_at requis.";
+      if (Number.isNaN(new Date(dueAt).getTime())) {
+        return "Erreur : due_at doit etre une date ISO 8601 valide.";
+      }
+      const it = await addIntention({ subject, message, dueAt });
+      return `Relance programmee : « ${it.subject} » pour le ${new Date(it.dueAt).toLocaleString("fr-FR")}. Tu recevras une notification a ce moment-la.`;
     }
     case "add_watch_later": {
       const url = String(args.url ?? "");
@@ -724,18 +854,36 @@ async function runMemoryExtraction(
 }
 
 export async function POST(request: NextRequest) {
+  // Garde d'authentification dans le handler (le middleware protège déjà la
+  // route, mais un bypass du middleware ne doit pas exposer le chat).
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  }
+
+  // Rate limit keyé sur l'utilisateur (l'IP seule est spoofable via
+  // x-forwarded-for) : un tiers ne peut pas contourner le quota.
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
-  if (!checkRateLimit(ip)) {
+  if (!checkRateLimit(`${session.userId}:${ip}`)) {
     return new Response(JSON.stringify({ error: "Trop de requêtes. Réessaie dans une minute." }), {
       status: 429,
       headers: { "Content-Type": "application/json" },
     });
   }
 
-  const body = (await request.json()) as {
-    messages: ChatMessage[];
-    model?: "general" | "code";
-  };
+  let body: { messages: ChatMessage[]; model?: "general" | "code" };
+  try {
+    const parsed = chatBodySchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Corps de requête invalide : messages (tableau non vide avec role et content) requis." },
+        { status: 400 }
+      );
+    }
+    body = parsed.data as unknown as { messages: ChatMessage[]; model?: "general" | "code" };
+  } catch {
+    return NextResponse.json({ error: "Corps de requête invalide" }, { status: 400 });
+  }
 
   // Auto-parsing des liens dans le dernier message utilisateur
   const lastUserMsg = [...body.messages].reverse().find((m) => m.role === "user");
@@ -779,7 +927,7 @@ export async function POST(request: NextRequest) {
   const context = body.model === "code" ? "code" : "general";
   const { primary: modelName, alt: altModel } = await getModel(context);
 
-  const systemPrompt = await buildSystemPrompt(context);
+  const systemPrompt = await buildSystemPrompt(context, body.messages);
 
   const messages: UnifiedMessage[] = [
     { role: "system", content: systemPrompt },
@@ -798,16 +946,26 @@ export async function POST(request: NextRequest) {
   ];
 
   const encoder = new TextEncoder();
+  // AbortController local : aborté quand le client se déconnecte (cancel()),
+  // ce qui annule aussi la requête IA en cours côté serveur.
+  const abortController = new AbortController();
+  let streamClosed = false;
+
   const stream = new ReadableStream({
     async start(controller) {
       function send(data: StreamEvent) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        if (streamClosed) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        } catch {
+          // Le flux a été fermé entre le check et l'enqueue : on ignore.
+        }
       }
 
       const maxIterations = 20;
 
       async function runModel(model: string): Promise<boolean> {
-        const generator = streamChatCompletion(model, messages, tools);
+        const generator = streamChatCompletion(model, messages, tools, abortController.signal);
         const toolCallsToExecute: { toolCallId: string; name: string; arguments: string }[] = [];
         let assistantContent = "";
 
@@ -886,37 +1044,48 @@ export async function POST(request: NextRequest) {
       let lastAssistantContent = "";
 
       try {
+        let useFallback = false;
         for (let i = 0; i < maxIterations; i++) {
-          const useFallback = i > 0;
           const currentModel = useFallback ? altModel : modelName;
 
           try {
             const shouldContinue = await runModel(currentModel);
-            const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
-            if (lastAssistantMsg && typeof lastAssistantMsg.content === "string") {
-              lastAssistantContent = lastAssistantMsg.content;
-            }
             if (!shouldContinue) {
               void runMemoryExtraction(modelName, body.messages, send, lastAssistantContent);
               return;
             }
+            const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
+            if (lastAssistantMsg && typeof lastAssistantMsg.content === "string") {
+              lastAssistantContent = lastAssistantMsg.content;
+            }
           } catch (err) {
+            if (streamClosed) throw err; // client parti : pas de fallback inutile
             console.error(`[chat] runModel(${currentModel}) failed:`, err instanceof Error ? err.message : String(err));
             if (useFallback || currentModel === altModel) throw new Error(`Le modèle ${currentModel} a échoué après fallback`);
+            useFallback = true;
             continue;
           }
+          useFallback = false;
         }
 
         void runMemoryExtraction(modelName, body.messages, send, lastAssistantContent);
         send({ type: "done", content: "" });
         controller.close();
       } catch (error) {
+        if (streamClosed) return;
         console.error("Chat stream error:", error);
         const message = error instanceof Error ? error.message : "Erreur inconnue";
         send({ type: "error", message });
         send({ type: "done", content: "" });
         controller.close();
       }
+    },
+    cancel() {
+      // Le client a fermé la connexion (bouton Stop, navigation, erreur
+      // réseau) : on marque le flux comme fermé et on annule la requête IA
+      // pour libérer les ressources côté serveur.
+      streamClosed = true;
+      abortController.abort();
     },
   });
 
