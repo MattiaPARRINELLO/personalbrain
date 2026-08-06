@@ -29,8 +29,8 @@ import type {
   ConcertPrep,
   GalleryItem,
   GalleryData,
-  GalleryStatus,
-  DailyBrief,
+  Intention,
+  IntentionsData,
 } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -89,32 +89,61 @@ function isTransientError(err: unknown): boolean {
   return typeof code === "string" && TRANSIENT_ERROR_CODES.has(code);
 }
 
-async function writeJsonAtomic<T>(filename: string, data: T, retries = 3): Promise<void> {
+// Corps d'écriture sans lock : ne doit être appelé que sous withFileLock
+// (mutateJson) pour éviter un deadlock sur le lock par fichier.
+async function writeJsonAtomicUnlocked<T>(filename: string, data: T, retries = 3): Promise<void> {
   await ensureDir(DATA_DIR);
   const filePath = path.join(DATA_DIR, filename);
   const tmpPath = filePath + ".tmp";
 
-  await withFileLock(filename, async () => {
-    let lastError: unknown;
-    for (let attempt = 0; attempt < retries; attempt++) {
-      try {
-        await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), "utf-8");
-        await fs.rename(tmpPath, filePath);
-        return;
-      } catch (err) {
-        lastError = err;
-        if (!isTransientError(err) || attempt === retries - 1) {
-          try {
-            await fs.unlink(tmpPath);
-          } catch {
-            // Le fichier tmp n'existe pas forcément, on ignore.
-          }
-          throw err;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), "utf-8");
+      await fs.rename(tmpPath, filePath);
+      return;
+    } catch (err) {
+      lastError = err;
+      if (!isTransientError(err) || attempt === retries - 1) {
+        try {
+          await fs.unlink(tmpPath);
+        } catch {
+          // Le fichier tmp n'existe pas forcément, on ignore.
         }
-        await new Promise((r) => setTimeout(r, 50 * Math.pow(2, attempt)));
+        throw err;
       }
+      await new Promise((r) => setTimeout(r, 50 * Math.pow(2, attempt)));
     }
-    throw lastError instanceof Error ? lastError : new Error("writeJsonAtomic failed");
+  }
+  throw lastError instanceof Error ? lastError : new Error("writeJsonAtomic failed");
+}
+
+async function writeJsonAtomic<T>(filename: string, data: T, retries = 3): Promise<void> {
+  await withFileLock(filename, () => writeJsonAtomicUnlocked(filename, data, retries));
+}
+
+/**
+ * Cycle complet read → mutate → write sous un seul lock par fichier.
+ * Le mutator reçoit les données actuelles ; s'il retourne `null`, rien n'est
+ * écrit (cas "aucun changement"). Sinon il peut muter `data` en place et
+ * retourner void, ou retourner un nouvel objet à persister.
+ * Retourne les données persistées, ou `null` si le mutator a retourné `null`.
+ */
+async function mutateJson<T>(
+  filename: string,
+  fallback: T,
+  mutator: (data: T) => T | null | void
+): Promise<T | null> {
+  return withFileLock(filename, async () => {
+    const data = await readOrCreateUnlocked(filename, fallback);
+    const result = mutator(data);
+    if (result === null) return null;
+    const next = result ?? data;
+    // Backup périodique avant écriture : couvre TOUS les fichiers mutés
+    // (y compris chat-history.json et activity.json, sans sauvegarde avant).
+    await maybeBackup(filename);
+    await writeJsonAtomicUnlocked(filename, next);
+    return next;
   });
 }
 
@@ -198,8 +227,12 @@ async function backupFile(filename: string): Promise<void> {
   const dst = path.join(BACKUP_DIR, `${filename}.${ts}.bak`);
   try {
     await fs.copyFile(src, dst);
-  } catch {
-    // Fichier source n'existe pas encore
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    // ENOENT = fichier pas encore créé, cas normal au premier write.
+    if (code !== "ENOENT") {
+      console.warn(`[storage] Backup échoué pour ${filename}:`, err);
+    }
   }
 }
 
@@ -254,9 +287,15 @@ async function maybeBackup(filename: string): Promise<void> {
   const now = Date.now();
   const last = lastBackup.get(filename) ?? 0;
   if (now - last > BACKUP_INTERVAL_MS) {
-    lastBackup.set(filename, now);
-    await backupFile(filename);
-    await rotateBackups(filename);
+    // On marque le backup comme fait SEULEMENT après succès, sinon on
+    // retente à la prochaine écriture.
+    try {
+      await backupFile(filename);
+      await rotateBackups(filename);
+      lastBackup.set(filename, now);
+    } catch (err) {
+      console.warn(`[storage] Backup impossible pour ${filename}:`, err);
+    }
   }
 }
 
@@ -315,10 +354,32 @@ const defaultEmails: EmailsData = {
 const defaultReminders: RemindersData = { reminders: [] };
 const defaultWatchLater: WatchLaterData = { items: [] };
 
+// Version sans lock : réservée à l'usage interne sous withFileLock (mutateJson).
+async function readOrCreateUnlocked<T>(filename: string, fallback: T): Promise<T> {
+  try {
+    return await readJson<T>(filename);
+  } catch {
+    // Fichier absent OU corrompu : on tente la récupération depuis un backup
+    // avant d'écraser avec le fallback (évite la perte définitive de données).
+    const recovered = await readBackupJson<T>(filename);
+    if (recovered !== null) {
+      await writeJsonAtomicUnlocked(filename, recovered);
+      return recovered;
+    }
+    await writeJsonAtomicUnlocked(filename, fallback);
+    return fallback;
+  }
+}
+
 async function readOrCreate<T>(filename: string, fallback: T): Promise<T> {
   try {
     return await readJson<T>(filename);
   } catch {
+    const recovered = await readBackupJson<T>(filename);
+    if (recovered !== null) {
+      await writeJsonAtomic(filename, recovered);
+      return recovered;
+    }
     await writeJsonAtomic(filename, fallback);
     return fallback;
   }
@@ -435,7 +496,6 @@ export async function addGalleryItem(input: {
   totalPhotos: number;
   deadline?: string;
 }): Promise<GalleryItem> {
-  const data = await getGallery();
   const item: GalleryItem = {
     id: crypto.randomUUID?.() ?? String(Date.now()),
     concertId: input.concertId,
@@ -448,27 +508,32 @@ export async function addGalleryItem(input: {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  data.items.unshift(item);
-  await saveGallery(data);
+  await mutateJson<GalleryData>("gallery.json", { items: [] }, (data) => {
+    data.items.unshift(item);
+  });
   return item;
 }
 
 export async function updateGalleryItem(id: string, updates: Partial<Pick<GalleryItem, "status" | "selectedPhotos" | "editedPhotos" | "deliveredTo" | "totalPhotos">>): Promise<GalleryItem | null> {
-  const data = await getGallery();
-  const idx = data.items.findIndex((g) => g.id === id);
-  if (idx < 0) return null;
-  data.items[idx] = { ...data.items[idx], ...updates, updatedAt: new Date().toISOString() };
-  await saveGallery(data);
-  return data.items[idx];
+  let updated: GalleryItem | null = null;
+  await mutateJson<GalleryData>("gallery.json", { items: [] }, (data) => {
+    const idx = data.items.findIndex((g) => g.id === id);
+    if (idx < 0) return null;
+    data.items[idx] = { ...data.items[idx], ...updates, updatedAt: new Date().toISOString() };
+    updated = data.items[idx];
+  });
+  return updated;
 }
 
 export async function deleteGalleryItem(id: string): Promise<boolean> {
-  const data = await getGallery();
-  const before = data.items.length;
-  data.items = data.items.filter((g) => g.id !== id);
-  if (data.items.length === before) return false;
-  await saveGallery(data);
-  return true;
+  let deleted = false;
+  await mutateJson<GalleryData>("gallery.json", { items: [] }, (data) => {
+    const before = data.items.length;
+    data.items = data.items.filter((g) => g.id !== id);
+    deleted = data.items.length !== before;
+    return deleted ? undefined : null;
+  });
+  return deleted;
 }
 
 export async function getLeetcode(): Promise<LeetcodeData> {
@@ -481,10 +546,10 @@ export async function saveLeetcode(data: LeetcodeData): Promise<void> {
 }
 
 export async function addLeetcodeExercise(exercise: LeetcodeExercise): Promise<void> {
-  const data = await getLeetcode();
-  data.exercises.unshift(exercise);
-  data.history.push({ date: new Date().toISOString(), solved: true });
-  await saveLeetcode(data);
+  await mutateJson<LeetcodeData>("leetcode.json", defaultLeetcode, (data) => {
+    data.exercises.unshift(exercise);
+    data.history.push({ date: new Date().toISOString(), solved: true });
+  });
 }
 
 export async function getMemory(): Promise<MemoryData> {
@@ -501,7 +566,6 @@ export async function addMemoryFact(
   category: MemoryFact["category"],
   options?: { source?: MemoryFact["source"]; confidence?: number }
 ): Promise<MemoryFact> {
-  const data = await getMemory();
   const fact: MemoryFact = {
     id: crypto.randomUUID?.() ?? String(Date.now()),
     content,
@@ -511,30 +575,33 @@ export async function addMemoryFact(
     confidence: options?.confidence,
     accessCount: 0,
   };
-  data.facts.push(fact);
-  await saveMemory(data);
+  await mutateJson<MemoryData>("memory.json", defaultMemory, (data) => {
+    data.facts.push(fact);
+  });
   return fact;
 }
 
 export async function updateMemoryFact(id: string, updates: Partial<Pick<MemoryFact, "content" | "category">>): Promise<MemoryFact | null> {
-  const data = await getMemory();
-  const idx = data.facts.findIndex((f) => f.id === id);
-  if (idx < 0) return null;
-  data.facts[idx] = { ...data.facts[idx], ...updates };
-  await saveMemory(data);
-  return data.facts[idx];
+  let updated: MemoryFact | null = null;
+  await mutateJson<MemoryData>("memory.json", defaultMemory, (data) => {
+    const idx = data.facts.findIndex((f) => f.id === id);
+    if (idx < 0) return null;
+    data.facts[idx] = { ...data.facts[idx], ...updates };
+    updated = data.facts[idx];
+  });
+  return updated;
 }
 
 export async function touchMemoryFact(id: string): Promise<void> {
-  const data = await getMemory();
-  const idx = data.facts.findIndex((f) => f.id === id);
-  if (idx < 0) return;
-  data.facts[idx] = {
-    ...data.facts[idx],
-    accessCount: (data.facts[idx].accessCount ?? 0) + 1,
-    lastAccessedAt: new Date().toISOString(),
-  };
-  await saveMemory(data);
+  await mutateJson<MemoryData>("memory.json", defaultMemory, (data) => {
+    const idx = data.facts.findIndex((f) => f.id === id);
+    if (idx < 0) return null;
+    data.facts[idx] = {
+      ...data.facts[idx],
+      accessCount: (data.facts[idx].accessCount ?? 0) + 1,
+      lastAccessedAt: new Date().toISOString(),
+    };
+  });
 }
 
 export async function findSimilarMemoryFacts(content: string, category: MemoryFact["category"]): Promise<MemoryFact | null> {
@@ -584,12 +651,14 @@ export async function findSimilarMemoryFacts(content: string, category: MemoryFa
 }
 
 export async function deleteMemoryFact(id: string): Promise<boolean> {
-  const data = await getMemory();
-  const before = data.facts.length;
-  data.facts = data.facts.filter((f) => f.id !== id);
-  if (data.facts.length === before) return false;
-  await saveMemory(data);
-  return true;
+  let deleted = false;
+  await mutateJson<MemoryData>("memory.json", defaultMemory, (data) => {
+    const before = data.facts.length;
+    data.facts = data.facts.filter((f) => f.id !== id);
+    deleted = data.facts.length !== before;
+    return deleted ? undefined : null;
+  });
+  return deleted;
 }
 
 export async function getMemoryRelationships(): Promise<MemoryRelationship[]> {
@@ -602,19 +671,19 @@ export async function addMemoryRelationship(
   targetId: string,
   type: string
 ): Promise<MemoryRelationship> {
-  const data = await getMemory();
   const rel: MemoryRelationship = {
     sourceId,
     targetId,
     type,
     createdAt: new Date().toISOString(),
   };
-  const exists = data.relationships.some(
-    (r) => r.sourceId === sourceId && r.targetId === targetId && r.type === type
-  );
-  if (exists) return rel;
-  data.relationships.push(rel);
-  await saveMemory(data);
+  await mutateJson<MemoryData>("memory.json", defaultMemory, (data) => {
+    const exists = data.relationships.some(
+      (r) => r.sourceId === sourceId && r.targetId === targetId && r.type === type
+    );
+    if (exists) return null;
+    data.relationships.push(rel);
+  });
   return rel;
 }
 
@@ -642,12 +711,11 @@ export async function saveEmails(data: EmailsData): Promise<void> {
 }
 
 export async function markEmailRead(id: string): Promise<void> {
-  const data = await getEmails();
-  const email = data.emails.find((e) => e.id === id);
-  if (email) {
+  await mutateJson<EmailsData>("emails.json", defaultEmails, (data) => {
+    const email = data.emails.find((e) => e.id === id);
+    if (!email) return null;
     email.unread = false;
-    await saveEmails(data);
-  }
+  });
 }
 
 export async function getCalendar(): Promise<CalendarEvent[]> {
@@ -666,26 +734,26 @@ export async function getCalendar(): Promise<CalendarEvent[]> {
 }
 
 export async function addCalendarEvent(event: Omit<CalendarEvent, "id">): Promise<CalendarEvent> {
-  const concerts = await getConcerts();
   const newEvent: CalendarEvent = {
     ...event,
     id: crypto.randomUUID?.() ?? String(Date.now()),
   };
 
   if (event.type === "concert") {
-    concerts.events.push({
-      id: newEvent.id,
-      artist: event.title.replace(/^Concert :\s*/i, ""),
-      venue: event.venue ?? "",
-      date: event.date,
-      status: "shooted",
+    await mutateJson<ConcertsData>("concerts.json", defaultConcerts, (data) => {
+      data.events.push({
+        id: newEvent.id,
+        artist: event.title.replace(/^Concert :\s*/i, ""),
+        venue: event.venue ?? "",
+        date: event.date,
+        status: "shooted",
+      });
     });
-    await saveConcerts(concerts);
   } else {
-    const existing = await readOrCreate("calendar.json", { events: [] as CalendarEvent[] });
-    existing.events.push(newEvent);
+    await mutateJson<{ events: CalendarEvent[] }>("calendar.json", { events: [] }, (data) => {
+      data.events.push(newEvent);
+    });
     await maybeBackup("calendar.json");
-    await writeJsonAtomic("calendar.json", existing);
   }
 
   return newEvent;
@@ -777,7 +845,67 @@ function extractYouTubeId(url: string): string | null {
   return null;
 }
 
+// Anti-SSRF : n'autorise que des URLs http(s) publiques. Bloque les adresses
+// privées/réservées (localhost, RFC1918, link-local, metadata cloud) pour que
+// le fetch automatique d'URLs utilisateur ne puisse pas atteindre le réseau
+// interne ni les endpoints de métadonnées cloud.
+// Si la résolution DNS échoue (hors-ligne), on laisse le fetch décider :
+// une cible injoignable échouera naturellement sans exposer le réseau interne.
+async function isSafeFetchUrl(rawUrl: string): Promise<boolean> {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+
+  const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
+  if (hostname === "localhost") return false;
+
+  const isIpLiteral = /^[\d.]+$/.test(hostname) || hostname.includes(":");
+  if (isIpLiteral) {
+    return ![
+      /^127\./,
+      /^10\./,
+      /^192\.168\./,
+      /^169\.254\./,
+      /^172\.(1[6-9]|2\d|3[01])\./,
+      /^0\./,
+      /^::1$/,
+      /^fe80:/,
+      /^fc00:/,
+      /^fd/,
+    ].some((p) => p.test(hostname));
+  }
+
+  // Hostname DNS : refuser si l'une des adresses résolues est privée.
+  try {
+    const { lookup } = await import("dns/promises");
+    const addresses = await lookup(hostname, { all: true, verbatim: true });
+    return !addresses.some(({ address }) => {
+      const a = address.toLowerCase();
+      return (
+        a === "::1" ||
+        a.startsWith("127.") ||
+        a.startsWith("10.") ||
+        a.startsWith("192.168.") ||
+        a.startsWith("169.254.") ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(a) ||
+        a.startsWith("fe80:") ||
+        a.startsWith("fc") ||
+        a.startsWith("fd")
+      );
+    });
+  } catch {
+    return true;
+  }
+}
+
 export async function fetchPageMeta(url: string): Promise<{ title: string; thumbnail?: string }> {
+  if (!(await isSafeFetchUrl(url))) {
+    return { title: "URL non autorisée (adresse privée ou invalide)" };
+  }
   try {
     const ytId = extractYouTubeId(url);
     if (ytId) {
@@ -824,7 +952,6 @@ export async function addReminder(input: {
   dueAt: string;
   recurrence?: Reminder["recurrence"];
 }): Promise<Reminder> {
-  const data = await getReminders();
   const reminder: Reminder = {
     id: crypto.randomUUID?.() ?? String(Date.now()),
     title: input.title.trim(),
@@ -834,18 +961,21 @@ export async function addReminder(input: {
     createdAt: new Date().toISOString(),
     recurrence: input.recurrence,
   };
-  data.reminders.unshift(reminder);
-  await saveReminders(data);
+  await mutateJson<RemindersData>("reminders.json", defaultReminders, (data) => {
+    data.reminders.unshift(reminder);
+  });
   return reminder;
 }
 
 export async function updateReminder(id: string, updates: Partial<Pick<Reminder, "title" | "notes" | "dueAt" | "status" | "notifiedAt" | "recurrence">>): Promise<Reminder | null> {
-  const data = await getReminders();
-  const idx = data.reminders.findIndex((r) => r.id === id);
-  if (idx < 0) return null;
-  data.reminders[idx] = { ...data.reminders[idx], ...updates };
-  await saveReminders(data);
-  return data.reminders[idx];
+  let updated: Reminder | null = null;
+  await mutateJson<RemindersData>("reminders.json", defaultReminders, (data) => {
+    const idx = data.reminders.findIndex((r) => r.id === id);
+    if (idx < 0) return null;
+    data.reminders[idx] = { ...data.reminders[idx], ...updates };
+    updated = data.reminders[idx];
+  });
+  return updated;
 }
 
 export function computeNextRecurrence(dueAt: string, recurrence: Reminder["recurrence"]): string | null {
@@ -867,12 +997,14 @@ export function computeNextRecurrence(dueAt: string, recurrence: Reminder["recur
 }
 
 export async function deleteReminder(id: string): Promise<boolean> {
-  const data = await getReminders();
-  const before = data.reminders.length;
-  data.reminders = data.reminders.filter((r) => r.id !== id);
-  if (data.reminders.length === before) return false;
-  await saveReminders(data);
-  return true;
+  let deleted = false;
+  await mutateJson<RemindersData>("reminders.json", defaultReminders, (data) => {
+    const before = data.reminders.length;
+    data.reminders = data.reminders.filter((r) => r.id !== id);
+    deleted = data.reminders.length !== before;
+    return deleted ? undefined : null;
+  });
+  return deleted;
 }
 
 export async function getWatchLater(): Promise<WatchLaterData> {
@@ -892,7 +1024,6 @@ export async function addWatchLaterItem(input: {
   source?: string;
   category?: WatchLaterCategory;
 }): Promise<WatchLaterItem> {
-  const data = await getWatchLater();
   const item: WatchLaterItem = {
     id: crypto.randomUUID?.() ?? String(Date.now()),
     url: input.url,
@@ -904,42 +1035,47 @@ export async function addWatchLaterItem(input: {
     category: input.category || detectCategory(input.url),
     createdAt: new Date().toISOString(),
   };
-  data.items.unshift(item);
-  await saveWatchLater(data);
+  await mutateJson<WatchLaterData>("watch-later.json", defaultWatchLater, (data) => {
+    data.items.unshift(item);
+  });
   return item;
 }
 
 export async function updateWatchLaterItem(id: string, updates: Partial<Pick<WatchLaterItem, "title" | "description" | "category" | "summary" | "aiTags" | "read">>): Promise<WatchLaterItem | null> {
-  const data = await getWatchLater();
-  const idx = data.items.findIndex((i) => i.id === id);
-  if (idx < 0) return null;
-  data.items[idx] = { ...data.items[idx], ...updates };
-  await saveWatchLater(data);
-  return data.items[idx];
+  let updated: WatchLaterItem | null = null;
+  await mutateJson<WatchLaterData>("watch-later.json", defaultWatchLater, (data) => {
+    const idx = data.items.findIndex((i) => i.id === id);
+    if (idx < 0) return null;
+    data.items[idx] = { ...data.items[idx], ...updates };
+    updated = data.items[idx];
+  });
+  return updated;
 }
 
 export async function deleteWatchLaterItem(id: string): Promise<boolean> {
-  const data = await getWatchLater();
-  const before = data.items.length;
-  data.items = data.items.filter((i) => i.id !== id);
-  if (data.items.length === before) return false;
-  await saveWatchLater(data);
-  return true;
+  let deleted = false;
+  await mutateJson<WatchLaterData>("watch-later.json", defaultWatchLater, (data) => {
+    const before = data.items.length;
+    data.items = data.items.filter((i) => i.id !== id);
+    deleted = data.items.length !== before;
+    return deleted ? undefined : null;
+  });
+  return deleted;
 }
 
 export async function reorderWatchLaterItems(orderedIds: string[]): Promise<boolean> {
-  const data = await getWatchLater();
-  const byId = new Map(data.items.map((i) => [i.id, i] as const));
-  const next: typeof data.items = [];
-  for (const id of orderedIds) {
-    const found = byId.get(id);
-    if (found) next.push(found);
-  }
-  for (const i of data.items) {
-    if (!orderedIds.includes(i.id)) next.push(i);
-  }
-  data.items = next;
-  await saveWatchLater(data);
+  await mutateJson<WatchLaterData>("watch-later.json", defaultWatchLater, (data) => {
+    const byId = new Map(data.items.map((i) => [i.id, i] as const));
+    const next: typeof data.items = [];
+    for (const id of orderedIds) {
+      const found = byId.get(id);
+      if (found) next.push(found);
+    }
+    for (const i of data.items) {
+      if (!orderedIds.includes(i.id)) next.push(i);
+    }
+    data.items = next;
+  });
   return true;
 }
 
@@ -962,15 +1098,17 @@ function detectCategory(url: string): WatchLaterCategory {
 }
 
 export async function markWatchLaterRead(id: string): Promise<void> {
-  const data = await getWatchLater();
-  const idx = data.items.findIndex((i) => i.id === id);
-  if (idx >= 0) {
+  await mutateJson<WatchLaterData>("watch-later.json", defaultWatchLater, (data) => {
+    const idx = data.items.findIndex((i) => i.id === id);
+    if (idx < 0) return null;
     data.items[idx] = { ...data.items[idx], read: true };
-    await saveWatchLater(data);
-  }
+  });
 }
 
 export async function autoSummarize(url: string, title: string): Promise<{ summary: string; tags: string[] }> {
+  if (!(await isSafeFetchUrl(url))) {
+    return { summary: "", tags: [] };
+  }
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(8000),
@@ -1035,7 +1173,6 @@ export async function getActivity(limit = 50): Promise<ActivityEntry[]> {
 }
 
 export async function logActivity(action: ActivityAction, label: string, details?: string): Promise<void> {
-  const data = await readOrCreate("activity.json", defaultActivity);
   const entry: ActivityEntry = {
     id: crypto.randomUUID?.() ?? String(Date.now()),
     action,
@@ -1043,11 +1180,12 @@ export async function logActivity(action: ActivityAction, label: string, details
     details,
     createdAt: new Date().toISOString(),
   };
-  data.entries.unshift(entry);
-  if (data.entries.length > MAX_ACTIVITY_ENTRIES) {
-    data.entries = data.entries.slice(0, MAX_ACTIVITY_ENTRIES);
-  }
-  await writeJsonAtomic("activity.json", data);
+  await mutateJson<ActivityData>("activity.json", defaultActivity, (data) => {
+    data.entries.unshift(entry);
+    if (data.entries.length > MAX_ACTIVITY_ENTRIES) {
+      data.entries = data.entries.slice(0, MAX_ACTIVITY_ENTRIES);
+    }
+  });
 }
 
 /* ───── Accreditations ───── */
@@ -1070,7 +1208,6 @@ export async function addAccreditation(input: {
   contactEmail?: string;
   notes?: string;
 }): Promise<Accreditation> {
-  const data = await getAccreditations();
   const now = new Date().toISOString();
   const accreditation: Accreditation = {
     id: crypto.randomUUID?.() ?? String(Date.now()),
@@ -1083,8 +1220,9 @@ export async function addAccreditation(input: {
     createdAt: now,
     updatedAt: now,
   };
-  data.accreditations.unshift(accreditation);
-  await saveAccreditations(data);
+  await mutateJson<AccreditationsData>("accreditations.json", defaultAccreditations, (data) => {
+    data.accreditations.unshift(accreditation);
+  });
   return accreditation;
 }
 
@@ -1092,21 +1230,25 @@ export async function updateAccreditation(
   id: string,
   updates: Partial<Pick<Accreditation, "status" | "notes" | "contactEmail">>
 ): Promise<Accreditation | null> {
-  const data = await getAccreditations();
-  const idx = data.accreditations.findIndex((a) => a.id === id);
-  if (idx < 0) return null;
-  data.accreditations[idx] = { ...data.accreditations[idx], ...updates, updatedAt: new Date().toISOString() };
-  await saveAccreditations(data);
-  return data.accreditations[idx];
+  let updated: Accreditation | null = null;
+  await mutateJson<AccreditationsData>("accreditations.json", defaultAccreditations, (data) => {
+    const idx = data.accreditations.findIndex((a) => a.id === id);
+    if (idx < 0) return null;
+    data.accreditations[idx] = { ...data.accreditations[idx], ...updates, updatedAt: new Date().toISOString() };
+    updated = data.accreditations[idx];
+  });
+  return updated;
 }
 
 export async function deleteAccreditation(id: string): Promise<boolean> {
-  const data = await getAccreditations();
-  const before = data.accreditations.length;
-  data.accreditations = data.accreditations.filter((a) => a.id !== id);
-  if (data.accreditations.length === before) return false;
-  await saveAccreditations(data);
-  return true;
+  let deleted = false;
+  await mutateJson<AccreditationsData>("accreditations.json", defaultAccreditations, (data) => {
+    const before = data.accreditations.length;
+    data.accreditations = data.accreditations.filter((a) => a.id !== id);
+    deleted = data.accreditations.length !== before;
+    return deleted ? undefined : null;
+  });
+  return deleted;
 }
 
 export async function searchAccreditations(query: string): Promise<Accreditation[]> {
@@ -1133,24 +1275,26 @@ export async function saveChatHistory(data: ChatHistory): Promise<void> {
 }
 
 export async function saveChatSession(session: ChatSession): Promise<void> {
-  const data = await getChatHistory();
-  const idx = data.sessions.findIndex((s) => s.id === session.id);
   session.updatedAt = new Date().toISOString();
-  if (idx >= 0) {
-    data.sessions[idx] = session;
-  } else {
-    data.sessions.push(session);
-  }
-  await saveChatHistory(data);
+  await mutateJson<ChatHistory>("chat-history.json", defaultChatHistory, (data) => {
+    const idx = data.sessions.findIndex((s) => s.id === session.id);
+    if (idx >= 0) {
+      data.sessions[idx] = session;
+    } else {
+      data.sessions.push(session);
+    }
+  });
 }
 
 export async function deleteChatSession(id: string): Promise<boolean> {
-  const data = await getChatHistory();
-  const before = data.sessions.length;
-  data.sessions = data.sessions.filter((s) => s.id !== id);
-  if (data.sessions.length === before) return false;
-  await saveChatHistory(data);
-  return true;
+  let deleted = false;
+  await mutateJson<ChatHistory>("chat-history.json", defaultChatHistory, (data) => {
+    const before = data.sessions.length;
+    data.sessions = data.sessions.filter((s) => s.id !== id);
+    deleted = data.sessions.length !== before;
+    return deleted ? undefined : null;
+  });
+  return deleted;
 }
 
 /* ───── Photo Shoots ───── */
@@ -1173,12 +1317,11 @@ export async function addPhotoShoot(input: {
   notes?: string;
   status?: PhotoShootStatus;
 }): Promise<PhotoShoot> {
-  const data = await getPhotoShoots();
   const now = new Date().toISOString();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const shootDate = new Date(input.date + "T00:00:00");
-  const isPast = shootDate <= today;
+  const isPast = !Number.isNaN(shootDate.getTime()) && shootDate <= today;
   const defaultStatus: PhotoShootStatus = isPast ? "done" : "upcoming";
   const shoot: PhotoShoot = {
     id: crypto.randomUUID?.() ?? String(Date.now()),
@@ -1190,8 +1333,9 @@ export async function addPhotoShoot(input: {
     createdAt: now,
     updatedAt: now,
   };
-  data.shoots.unshift(shoot);
-  await savePhotoShoots(data);
+  await mutateJson<PhotoShootsData>("photo-shoots.json", defaultPhotoShoots, (data) => {
+    data.shoots.unshift(shoot);
+  });
   return shoot;
 }
 
@@ -1199,19 +1343,73 @@ export async function updatePhotoShoot(
   id: string,
   updates: Partial<Pick<PhotoShoot, "status" | "notes" | "galleryLink" | "photosSent" | "title" | "date" | "client">>
 ): Promise<PhotoShoot | null> {
-  const data = await getPhotoShoots();
-  const idx = data.shoots.findIndex((s) => s.id === id);
-  if (idx < 0) return null;
-  data.shoots[idx] = { ...data.shoots[idx], ...updates, updatedAt: new Date().toISOString() };
-  await savePhotoShoots(data);
-  return data.shoots[idx];
+  let updated: PhotoShoot | null = null;
+  await mutateJson<PhotoShootsData>("photo-shoots.json", defaultPhotoShoots, (data) => {
+    const idx = data.shoots.findIndex((s) => s.id === id);
+    if (idx < 0) return null;
+    data.shoots[idx] = { ...data.shoots[idx], ...updates, updatedAt: new Date().toISOString() };
+    updated = data.shoots[idx];
+  });
+  return updated;
 }
 
 export async function deletePhotoShoot(id: string): Promise<boolean> {
-  const data = await getPhotoShoots();
-  const before = data.shoots.length;
-  data.shoots = data.shoots.filter((s) => s.id !== id);
-  if (data.shoots.length === before) return false;
-  await savePhotoShoots(data);
-  return true;
+  let deleted = false;
+  await mutateJson<PhotoShootsData>("photo-shoots.json", defaultPhotoShoots, (data) => {
+    const before = data.shoots.length;
+    data.shoots = data.shoots.filter((s) => s.id !== id);
+    deleted = data.shoots.length !== before;
+    return deleted ? undefined : null;
+  });
+  return deleted;
+}
+
+/* ───── Intentions (relances programmées) ───── */
+
+const defaultIntentions: IntentionsData = { intentions: [] };
+
+export async function getIntentions(): Promise<IntentionsData> {
+  return readOrCreate("intentions.json", defaultIntentions);
+}
+
+export async function addIntention(input: {
+  subject: string;
+  message?: string;
+  dueAt: string;
+}): Promise<Intention> {
+  const intention: Intention = {
+    id: crypto.randomUUID?.() ?? String(Date.now()),
+    subject: input.subject.trim(),
+    message: input.message?.trim() || undefined,
+    dueAt: input.dueAt,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  };
+  await mutateJson<IntentionsData>("intentions.json", defaultIntentions, (data) => {
+    data.intentions.unshift(intention);
+  });
+  return intention;
+}
+
+export async function listPendingIntentions(): Promise<Intention[]> {
+  const data = await getIntentions();
+  return data.intentions.filter((i) => i.status === "pending");
+}
+
+export async function resolveIntention(
+  id: string,
+  status: "done" | "cancelled"
+): Promise<boolean> {
+  let resolved = false;
+  await mutateJson<IntentionsData>("intentions.json", defaultIntentions, (data) => {
+    const idx = data.intentions.findIndex((i) => i.id === id);
+    if (idx < 0) return null;
+    data.intentions[idx] = {
+      ...data.intentions[idx],
+      status,
+      resolvedAt: new Date().toISOString(),
+    };
+    resolved = true;
+  });
+  return resolved;
 }
