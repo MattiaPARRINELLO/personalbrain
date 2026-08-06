@@ -1,6 +1,7 @@
 import { getReminders, getConcerts, getEmails, getLeetcode, getCalendar, writeJsonAtomic, readJsonSafe, prepareConcert } from "./storage";
 import { chatCompletion } from "./ai-providers";
 import { getConfig } from "./config";
+import { toISODate, toHHMM } from "./utils";
 import type { DailyBrief } from "./types";
 
 const BRIEF_FILENAME = "daily-briefs.json";
@@ -26,7 +27,7 @@ export async function generateDailyBrief(): Promise<string | null> {
 
     // Rappels du jour encore pending
     const todayReminders = remindersData.reminders.filter(
-      (r) => r.dueAt.slice(0, 10) === today && r.status === "pending"
+      (r) => toISODate(r.dueAt) === today && r.status === "pending"
     );
 
     // Concerts du jour
@@ -34,7 +35,7 @@ export async function generateDailyBrief(): Promise<string | null> {
 
     // Agenda du jour depuis le calendrier
     const todayAgenda = calendarEvents.filter(
-      (e) => e.date.slice(0, 10) === today
+      (e) => toISODate(e.date) === today
     );
 
     // Emails non lus + urgents
@@ -82,7 +83,7 @@ export async function generateDailyBrief(): Promise<string | null> {
       prompt += "\nConcerts aujourd'hui :\n" + todayConcerts.map((c) => `- ${c.artist} @ ${c.venue}`).join("\n") + "\n";
     }
     if (todayReminders.length > 0) {
-      prompt += "\nRappels du jour :\n" + todayReminders.map((r) => `- ${r.title} (${r.dueAt.slice(11, 16)})`).join("\n") + "\n";
+      prompt += "\nRappels du jour :\n" + todayReminders.map((r) => `- ${r.title} (${toHHMM(r.dueAt)})`).join("\n") + "\n";
     }
     if (urgentEmails.length > 0) {
       prompt += "\nEmails urgents :\n" + urgentEmails.map((e) => `- ${e.from} : ${e.subject}`).join("\n") + "\n";

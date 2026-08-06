@@ -12,6 +12,19 @@ const REMINDER_INTERVAL_MS = 60_000;
 const DAILY_BRIEF_HOUR = 7;
 const NOTIFIED_FILE = "notified-reminders.json";
 
+// Focus mode actif : les notifications sont mises en silence. Les rappels et
+// relances restent en attente et seront envoyés après la fin de la session.
+async function isFocusActive(): Promise<boolean> {
+  try {
+    const { getFocusState } = await import("./focus");
+    const state = await getFocusState();
+    if (!state.active || !state.endsAt) return false;
+    return new Date(state.endsAt).getTime() > Date.now();
+  } catch {
+    return false;
+  }
+}
+
 async function getNotifiedReminders(): Promise<Set<string>> {
   try {
     const { readJsonSafe } = await import("./storage");
@@ -35,52 +48,61 @@ async function markReminderNotified(id: string): Promise<void> {
   }
 }
 
-export async function sendPushToAll(payload: string, tag?: string) {
+export async function sendPushToAll(payload: string, tag?: string): Promise<boolean> {
   const subs = await getSubscriptions();
-  if (subs.length === 0) return;
+  let webSent = false;
+  if (subs.length > 0) {
+    const vapidDetails = configureVapid();
+    if (!vapidDetails.publicKey || !vapidDetails.privateKey) {
+      console.error("[scheduler] VAPID keys missing");
+    } else {
+      console.log(`[scheduler] Envoi push à ${subs.length} appareil(s)...`);
 
-  const vapidDetails = configureVapid();
-  if (!vapidDetails.publicKey || !vapidDetails.privateKey) {
-    console.error("[scheduler] VAPID keys missing");
-    return;
-  }
+      const results = await Promise.allSettled(
+        subs.map(async (sub: StoredPushSubscription) => {
+          try {
+            await sendPushNotification(sub.endpoint, sub.keys, payload);
+            console.log(`[scheduler] Push OK → ${sub.endpoint.slice(0, 50)}...`);
+            return true;
+          } catch (err: unknown) {
+            const e = err as { statusCode?: number; body?: string };
+            console.error(`[scheduler] Push ÉCHEC ${e.statusCode || ""} → ${sub.endpoint.slice(0, 50)}...`, e.body || "");
+            if (e.statusCode === 410 || e.statusCode === 404 || e.statusCode === 401) {
+              const { removeSubscription } = await import("./push-subscriptions");
+              await removeSubscription(sub.endpoint);
+              console.log(`[scheduler] Souscription invalide supprimée: ${sub.endpoint.slice(0, 50)}...`);
+            }
+            return false;
+          }
+        })
+      );
 
-  console.log(`[scheduler] Envoi push à ${subs.length} appareil(s)...`);
+      webSent = results.some((r) => r.status === "fulfilled" && r.value === true);
 
-  const results = await Promise.allSettled(
-    subs.map(async (sub: StoredPushSubscription) => {
-      try {
-        await sendPushNotification(sub.endpoint, sub.keys, payload);
-        console.log(`[scheduler] Push OK → ${sub.endpoint.slice(0, 50)}...`);
-      } catch (err: unknown) {
-        const e = err as { statusCode?: number; body?: string };
-        console.error(`[scheduler] Push ÉCHEC ${e.statusCode || ""} → ${sub.endpoint.slice(0, 50)}...`, e.body || "");
-        if (e.statusCode === 410 || e.statusCode === 404 || e.statusCode === 401) {
-          const { removeSubscription } = await import("./push-subscriptions");
-          await removeSubscription(sub.endpoint);
-          console.log(`[scheduler] Souscription invalide supprimée: ${sub.endpoint.slice(0, 50)}...`);
-        }
+      const failed = results.filter((r) => r.status === "fulfilled" && r.value === false).length;
+      if (failed > 0) {
+        console.warn(`[scheduler] ${failed}/${subs.length} push notifications failed`);
+      } else {
+        console.log(`[scheduler] ${subs.length}/${subs.length} push envoyés avec succès`);
       }
-    })
-  );
-
-  const failed = results.filter((r) => r.status === "rejected").length;
-  if (failed > 0) {
-    console.warn(`[scheduler] ${failed}/${subs.length} push notifications failed`);
-  } else {
-    console.log(`[scheduler] ${subs.length}/${subs.length} push envoyés avec succès`);
+    }
   }
 
+  let fcmSent = false;
   try {
     const { sendFcmPushToAll } = await import("./fcm");
     await sendFcmPushToAll(payload);
+    fcmSent = true;
   } catch (err) {
     console.error("[scheduler] Erreur FCM:", err);
   }
+
+  return webSent || fcmSent;
 }
 
 export async function checkReminders() {
   try {
+    if (await isFocusActive()) return; // silence pendant le focus
     const data = await getReminders();
     const now = Date.now();
     const pending = data.reminders.filter(
@@ -91,8 +113,6 @@ export async function checkReminders() {
 
     for (const r of pending) {
       if (notifiedReminders.has(r.id)) continue;
-      notifiedReminders.add(r.id);
-      await markReminderNotified(r.id);
 
       const payload = JSON.stringify({
         title: r.title,
@@ -109,10 +129,48 @@ export async function checkReminders() {
         vibrate: [200, 100, 200],
       });
 
-      await sendPushToAll(payload, "reminder-" + r.id);
+      // On marque le rappel notifié SEULEMENT si l'envoi a réussi (web ou
+      // FCM) : sinon il sera retenté au prochain tick au lieu d'être perdu.
+      const sent = await sendPushToAll(payload, "reminder-" + r.id);
+      if (sent) {
+        notifiedReminders.add(r.id);
+        await markReminderNotified(r.id);
+      }
     }
   } catch (err) {
     console.error("[scheduler] checkReminders failed:", err);
+  }
+}
+
+export async function checkIntentions() {
+  try {
+    if (await isFocusActive()) return; // silence pendant le focus
+    const { listPendingIntentions, resolveIntention } = await import("./storage");
+    const now = Date.now();
+    const due = (await listPendingIntentions()).filter(
+      (i) => new Date(i.dueAt).getTime() <= now + 60_000
+    );
+
+    for (const it of due) {
+      const payload = JSON.stringify({
+        title: `Relance : ${it.subject}`,
+        body: it.message || `Tu voulais relancer sur « ${it.subject} ».`,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: "intention-" + it.id,
+        data: { type: "intention", intentionId: it.id, url: "/chat" },
+        requireInteraction: false,
+        vibrate: [200, 100, 200],
+      });
+
+      // Marquée faite UNIQUEMENT si l'envoi a réussi, sinon retentée au tick suivant.
+      const sent = await sendPushToAll(payload, "intention-" + it.id);
+      if (sent) {
+        await resolveIntention(it.id, "done");
+      }
+    }
+  } catch (err) {
+    console.error("[scheduler] checkIntentions failed:", err);
   }
 }
 
@@ -187,7 +245,11 @@ export function startScheduler() {
   }
 
   checkReminders();
-  reminderInterval = setInterval(checkReminders, REMINDER_INTERVAL_MS);
+  checkIntentions();
+  reminderInterval = setInterval(() => {
+    checkReminders();
+    checkIntentions();
+  }, REMINDER_INTERVAL_MS);
 
   startDailyBrief();
 

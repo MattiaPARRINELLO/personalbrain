@@ -1,4 +1,5 @@
 import { readJsonSafe } from "./storage";
+import type { App } from "firebase-admin/app";
 
 const _import = new Function("url", "return import(url)") as (url: string) => Promise<unknown>;
 
@@ -9,7 +10,7 @@ const FB_MSG = BASE + "messaging/index.js";
 interface FirebaseAdmin {
   initializeApp: (opts: { credential: object }) => void;
   cert: (sa: { projectId: string; privateKey: string; clientEmail: string }) => object;
-  getApps: () => { length: number }[];
+  getApps: () => App[];
 }
 
 interface FirebaseMessaging {
