@@ -1,5 +1,7 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
+
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
@@ -30,6 +32,7 @@ const updateAccreditationSchema = z
   .strict();
 
 export async function loadAccreditations() {
+  await requireSession();
   return getAccreditations();
 }
 
@@ -40,6 +43,7 @@ export async function createAccreditation(input: {
   contactEmail?: string;
   notes?: string;
 }): Promise<Accreditation> {
+  await requireSession();
   const parsed = createAccreditationSchema.safeParse(input);
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Payload invalide");
@@ -58,6 +62,7 @@ export async function editAccreditation(
   id: string,
   updates: Partial<Pick<Accreditation, "status" | "notes" | "contactEmail">>
 ): Promise<Accreditation | null> {
+  await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const parsed = updateAccreditationSchema.safeParse(updates);
   if (!parsed.success) {
@@ -74,6 +79,7 @@ export async function editAccreditation(
 }
 
 export async function removeAccreditation(id: string): Promise<boolean> {
+  await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const ok = await deleteAccreditation(id);
   if (ok) await logActivity("accreditation_deleted", "Accréditation supprimée", id);
@@ -82,8 +88,19 @@ export async function removeAccreditation(id: string): Promise<boolean> {
 }
 
 export async function scanAccreditationsAction(): Promise<{ message: string; created: number; updated: number }> {
+  await requireSession();
   const { fetchGmailMessages } = await import("@/lib/google-actions");
-  const messages = await fetchGmailMessages("accréditation OR photo pass OR press OR accredit", 20);
+  let messages;
+  try {
+    messages = await fetchGmailMessages("accréditation OR photo pass OR press OR accredit", 20);
+  } catch (err) {
+    console.error("[accreditations] Scan Gmail échoué:", err);
+    throw new Error(
+      "Impossible de scanner Gmail : " +
+      (err instanceof Error ? err.message : "erreur inconnue") +
+      " (réessaie après avoir reconnecté le compte Google)."
+    );
+  }
 
   let created = 0;
   let updated = 0;
@@ -151,6 +168,7 @@ export async function scanAccreditationsAction(): Promise<{ message: string; cre
 }
 
 export async function generateFollowUpDraft(accreditationId: string): Promise<string> {
+  await requireSession();
   const existing = await getAccreditations();
   const acc = existing.accreditations.find((a) => a.id === accreditationId);
   if (!acc) throw new Error("Accréditation introuvable");

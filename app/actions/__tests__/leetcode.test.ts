@@ -15,6 +15,7 @@ const mockLeetcodeApi = {
 vi.mock("@/lib/storage", () => mockStorage);
 vi.mock("@/lib/leetcode-api", () => mockLeetcodeApi);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/session", () => ({ requireSession: vi.fn().mockResolvedValue({ userId: "test-user" }) }));
 
 const { loadLeetcode, saveLeetcodeData, storeExercise, syncLeetcode, getSmartSuggestion, setLeetcodeUsername } = await import("@/app/actions/leetcode");
 

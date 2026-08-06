@@ -10,6 +10,7 @@ const mockStorage = {
 
 vi.mock("@/lib/storage", () => mockStorage);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/session", () => ({ requireSession: vi.fn().mockResolvedValue({ userId: "test-user" }) }));
 
 const { createReminder, loadReminders, editReminder, removeReminder, markReminderStatus } = await import("@/app/actions/reminders");
 

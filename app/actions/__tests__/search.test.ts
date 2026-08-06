@@ -11,6 +11,7 @@ const mockStorage = {
 };
 
 vi.mock("@/lib/storage", () => mockStorage);
+vi.mock("@/lib/session", () => ({ requireSession: vi.fn().mockResolvedValue({ userId: "test-user" }) }));
 
 const { unifiedSearch } = await import("@/app/actions/search");
 

@@ -1,5 +1,7 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
+
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
@@ -37,6 +39,7 @@ const updateWatchLaterSchema = z
   .strict();
 
 export async function loadWatchLater(): Promise<WatchLaterData> {
+  await requireSession();
   return getWatchLater();
 }
 
@@ -48,6 +51,7 @@ export async function createWatchLaterItem(input: {
   source?: string;
   category?: WatchLaterCategory;
 }): Promise<WatchLaterItem> {
+  await requireSession();
   const parsed = createWatchLaterSchema.safeParse(input);
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Payload invalide");
@@ -59,15 +63,21 @@ export async function createWatchLaterItem(input: {
   });
   await logActivity("watch_later_added", `À voir : ${item.title}`, item.url);
 
-  Promise.allSettled([
-    (async () => {
+  // Résumé IA : on attend au maximum 15 s pour ne pas bloquer la création,
+  // et les erreurs sont loggées au lieu d'être avalées silencieusement.
+  try {
+    const summarize = (async () => {
       const { summary, tags } = await autoSummarize(item.url, item.title);
       if (summary || tags.length > 0) {
         await updateWatchLaterItem(item.id, { summary, aiTags: tags });
         revalidatePath("/watch-later");
       }
-    })(),
-  ]);
+    })();
+    const timeout = new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 15_000));
+    await Promise.race([summarize, timeout]);
+  } catch (err) {
+    console.error("[watch-later] Résumé automatique échoué:", err);
+  }
 
   revalidatePath("/watch-later");
   return item;
@@ -76,6 +86,7 @@ export async function createWatchLaterItem(input: {
 export async function summarizeWatchLaterItem(
   id: string
 ): Promise<{ summary: string; tags: string[] } | null> {
+  await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const data = await getWatchLater();
   const item = data.items.find((i) => i.id === id);
@@ -93,6 +104,7 @@ export async function editWatchLaterItem(
   id: string,
   updates: Partial<Pick<WatchLaterItem, "title" | "description" | "category">>
 ): Promise<WatchLaterItem | null> {
+  await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const parsed = updateWatchLaterSchema.safeParse(updates);
   if (!parsed.success) {
@@ -104,6 +116,7 @@ export async function editWatchLaterItem(
 }
 
 export async function removeWatchLaterItem(id: string): Promise<boolean> {
+  await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
   const ok = await deleteWatchLaterItem(id);
   if (ok) await logActivity("watch_later_deleted", "Élément retiré de À voir plus tard", id);
@@ -112,6 +125,7 @@ export async function removeWatchLaterItem(id: string): Promise<boolean> {
 }
 
 export async function reorderWatchLater(orderedIds: string[]): Promise<boolean> {
+  await requireSession();
   if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
     throw new Error("Liste d'IDs invalide");
   }

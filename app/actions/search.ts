@@ -1,5 +1,7 @@
 "use server";
 
+import { requireSession } from "@/lib/session";
+
 import {
   getConcerts,
   getMemory,
@@ -21,13 +23,13 @@ export interface UnifiedSearchResult {
 }
 
 export async function unifiedSearch(query: string): Promise<UnifiedSearchResult> {
+  await requireSession();
   const q = query.toLowerCase().trim();
   if (!q) return { concerts: [], facts: [], emails: [], reminders: [], watchLater: [], accreditations: [] };
 
-  const [concerts, memory, , reminders, watchLater, accreditations] = await Promise.all([
+  const [concerts, memory, reminders, watchLater, accreditations] = await Promise.all([
     getConcerts(),
     getMemory(),
-    getEmails(),
     getReminders(),
     getWatchLater(),
     getAccreditations(),
