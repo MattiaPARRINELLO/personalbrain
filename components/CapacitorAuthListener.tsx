@@ -22,7 +22,7 @@ export function CapacitorAuthListener() {
 
       try {
         await setCapSessionCookie(token);
-        window.location.href = window.location.origin;
+        window.location.href = window.location.origin + "/chat";
       } catch {
         // fallback: reload current page
         window.location.reload();

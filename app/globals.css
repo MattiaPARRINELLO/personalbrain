@@ -519,6 +519,14 @@ textarea::placeholder {
   animation: breathe 3s ease-in-out infinite;
 }
 
+.animate-blink-cursor {
+  animation: blink-cursor 1s step-end infinite;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
 .animate-orbit-ring {
   animation: orbit-ring 8s linear infinite;
 }

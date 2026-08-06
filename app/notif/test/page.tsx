@@ -24,7 +24,9 @@ export default function NotifTestPage() {
   const [browserPerm, setBrowserPerm] = useState<string>("...");
 
   useEffect(() => {
-    setBrowserPerm(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
+    queueMicrotask(() => {
+      setBrowserPerm(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
+    });
     fetchSubs();
     fetchFcm();
   }, []);

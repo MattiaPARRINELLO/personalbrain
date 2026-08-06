@@ -45,7 +45,7 @@ export default function DailyBriefPage() {
       <div className="text-center py-20">
         <p className="text-[var(--text-3)] text-sm mb-4">Aucun brief disponible.</p>
         <Link
-          href="/"
+          href="/chat"
           className="inline-flex items-center gap-2 text-sm text-[var(--accent-cool)] hover:underline"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -58,7 +58,7 @@ export default function DailyBriefPage() {
   return (
     <>
       <Link
-        href="/"
+        href="/chat"
         className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-[var(--text-4)] hover:text-[var(--text-2)] transition-colors duration-200 mb-8"
       >
         <ArrowLeft className="w-3 h-3" />
