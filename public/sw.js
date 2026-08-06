@@ -1,5 +1,3 @@
-const VAPID_PUBLIC_KEY = "BMmFNNXqVHLnhyokND2qq1ga3n1lq_4w1eTEhuU0Q-3f6wZUOMgQ0jeT03CkwsobgmRnxrmDPCGpj6FmLjP7bl0";
-
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -11,20 +9,35 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
+// La clé publique VAPID est servie par l'API (plus de hardcode) : la rotation
+// de clé n'exige plus de rebuild ni de reinstall du service worker.
+async function getVapidPublicKey() {
+  const res = await fetch("/api/push/vapid-key");
+  if (!res.ok) throw new Error("vapid-key HTTP " + res.status);
+  const data = await res.json();
+  if (!data.key) throw new Error("clé VAPID absente");
+  return data.key;
+}
+
 self.addEventListener("pushsubscriptionchange", (event) => {
   event.waitUntil(
-    self.registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-    }).then((newSub) => {
-      return fetch("/api/push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newSub.toJSON()),
-      });
-    }).catch((err) => {
-      console.error("[SW] pushsubscriptionchange error:", err);
-    })
+    getVapidPublicKey()
+      .then((key) =>
+        self.registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(key),
+        })
+      )
+      .then((newSub) => {
+        return fetch("/api/push", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newSub.toJSON()),
+        });
+      })
+      .catch((err) => {
+        console.error("[SW] pushsubscriptionchange error:", err);
+      })
   );
 });
 const CACHE = "backstage-v2";
