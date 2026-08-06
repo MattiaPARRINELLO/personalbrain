@@ -67,7 +67,12 @@ NODE_ENV=production
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
 VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
 VAPID_SUBJECT=${VAPID_SUBJECT}
+CRON_SECRET=${CRON_SECRET:-}
 EOF
+
+if [ -z "${CRON_SECRET:-}" ]; then
+  echo -e "${YELLOW}⚠  CRON_SECRET non défini dans .deploy.env — les routes /api/cron/* seront refusées en production. Définissez-le (openssl rand -hex 32) et ajoutez le header x-cron-secret à votre crontab.${NC}"
+fi
 
 echo -e "${GREEN}✓ Standalone prêt dans ${DEPLOY_TMP}${NC}"
 

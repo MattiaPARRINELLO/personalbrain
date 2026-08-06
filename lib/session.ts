@@ -46,6 +46,12 @@ export async function clearSession(): Promise<void> {
   });
 }
 
+export async function requireSession(): Promise<{ userId: string }> {
+  const session = await getSession();
+  if (!session) throw new Error("Non authentifié");
+  return session;
+}
+
 export async function getSession(): Promise<{ userId: string } | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;

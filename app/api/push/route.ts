@@ -2,8 +2,18 @@ import { NextResponse } from "next/server";
 import { addSubscription, removeSubscription, getSubscriptions } from "@/lib/push-subscriptions";
 import type { StoredPushSubscription } from "@/lib/push-subscriptions";
 import { configureVapid, sendPushNotification } from "@/lib/send-push";
+import { getSession } from "@/lib/session";
+
+// Le POST d'abonnement reste public (appelé par le service worker en
+// arrière-plan), mais la liste, le test et la suppression exigent une session.
+async function requireSessionOr401(): Promise<NextResponse | null> {
+  const session = await getSession();
+  return session ? null : NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+}
 
 export async function GET() {
+  const denied = await requireSessionOr401();
+  if (denied) return denied;
   const subs = await getSubscriptions();
   return NextResponse.json({ count: subs.length, endpoints: subs.map((s) => s.endpoint.slice(0, 60) + "...") });
 }
@@ -24,6 +34,8 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const denied = await requireSessionOr401();
+  if (denied) return denied;
   try {
     configureVapid();
 
@@ -86,10 +98,12 @@ export async function PUT(request: Request) {
     return NextResponse.json({ sent: succeeded.length, failed: errors.length, count: subs.length, endpoints: succeeded, errors, fcm: fcmResult });
   } catch (err) {
     console.error("[push test]", err instanceof Error ? err.message : String(err));
-    return NextResponse.json({ error: "Erreur serveur", detail: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
 export async function DELETE(request: Request) {
+  const denied = await requireSessionOr401();
+  if (denied) return denied;
   try {
     const { endpoint, all } = (await request.json()) as { endpoint?: string; all?: boolean };
     if (all) {

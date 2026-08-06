@@ -1,13 +1,36 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { verifyRegistrationResponse } from "@simplewebauthn/server";
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
-import { getRpID, getOrigin, saveCredential } from "@/lib/auth";
-import { consumeChallenge, createSession } from "@/lib/session";
+import { getRpID, getOrigin, saveCredential, hasCredentials } from "@/lib/auth";
+import { consumeChallenge, createSession, getSession } from "@/lib/session";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const body = (await request.json()) as {
     response: unknown;
+    setupToken?: string;
   };
+
+  // Même garde que register-options : l'ajout d'une passkey à un compte déjà
+  // configuré exige une session active (anti prise de contrôle).
+  const alreadyRegistered = await hasCredentials();
+  if (alreadyRegistered) {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
+  } else if (process.env.SETUP_TOKEN) {
+    if (body.setupToken !== process.env.SETUP_TOKEN) {
+      return NextResponse.json(
+        { error: "Bootstrap protégé : le token de configuration est requis ou invalide." },
+        { status: 403 }
+      );
+    }
+  } else {
+    console.warn(
+      "[passkey] SETUP_TOKEN non défini : le premier enregistrement passkey est ouvert à tous. " +
+      "Définissez SETUP_TOKEN avant d'exposer l'app à l'internet."
+    );
+  }
 
   const challenge = await consumeChallenge();
   if (!challenge) {
