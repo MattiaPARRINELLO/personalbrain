@@ -4,7 +4,7 @@ import path from "path";
 export default defineConfig({
   test: {
     environment: "node",
-    exclude: ["node_modules", "e2e", "**/e2e/**"],
+    exclude: ["node_modules", ".mimocode", "e2e", "**/e2e/**"],
   },
   resolve: {
     alias: {

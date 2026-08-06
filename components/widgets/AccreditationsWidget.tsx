@@ -30,6 +30,7 @@ function formatDate(dateStr: string): string {
 export function AccreditationsWidget() {
   const [data, setData] = useState<PhotoShoot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -37,6 +38,9 @@ export function AccreditationsWidget() {
       try {
         const d = await loadPhotoShoots();
         setData(d.shoots);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Impossible de charger les shootings");
       } finally {
         setLoading(false);
       }
@@ -68,6 +72,11 @@ export function AccreditationsWidget() {
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-14 rounded-lg bg-[var(--surface-2)] animate-pulse" />
             ))}
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center py-6 text-center">
+            <Camera className="w-8 h-8 text-[var(--danger)] mb-2" />
+            <p className="text-[12px] text-[var(--danger)]">{error}</p>
           </div>
         ) : upcoming.length === 0 ? (
           <div className="flex flex-col items-center py-6 text-center">

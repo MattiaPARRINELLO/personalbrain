@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import type { MemoryFact, MemoryRelationship } from "@/lib/types";
 
 interface GraphNode {
@@ -27,30 +27,43 @@ interface KnowledgeGraphProps {
 
 export function KnowledgeGraph({ facts, relationships, onEditFact }: KnowledgeGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const initialNodes = useMemo(() => {
-    const centerX = 300;
-    const centerY = 300;
-    const radius = 150;
-    return facts.map((f, i) => {
-      const angle = (2 * Math.PI * i) / facts.length;
-      return {
-        id: f.id,
-        label: f.content.length > 30 ? f.content.slice(0, 30) + "…" : f.content,
-        category: f.category,
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle),
-        vx: 0,
-        vy: 0,
-      };
-    });
-  }, [facts]);
-  const [nodes, setNodes] = useState<GraphNode[]>(() => initialNodes);
-  const [edges] = useState<GraphEdge[]>(() =>
-    relationships.map((r) => ({ source: r.sourceId, target: r.targetId, type: r.type }))
-  );
+  const [nodes, setNodes] = useState<GraphNode[]>([]);
+  const [edges, setEdges] = useState<GraphEdge[]>([]);
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
   const [dragging, setDragging] = useState<{ node: GraphNode; ox: number; oy: number } | null>(null);
   const animRef = useRef<number>(0);
+
+  // Resynchronise le graphe quand les faits/relations changent (ajout,
+  // modification, suppression) en conservant la position des nœuds existants
+  // pour ne pas casser la simulation en cours.
+  useEffect(() => {
+    // Resync différée d'une microtask : évite le setState synchrone dans
+    // l'effect (cascading renders) sans changer le comportement visible.
+    queueMicrotask(() => {
+      setNodes((prev) => {
+        const prevById = new Map(prev.map((n) => [n.id, n]));
+        const radius = 150;
+        return facts.map((f, i) => {
+          const label = f.content.length > 30 ? f.content.slice(0, 30) + "…" : f.content;
+          const existing = prevById.get(f.id);
+          if (existing) {
+            return existing.label === label ? existing : { ...existing, label, category: f.category };
+          }
+          const angle = (2 * Math.PI * i) / facts.length;
+          return {
+            id: f.id,
+            label,
+            category: f.category,
+            x: 300 + radius * Math.cos(angle),
+            y: 300 + radius * Math.sin(angle),
+            vx: 0,
+            vy: 0,
+          };
+        });
+      });
+      setEdges(relationships.map((r) => ({ source: r.sourceId, target: r.targetId, type: r.type })));
+    });
+  }, [facts, relationships]);
 
   // Force-directed layout simulation
   useEffect(() => {
