@@ -8,9 +8,21 @@ export const CHALLENGE_TTL_SECONDS = 5 * 60;
 
 const SECRET_FILE = path.join(process.cwd(), "data", ".auth-secret");
 
+// Décode la valeur hex (openssl rand -hex 32) en bytes ; sinon raw.
+// Garantit que AUTH_SECRET et data/.auth-secret produisent la MÊME clé
+// pour une même valeur (sinon les sessions signées en local ne sont pas
+// valides côté serveur et inversement).
+function secretBytes(secret: string): Uint8Array {
+  const trimmed = secret.trim();
+  if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
+    return Uint8Array.from(Buffer.from(trimmed, "hex"));
+  }
+  return Uint8Array.from(new TextEncoder().encode(secret));
+}
+
 async function getSecret(): Promise<Uint8Array> {
   if (process.env.AUTH_SECRET) {
-    return Uint8Array.from(new TextEncoder().encode(process.env.AUTH_SECRET));
+    return secretBytes(process.env.AUTH_SECRET);
   }
 
   try {
