@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { addMemoryFact, findSimilarMemoryFacts, getMemory, logActivity } from "@/lib/storage";
+import { addMemoryFact, findSimilarMemoryFacts, logActivity } from "@/lib/storage";
+import { safeErrorMessage } from "@/lib/utils";
 
 const bodySchema = z.object({
   content: z.string().trim().min(1, "Le contenu est requis").max(500),
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("Memory remember error:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Erreur interne" },
+      { error: safeErrorMessage(err) },
       { status: 500 }
     );
   }

@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, updateGoogleCalendarEvent } from "@/lib/google-actions";
 import { getServerCached, setServerCached, invalidateServerCache } from "@/lib/server-cache";
+import { safeErrorMessage } from "@/lib/utils";
+import type { GoogleCalendarEvent as CalendarEventItem } from "@/lib/types";
 
-export interface CalendarEventItem {
-  id: string;
-  summary: string;
-  start: string;
-  end: string;
-  location?: string;
-  description?: string;
-  colorId?: string;
-}
+export type { CalendarEventItem };
 
 const CALENDAR_LIST_CACHE_KEY = "calendar:list";
 const CALENDAR_LIST_TTL_MS = 2 * 60 * 1000;
+
+function isIsoDate(value: string): boolean {
+  return !Number.isNaN(new Date(value).getTime());
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,6 +19,9 @@ export async function GET(request: NextRequest) {
     const timeMax = request.nextUrl.searchParams.get("timeMax");
     if (!timeMin || !timeMax) {
       return NextResponse.json({ error: "timeMin et timeMax requis" }, { status: 400 });
+    }
+    if (!isIsoDate(timeMin) || !isIsoDate(timeMax)) {
+      return NextResponse.json({ error: "timeMin et timeMax doivent être des dates valides" }, { status: 400 });
     }
 
     const cacheKey = `${CALENDAR_LIST_CACHE_KEY}:${timeMin}:${timeMax}`;
@@ -35,8 +36,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response);
   } catch (err) {
     console.error("Calendar GET error:", err);
-    const message = err instanceof Error ? err.message : "Erreur inconnue";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: safeErrorMessage(err) }, { status: 500 });
   }
 }
 
@@ -51,13 +51,19 @@ export async function POST(request: NextRequest) {
       colorId?: string;
     };
 
+    if (!body.summary?.trim()) {
+      return NextResponse.json({ error: "summary requis" }, { status: 400 });
+    }
+    if (!isIsoDate(body.start) || !isIsoDate(body.end) || new Date(body.end) <= new Date(body.start)) {
+      return NextResponse.json({ error: "start et end doivent être des dates valides (end > start)" }, { status: 400 });
+    }
+
     const id = await createGoogleCalendarEvent(body.summary, body.start, body.end, body.location, body.description, body.colorId);
     invalidateServerCache(CALENDAR_LIST_CACHE_KEY);
     return NextResponse.json({ success: true, id });
   } catch (err) {
     console.error("Calendar POST error:", err);
-    const message = err instanceof Error ? err.message : "Erreur inconnue";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: safeErrorMessage(err) }, { status: 500 });
   }
 }
 
@@ -86,7 +92,6 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Calendar PATCH error:", err);
-    const message = err instanceof Error ? err.message : "Erreur inconnue";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: safeErrorMessage(err) }, { status: 500 });
   }
 }

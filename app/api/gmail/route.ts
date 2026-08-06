@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchGmailMessages, sendGmailReply } from "@/lib/google-actions";
 import { getServerCached, setServerCached, invalidateServerCachePattern } from "@/lib/server-cache";
+import { safeErrorMessage } from "@/lib/utils";
+import type { GmailMessage } from "@/lib/types";
 
-export interface GmailMessage {
-  id: string;
-  threadId: string;
-  from: string;
-  subject: string;
-  date: string;
-  snippet: string;
-  body: string;
-  unread: boolean;
-  messageId?: string;
-}
+export type { GmailMessage };
 
 const GMAIL_LIST_CACHE_KEY = "gmail:list";
 const GMAIL_LIST_TTL_MS = 2 * 60 * 1000;
@@ -33,8 +25,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response);
   } catch (err) {
     console.error("Gmail GET error:", err);
-    const message = err instanceof Error ? err.message : "Erreur inconnue";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: safeErrorMessage(err) }, { status: 500 });
   }
 }
 
@@ -50,7 +41,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, id });
   } catch (err) {
     console.error("Gmail POST error:", err);
-    const message = err instanceof Error ? err.message : "Erreur inconnue";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: safeErrorMessage(err) }, { status: 500 });
   }
 }
