@@ -68,6 +68,9 @@ function extractBody(parts: GmailPart[] | undefined, mimeType: string | undefine
   return "";
 }
 
+// Timeout de sécurité : les APIs Google ne doivent pas pendre indéfiniment.
+const GOOGLE_FETCH_TIMEOUT_MS = 20_000;
+
 async function googleFetch<T>(auth: OAuth2Client, url: string, init?: RequestInit): Promise<T> {
   const accessToken = auth.credentials.access_token;
   if (!accessToken) {
@@ -75,6 +78,7 @@ async function googleFetch<T>(auth: OAuth2Client, url: string, init?: RequestIni
   }
   const res = await fetch(url, {
     ...init,
+    signal: AbortSignal.timeout(GOOGLE_FETCH_TIMEOUT_MS),
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
@@ -85,6 +89,7 @@ async function googleFetch<T>(auth: OAuth2Client, url: string, init?: RequestIni
   if (!res.ok) {
     throw new Error(`Google API error ${res.status}: ${text.slice(0, 300)}`);
   }
+  if (!text) return null as T;
   return JSON.parse(text) as T;
 }
 
@@ -124,7 +129,7 @@ export async function fetchGmailMessages(query?: string, maxResults = 10): Promi
         date,
         snippet,
         body: snippet,
-        unread: !msg.labelIds?.includes("UNREAD"),
+        unread: msg.labelIds?.includes("UNREAD") ?? true,
         messageId,
       };
     })
