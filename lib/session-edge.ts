@@ -2,6 +2,17 @@ const SESSION_COOKIE = "pb_session";
 
 let cachedKey: CryptoKey | null = null;
 
+// Décode la valeur hex (openssl rand -hex 32) en bytes ; sinon raw.
+// Doit rester identique à lib/session-core.ts pour que les sessions soient
+// valides des deux côtés (edge et node).
+function secretBytes(secret: string): Uint8Array {
+  const trimmed = secret.trim();
+  if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
+    return Uint8Array.from(Buffer.from(trimmed, "hex"));
+  }
+  return Uint8Array.from(new TextEncoder().encode(secret));
+}
+
 async function getSigningKey(): Promise<CryptoKey> {
   if (cachedKey) return cachedKey;
 
@@ -11,7 +22,7 @@ async function getSigningKey(): Promise<CryptoKey> {
     );
   }
 
-  const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
+  const secret = secretBytes(process.env.AUTH_SECRET);
   cachedKey = await crypto.subtle.importKey(
     "raw",
     secret as unknown as BufferSource,
