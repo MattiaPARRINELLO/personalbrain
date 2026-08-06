@@ -5,6 +5,8 @@ import { Mic, Loader2 } from "lucide-react";
 
 interface VoiceInputProps {
   onResult: (text: string) => void;
+  onInterim?: (text: string) => void;
+  onListeningChange?: (listening: boolean) => void;
   disabled?: boolean;
 }
 
@@ -14,6 +16,7 @@ interface SpeechRecognition extends EventTarget {
   interimResults: boolean;
   start(): void;
   stop(): void;
+  abort(): void;
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
   onerror: ((event: unknown) => void) | null;
   onend: (() => void) | null;
@@ -45,10 +48,26 @@ declare global {
   }
 }
 
-export function VoiceInput({ onResult, disabled }: VoiceInputProps) {
+export function VoiceInput({ onResult, onInterim, onListeningChange, disabled }: VoiceInputProps) {
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // onResult/onInterim sont souvent des closures inline qui changent à chaque
+  // render : on les garde dans des refs pour ne recréer le SpeechRecognition
+  // qu'une seule fois.
+  const onResultRef = useRef(onResult);
+  const onInterimRef = useRef(onInterim);
+  const onListeningChangeRef = useRef(onListeningChange);
+  useEffect(() => {
+    onResultRef.current = onResult;
+    onInterimRef.current = onInterim;
+    onListeningChangeRef.current = onListeningChange;
+  }, [onResult, onInterim, onListeningChange]);
+
+  const setListeningState = (v: boolean) => {
+    setListening(v);
+    onListeningChangeRef.current?.(v);
+  };
 
   useEffect(() => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -59,37 +78,58 @@ export function VoiceInput({ onResult, disabled }: VoiceInputProps) {
     }
     const recognition = new SpeechRecognitionAPI();
     recognition.lang = "fr-FR";
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    // Dictée continue : plusieurs phrases à la suite, avec texte intermédiaire
+    // affiché en direct pendant que l'utilisateur parle.
+    recognition.continuous = true;
+    recognition.interimResults = true;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[0][0].transcript;
-      onResult(transcript);
-      setListening(false);
+      let final = "";
+      let interim = "";
+      for (let i = 0; i < event.results.length; i++) {
+        const res = event.results[i];
+        const transcript = res[0]?.transcript ?? "";
+        if (res.isFinal) final += transcript + " ";
+        else interim = transcript;
+      }
+      if (interim) onInterimRef.current?.(interim.trim());
+      const finalTrimmed = final.trim();
+      if (finalTrimmed) onResultRef.current(finalTrimmed);
     };
 
     recognition.onerror = () => {
-      setListening(false);
+      setListeningState(false);
     };
 
     recognition.onend = () => {
-      setListening(false);
+      setListeningState(false);
+      onInterimRef.current?.("");
     };
 
     recognitionRef.current = recognition;
-  }, [onResult]);
+    return () => {
+      // Arrêter proprement la reconnaissance au démontage (sinon le micro
+      // reste actif et l'instance fuit).
+      try {
+        recognition.abort();
+      } catch {
+        // Pas en cours d'écoute.
+      }
+      recognitionRef.current = null;
+    };
+  }, []);
 
   const toggleListening = useCallback(() => {
     if (!recognitionRef.current) return;
     if (listening) {
       recognitionRef.current.stop();
-      setListening(false);
+      setListeningState(false);
     } else {
       try {
         recognitionRef.current.start();
-        setListening(true);
+        setListeningState(true);
       } catch {
-        setListening(false);
+        setListeningState(false);
       }
     }
   }, [listening]);

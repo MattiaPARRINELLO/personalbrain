@@ -59,8 +59,11 @@ export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession,
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    import("@/app/actions/chat-history").then(({ getChatHistory }) => {
-      getChatHistory().then((history) => {
+    let cancelled = false;
+    import("@/app/actions/chat-history")
+      .then(({ getChatHistory }) => getChatHistory())
+      .then((history) => {
+        if (cancelled) return;
         const list: ChatSession[] = history.sessions
           .map((s) => ({
             id: s.id,
@@ -73,8 +76,13 @@ export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession,
           }))
           .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
         setSessions(list);
+      })
+      .catch((err) => {
+        console.error("[session-sidebar] Chargement des sessions échoué:", err);
       });
-    });
+    return () => {
+      cancelled = true;
+    };
   }, [activeSessionId]);
 
   const filtered = search
@@ -89,29 +97,38 @@ export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession,
   }
 
   const handleSelect = async (id: string) => {
-    const { getChatHistory } = await import("@/app/actions/chat-history");
-    const history = await getChatHistory();
-    const session = history.sessions.find((s) => s.id === id);
-    if (!session) return;
-    onSelectSession({
-      id: session.id,
-      title: session.title,
-      messages: session.messages.map((m) => ({
-        ...m,
-        toolCalls: m.toolCalls?.map((tc) => ({
-          ...tc,
-          status: (tc.status || "success") as "running" | "success" | "error",
+    try {
+      const { getChatHistory } = await import("@/app/actions/chat-history");
+      const history = await getChatHistory();
+      const session = history.sessions.find((s) => s.id === id);
+      if (!session) return;
+      onSelectSession({
+        id: session.id,
+        title: session.title,
+        messages: session.messages.map((m) => ({
+          ...m,
+          toolCalls: m.toolCalls?.map((tc) => ({
+            ...tc,
+            status: (tc.status || "success") as "running" | "success" | "error",
+          })),
         })),
-      })),
-    });
+      });
+    } catch (err) {
+      console.error("[session-sidebar] Sélection de session échouée:", err);
+    }
   };
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    const { deleteChatSession } = await import("@/app/actions/chat-history");
-    await deleteChatSession(id);
-    setSessions((prev) => prev.filter((s) => s.id !== id));
-    onDeleteSession?.(id);
+    try {
+      const { deleteChatSession } = await import("@/app/actions/chat-history");
+      await deleteChatSession(id);
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      onDeleteSession?.(id);
+    } catch (err) {
+      // La session reste affichée : on ne supprime pas l'entrée en cas d'échec.
+      console.error("[session-sidebar] Suppression de session échouée:", err);
+    }
   };
 
   const getDotColor = (ctx?: string) => {

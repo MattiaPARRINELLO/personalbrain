@@ -423,6 +423,9 @@ export function CommandPalette() {
 
   /* ----- execute ------------------------------------------------------------- */
   const executeSelected = useCallback(() => {
+    // Garde anti double-exécution (double Entrée rapide → doublon côté serveur)
+    if (busy) return;
+
     // If a command is fully parsed, execute it
     if (activeCommand && activeCommand.args !== null) {
       setBusy(true);
@@ -453,7 +456,7 @@ export function CommandPalette() {
       setInput(item.badge + " ");
       inputRef.current?.focus();
     }
-  }, [activeCommand, results, safeIdx, startTransition]);
+  }, [busy, activeCommand, results, safeIdx, startTransition]);
 
   /* ----- keyboard navigation ------------------------------------------------ */
   const handleKeyDown = (e: React.KeyboardEvent) => {
