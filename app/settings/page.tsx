@@ -9,6 +9,9 @@ import {
   Globe,
   Smartphone,
   Code2,
+  Download,
+  ShieldAlert,
+  Loader2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { setLeetcodeUsername, loadLeetcode } from "@/app/actions/leetcode";
@@ -62,6 +65,65 @@ export default function SettingsPage() {
       window.location.replace("/login");
     } catch (err) {
       console.error("Logout error", err);
+    }
+  };
+
+  const [exporting, setExporting] = useState(false);
+  const [exportMsg, setExportMsg] = useState<string | null>(null);
+
+  const handleExport = async () => {
+    setExporting(true);
+    setExportMsg(null);
+    try {
+      const res = await fetch("/api/export", { credentials: "same-origin" });
+      if (!res.ok) throw new Error("Export impossible");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `backstage-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setExportMsg("Export téléchargé ✓");
+    } catch (err) {
+      setExportMsg(err instanceof Error ? err.message : "Erreur lors de l'export");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const [deleting, setDeleting] = useState(false);
+  const [deleteMsg, setDeleteMsg] = useState<string | null>(null);
+
+  const handleDeleteAccount = async () => {
+    if (
+      !window.confirm(
+        "Supprimer définitivement TOUTES tes données (conversations, rappels, mémoire, comptes Google connectés) ? Cette action est irréversible."
+      )
+    ) {
+      return;
+    }
+    if (
+      !window.confirm(
+        "Confirmation finale : les sauvegardes automatiques seront supprimées aussi. Continuer ?"
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setDeleteMsg(null);
+    try {
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (!res.ok) throw new Error("Suppression impossible");
+      window.location.replace("/login");
+    } catch (err) {
+      setDeleteMsg(err instanceof Error ? err.message : "Erreur lors de la suppression");
+      setDeleting(false);
     }
   };
 
@@ -210,6 +272,84 @@ export default function SettingsPage() {
                     {leetMsg.text}
                   </p>
                 )}
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Données & vie privée"
+                subtitle="Exporte ou supprime tes données personnelles."
+                action={<Download className="w-4 h-4 text-[var(--text-3)]" />}
+              />
+              <CardBody>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[13px] font-medium text-[var(--text-1)]">
+                        Exporter mes données
+                      </p>
+                      <p className="text-[11px] text-[var(--text-3)] mt-0.5">
+                        Télécharge toutes tes données métier (conversations, rappels,
+                        mémoire, emails en cache…) en un fichier JSON.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleExport()}
+                      disabled={exporting}
+                      leftIcon={exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                    >
+                      {exporting ? "Export…" : "Exporter"}
+                    </Button>
+                  </div>
+
+                  {exportMsg && (
+                    <p
+                      className={`text-[11px] ${
+                        exportMsg.endsWith("✓")
+                          ? "text-[var(--success)]"
+                          : "text-[var(--danger)]"
+                      }`}
+                    >
+                      {exportMsg}
+                    </p>
+                  )}
+
+                  <div className="pt-1">
+                    <a
+                      href="/privacy"
+                      className="text-[11px] font-medium text-[var(--accent)] hover:underline"
+                    >
+                      Lire la politique de vie privée →
+                    </a>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-[var(--border-1)]">
+                    <div>
+                      <p className="text-[13px] font-medium text-[var(--text-1)]">
+                        Supprimer mon compte
+                      </p>
+                      <p className="text-[11px] text-[var(--text-3)] mt-0.5">
+                        Efface définitivement toutes tes données, tes passkeys et
+                        tes connexions Google.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => void handleDeleteAccount()}
+                      disabled={deleting}
+                      leftIcon={deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldAlert className="w-3.5 h-3.5" />}
+                    >
+                      {deleting ? "Suppression…" : "Supprimer"}
+                    </Button>
+                  </div>
+
+                  {deleteMsg && (
+                    <p className="text-[11px] text-[var(--danger)]">{deleteMsg}</p>
+                  )}
+                </div>
               </CardBody>
             </Card>
 
