@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 
-export async function POST() {
+export async function POST(request: Request) {
+  if (!isAuthorizedCron(request)) {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  }
   try {
     const { triggerDailyBrief } = await import("@/lib/notification-scheduler");
     await triggerDailyBrief();

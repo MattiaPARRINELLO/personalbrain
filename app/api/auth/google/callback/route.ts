@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createOAuth2Client, saveTokens, type GoogleAccountType } from "@/lib/google-client";
+import { requireSession } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireSession();
+  } catch {
+    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
   const error = searchParams.get("error");

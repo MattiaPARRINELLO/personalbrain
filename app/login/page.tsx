@@ -15,35 +15,19 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isCapMode = searchParams?.get("cap") === "1";
+  const setupToken = searchParams?.get("setupToken") ?? "";
 
   const [status, setStatus] = useState<"idle" | "loading" | "registering" | "authenticating">("idle");
   const [needsRegistration, setNeedsRegistration] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCapacitorApp] = useState(() => isCapacitor() && !isWebAuthnSupported());
 
-  useEffect(() => {
-    void fetch("/api/auth/session", { credentials: "same-origin" })
-      .then((res) => res.json() as Promise<{ authenticated: boolean }>)
-      .then((data) => {
-        if (data.authenticated) {
-          if (isCapMode) {
-            exchangeTokenAndClose();
-          } else {
-            router.replace("/");
-          }
-          return;
-        }
-        return fetch("/api/auth/passkey/register-options", { credentials: "same-origin" })
-          .then((res) => res.json() as Promise<{ isFirstRegistration: boolean }>)
-          .then((regData) => setNeedsRegistration(regData.isFirstRegistration));
-      })
-      .catch(() => setNeedsRegistration(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, isCapMode]);
-
   const exchangeTokenAndClose = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/token-exchange", { credentials: "same-origin" });
+      const res = await fetch("/api/auth/token-exchange", {
+        method: "POST",
+        credentials: "same-origin",
+      });
       const data = (await res.json()) as { token: string | null };
       if (data.token) {
         window.location.replace(`backstage://auth?token=${encodeURIComponent(data.token)}`);
@@ -54,6 +38,41 @@ function LoginForm() {
     }
   }, []);
 
+  useEffect(() => {
+    void fetch("/api/auth/session", { credentials: "same-origin" })
+      .then((res) => res.json() as Promise<{ authenticated: boolean }>)
+      .then((data) => {
+        if (data.authenticated) {
+          if (isCapMode) {
+            exchangeTokenAndClose();
+          } else {
+            router.replace("/chat");
+          }
+          return;
+        }
+        return fetch("/api/auth/passkey/register-options", {
+          credentials: "same-origin",
+          headers: setupToken ? { "x-setup-token": setupToken } : undefined,
+        })
+          .then(async (res) => {
+            const data = (await res.json()) as { isFirstRegistration?: boolean; error?: string };
+            if (!res.ok || data.error) {
+              // 401 = une passkey existe déjà mais la session est expirée :
+              // on bascule sur le flux d'authentification (le bouton « Se connecter »).
+              if (res.status === 401) {
+                setNeedsRegistration(false);
+                return;
+              }
+              setError(data.error ?? `Impossible de vérifier l'état de l'enregistrement (${res.status}).`);
+              return;
+            }
+            setNeedsRegistration(data.isFirstRegistration ?? false);
+          });
+      })
+      .catch(() => setNeedsRegistration(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, isCapMode]);
+
   async function handleRegister() {
     if (isCapacitorApp) {
       return openAuthInBrowser();
@@ -62,21 +81,24 @@ function LoginForm() {
     setStatus("registering");
     setError(null);
     try {
-      const optionsRes = await fetch("/api/auth/passkey/register-options", { credentials: "same-origin" });
+      const optionsRes = await fetch("/api/auth/passkey/register-options", {
+        credentials: "same-origin",
+        headers: setupToken ? { "x-setup-token": setupToken } : undefined,
+      });
       const optionsData = (await optionsRes.json()) as { options: PublicKeyCredentialCreationOptionsJSON };
       const attestation = await startRegistration({ optionsJSON: optionsData.options });
       const verifyRes = await fetch("/api/auth/passkey/register-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ response: attestation }),
+        body: JSON.stringify({ response: attestation, setupToken: setupToken || undefined }),
       });
       const verifyData = (await verifyRes.json()) as { verified?: boolean; error?: string };
       if (verifyData.verified) {
         if (isCapMode) {
           await exchangeTokenAndClose();
         } else {
-          router.replace("/");
+          router.replace("/chat");
         }
       } else {
         setError(verifyData.error ?? "L'enregistrement a échoué.");
@@ -115,7 +137,7 @@ function LoginForm() {
         if (isCapMode) {
           await exchangeTokenAndClose();
         } else {
-          router.replace("/");
+          router.replace("/chat");
         }
       } else {
         setError(verifyData.error ?? "L'authentification a échoué.");

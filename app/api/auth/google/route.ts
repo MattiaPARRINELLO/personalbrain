@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createOAuth2Client, type GoogleAccountType } from "@/lib/google-client";
+import { requireSession } from "@/lib/session";
 
 const SCOPES: Record<GoogleAccountType, string[]> = {
   gmail: [
@@ -13,6 +14,12 @@ const SCOPES: Record<GoogleAccountType, string[]> = {
 };
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireSession();
+  } catch {
+    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  }
+
   const type = (request.nextUrl.searchParams.get("type") ?? "gmail") as GoogleAccountType;
 
   if (!["gmail", "calendar"].includes(type)) {
