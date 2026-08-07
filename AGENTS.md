@@ -29,6 +29,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | Test (single run) | `bun run test` |
 | Test (watch) | `bun run test:watch` |
 
+## Git — règle stricte
+
+- **Committer systématiquement** : toute modification (code, config, docs, scripts) doit être committée immédiatement, dès qu'elle est terminée et vérifiée.
+- **Tout committer** : aucun changement ne doit rester en attente en fin de tâche — pas de working tree sale.
+- Un commit par modification cohérente ; message de commit en français (conventional commits : `feat:`, `fix:`, `chore:`, `refactor:`, `test:`…).
+- Ne jamais committer de secrets (`.env*`, tokens). `data/` est gitignoré — ne pas forcer.
+
 ## Architecture
 
 - **App Router** — pages: `/chat`, `/brain`, `/calendar`, `/gmail`, `/accreditations`, `/watch-later`, `/reminders`, `/search`, `/settings`, `/activity`, `/login`
