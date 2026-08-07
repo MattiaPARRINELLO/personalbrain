@@ -7,9 +7,7 @@ import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/browser";
-import { Fingerprint, Loader2, ShieldCheck, AlertCircle, Check, Smartphone, ExternalLink } from "lucide-react";
-import { isCapacitor, isWebAuthnSupported } from "@/lib/capacitor";
-import { openAuthInBrowser } from "@/lib/capacitor-auth";
+import { Fingerprint, Loader2, ShieldCheck, AlertCircle, Check } from "lucide-react";
 
 type Phase = "checking" | "idle" | "scanning" | "verified" | "error";
 
@@ -38,17 +36,19 @@ const TICKS = [
   "bottom-0 right-0 border-b-2 border-r-2 rounded-br",
 ];
 
+function isWebAuthnSupported(): boolean {
+  return typeof window !== "undefined" && !!window.PublicKeyCredential;
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isCapMode = searchParams?.get("cap") === "1";
   const setupToken = searchParams?.get("setupToken") ?? "";
 
   const [status, setStatus] = useState<"idle" | "loading" | "registering" | "authenticating">("idle");
   const [needsRegistration, setNeedsRegistration] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [verified, setVerified] = useState(false);
-  const [isCapacitorApp] = useState(() => isCapacitor() && !isWebAuthnSupported());
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const burstAnchor = useRef<HTMLButtonElement | null>(null);
   const [burstOrigin, setBurstOrigin] = useState<{ x: number; y: number } | null>(null);
@@ -60,32 +60,12 @@ function LoginForm() {
     []
   );
 
-  const exchangeTokenAndClose = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth/token-exchange", {
-        method: "POST",
-        credentials: "same-origin",
-      });
-      const data = (await res.json()) as { token: string | null };
-      if (data.token) {
-        window.location.replace(`backstage://auth?token=${encodeURIComponent(data.token)}`);
-      }
-    } catch {
-      // fallback: try to close the tab
-      window.close();
-    }
-  }, []);
-
   useEffect(() => {
     void fetch("/api/auth/session", { credentials: "same-origin" })
       .then((res) => res.json() as Promise<{ authenticated: boolean }>)
       .then((data) => {
         if (data.authenticated) {
-          if (isCapMode) {
-            exchangeTokenAndClose();
-          } else {
-            router.replace("/chat");
-          }
+          router.replace("/chat");
           return;
         }
         return fetch("/api/auth/passkey/register-options", {
@@ -109,7 +89,7 @@ function LoginForm() {
       })
       .catch(() => setNeedsRegistration(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, isCapMode]);
+  }, [router]);
 
   const completeAuth = useCallback(() => {
     setVerified(true);
@@ -122,18 +102,11 @@ function LoginForm() {
       });
     }
     redirectTimer.current = setTimeout(() => {
-      if (isCapMode) {
-        void exchangeTokenAndClose();
-      } else {
-        router.replace("/chat");
-      }
+      router.replace("/chat");
     }, 1500);
-  }, [isCapMode, exchangeTokenAndClose, router]);
+  }, [router]);
 
   async function handleRegister() {
-    if (isCapacitorApp) {
-      return openAuthInBrowser();
-    }
     if (status !== "idle" || verified) return;
 
     setStatus("registering");
@@ -165,9 +138,6 @@ function LoginForm() {
   }
 
   async function handleAuthenticate() {
-    if (isCapacitorApp) {
-      return openAuthInBrowser();
-    }
     if (status !== "idle" || verified) return;
 
     setStatus("authenticating");
@@ -211,13 +181,11 @@ function LoginForm() {
           : "idle";
 
   const isBusy = status !== "idle" || verified;
-  const label = isCapacitorApp
-    ? "Ouvrir l'authentification"
-    : needsRegistration === null
-      ? "Chargement…"
-      : needsRegistration
-        ? "Configurer Face ID / Touch ID"
-        : "Se connecter avec Face ID / Touch ID";
+  const label = needsRegistration === null
+    ? "Chargement…"
+    : needsRegistration
+      ? "Configurer Face ID / Touch ID"
+      : "Se connecter avec Face ID / Touch ID";
 
   return (
     <div className="relative z-10 flex min-h-screen items-center justify-center px-4 overflow-hidden">
@@ -348,22 +316,10 @@ function LoginForm() {
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               {verified ? "Ouverture…" : label}
             </span>
-          ) : isCapacitorApp ? (
-            <span className="inline-flex items-center gap-2">
-              <ExternalLink className="w-3.5 h-3.5" />
-              {label}
-            </span>
           ) : (
             label
           )}
         </button>
-
-        {isCapacitorApp && (
-          <div className="mt-5 flex items-start gap-2 text-[11.5px] text-[var(--text-3)] leading-relaxed">
-            <Smartphone className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--accent-cool)]" />
-            <span>L&apos;authentification s&apos;ouvre dans ton navigateur, reviens ensuite dans l&apos;app.</span>
-          </div>
-        )}
 
         <p className="text-[9.5px] text-[var(--text-4)] mt-10 text-center font-mono uppercase tracking-[0.2em]">
           <ShieldCheck className="w-3 h-3 inline-block mr-1.5 -mt-0.5" />

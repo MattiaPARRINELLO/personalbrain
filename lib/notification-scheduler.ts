@@ -88,16 +88,7 @@ export async function sendPushToAll(payload: string, tag?: string): Promise<bool
     }
   }
 
-  let fcmSent = false;
-  try {
-    const { sendFcmPushToAll } = await import("./fcm");
-    await sendFcmPushToAll(payload);
-    fcmSent = true;
-  } catch (err) {
-    console.error("[scheduler] Erreur FCM:", err);
-  }
-
-  return webSent || fcmSent;
+  return webSent;
 }
 
 export async function checkReminders() {
@@ -129,8 +120,8 @@ export async function checkReminders() {
         vibrate: [200, 100, 200],
       });
 
-      // On marque le rappel notifié SEULEMENT si l'envoi a réussi (web ou
-      // FCM) : sinon il sera retenté au prochain tick au lieu d'être perdu.
+      // On marque le rappel notifié SEULEMENT si l'envoi a réussi (web) :
+      // sinon il sera retenté au prochain tick au lieu d'être perdu.
       const sent = await sendPushToAll(payload, "reminder-" + r.id);
       if (sent) {
         notifiedReminders.add(r.id);

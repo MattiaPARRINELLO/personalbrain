@@ -4,9 +4,6 @@ import "./globals.css";
 import { PwaLoader } from "@/components/ui/PwaLoader";
 import { ThemeApplier } from "@/components/ui/ThemeApplier";
 import { ViewTransitionProvider } from "@/components/ViewTransitionProvider";
-import { CapacitorAuthListener } from "@/components/CapacitorAuthListener";
-import { CapacitorPushSetup } from "@/components/CapacitorPushSetup";
-import { CapacitorSplashScreen } from "@/components/CapacitorSplashScreen";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -60,9 +57,6 @@ export default function RootLayout({
 
       </head>
       <body className="min-h-full relative font-sans">
-        <CapacitorAuthListener />
-        <CapacitorPushSetup />
-        <CapacitorSplashScreen />
         <PwaLoader />
         <ThemeApplier />
         <ViewTransitionProvider>

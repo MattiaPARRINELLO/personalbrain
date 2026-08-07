@@ -7,10 +7,8 @@ import { getSession, clearSession } from "@/lib/session";
 const DATA_DIR = path.join(process.cwd(), "data");
 
 // Conservés après suppression : fichiers d'infrastructure non personnels.
-// La clé de signature (.auth-secret) permet de se réinscrire sans rotation ;
-// le service account Firebase est un secret technique du projet, pas une
-// donnée utilisateur.
-const KEEP = new Set([".gitkeep", ".auth-secret", "firebase-service-account.json"]);
+// La clé de signature (.auth-secret) permet de se réinscrire sans rotation.
+const KEEP = new Set([".gitkeep", ".auth-secret"]);
 
 export async function POST() {
   const session = await getSession();
