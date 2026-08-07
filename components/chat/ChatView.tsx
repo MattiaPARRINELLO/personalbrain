@@ -284,6 +284,331 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function activeToolsList(tools: Record<string, ToolCall>): ToolCall[] {
+  return Object.values(tools);
+}
+
+function Hero({ onPrompt, disabled }: { onPrompt: (p: string) => void; disabled: boolean }) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <div className="-mx-6 sm:-mx-8 -mt-6 sm:-mt-16 relative flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-[200px] h-[200px] sm:w-[500px] sm:h-[500px] rounded-full bg-[var(--accent)]/8 blur-[60px] sm:blur-[100px] animate-breathe" />
+        </div>
+
+        {/* Outer ring — hidden on mobile */}
+        <div className="hidden sm:block absolute w-[420px] h-[420px] animate-orbit-ring pointer-events-none">
+          <div className="absolute inset-0 rounded-full border border-[var(--accent)]/15" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[var(--accent)] shadow-[0_0_8px_rgba(165,180,252,0.6)]" />
+          <div className="absolute bottom-[15%] right-[10%] w-1.5 h-1.5 rounded-full bg-[var(--accent)]/40" />
+        </div>
+
+        {/* Middle ring — hidden on mobile */}
+        <div className="hidden sm:block absolute w-[320px] h-[320px] animate-orbit-ring-reverse pointer-events-none">
+          <div className="absolute inset-0 rounded-full border border-[var(--accent-cool)]/15" />
+          <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)] shadow-[0_0_6px_rgba(122,162,247,0.5)]" />
+        </div>
+
+        {/* Inner ring — hidden on mobile */}
+        <div className="hidden sm:block absolute w-[220px] h-[220px] animate-orbit-ring-slow pointer-events-none">
+          <div className="absolute inset-0 rounded-full border border-[var(--accent-warm)]/15" />
+          <div className="absolute top-[10%] left-[20%] w-1 h-1 rounded-full bg-[var(--accent-warm)] shadow-[0_0_6px_rgba(212,163,115,0.5)]" />
+        </div>
+
+        <div className="relative">
+          <Image
+            src="/backstage-logo.png"
+            alt="BACKSTAGE"
+            width={500}
+            height={500}
+            priority
+            className="w-full max-w-[140px] sm:max-w-[500px] h-auto object-contain drop-shadow-[0_0_20px_rgba(165,180,252,0.25)] sm:drop-shadow-[0_0_40px_rgba(165,180,252,0.35)]"
+          />
+        </div>
+      </div>
+      <h1 className="text-xl sm:text-6xl font-black tracking-[0.12em] uppercase text-[var(--text-1)] mb-1 sm:mb-2 font-mono">
+        BACKSTAGE
+      </h1>
+      <p className="text-[11px] sm:text-[14px] text-[var(--text-2)] max-w-md leading-relaxed mb-4 sm:mb-8 font-mono tracking-wide">
+        Ton espace de contrôle personnel.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full">
+        {SUGGESTIONS.map((s) => (
+          <button
+            key={s.label}
+            onClick={() => void onPrompt(s.label)}
+            disabled={disabled}
+            className="flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-[var(--text-2)] bg-[var(--surface-1)] border border-[var(--border-1)] rounded-lg hover:border-[var(--border-2)] hover:text-[var(--text-1)] transition-colors duration-200 text-left disabled:opacity-40"
+          >
+            <s.icon className="w-3.5 h-3.5 shrink-0 text-[var(--text-3)]" />
+            <span className="line-clamp-2">{s.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function containsEmailContent(text: string) {
+  return /@\w+\.\w+/.test(text) || /\b(email|mail|e-?mail|courriel|envoyer|écrire)\b/i.test(text);
+}
+
+function containsCalendarContent(text: string) {
+  return /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})\b/.test(text)
+    || /\b(calend(?:er|ar|rier|rier)|agenda|rendez-?vous|meeting|réunion|event|rdv|séance|séminaire)\b/i.test(text)
+    || /\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\b/i.test(text);
+}
+
+function containsReminderContent(text: string) {
+  return /\b(rappel?|remind|todo|à faire|tâche|task|noter|mémoriser|pense à|n'oublie)\b/i.test(text);
+}
+
+function ActionChips({ message }: { message: Message }) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const toast = useToast();
+  const isAssistant = message.role === "assistant" && message.id !== "welcome";
+  if (!isAssistant || !message.content) return null;
+
+  const content = message.content;
+  const showMail = containsEmailContent(content);
+  const showCalendar = containsCalendarContent(content);
+  const showReminder = containsReminderContent(content);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedId(message.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // clipboard not available
+    }
+  };
+
+  const handleAddReminder = async () => {
+    try {
+      const { createReminder } = await import("@/app/actions/reminders");
+      await createReminder({
+        title: content.slice(0, 120),
+        notes: content.slice(0, 2000),
+        dueAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      });
+      toast.show({ message: "Rappel créé", tone: "success", duration: 2500 });
+    } catch {
+      toast.show({ message: "Impossible de créer le rappel", tone: "danger", duration: 3000 });
+    }
+  };
+
+  const handleAddCalendar = async () => {
+    try {
+      const start = new Date(Date.now() + 60 * 60 * 1000);
+      const end = new Date(start.getTime() + 60 * 60 * 1000);
+      const res = await api.calendar.create({
+        summary: content.slice(0, 80),
+        start: start.toISOString(),
+        end: end.toISOString(),
+      });
+      if (!res.success) throw new Error("Échec de l'ajout");
+      toast.show({ message: "Événement ajouté au calendrier", tone: "success", duration: 2500 });
+    } catch (err) {
+      toast.show({
+        message: err instanceof Error ? err.message : "Impossible d'ajouter au calendrier",
+        tone: "danger",
+        duration: 3000,
+      });
+    }
+  };
+
+  const btn =
+    "inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--border-2)] hover:text-[var(--text-2)] transition-colors duration-200";
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5 fade-in-action-chips">
+      <button onClick={handleCopy} className={btn}>
+        {copiedId === message.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+        {copiedId === message.id ? "Copié" : "Copier"}
+      </button>
+      {showMail && (
+        <a href={`mailto:?body=${encodeURIComponent(content)}`} className={btn}>
+          <Mail className="w-3 h-3" />
+          Voir le mail
+        </a>
+      )}
+      {showCalendar && (
+        <button onClick={() => void handleAddCalendar()} className={`${btn} hover:border-[var(--accent-warm)]/40 hover:text-[var(--accent-warm)]`}>
+          <CalendarPlus className="w-3 h-3" />
+          Ajouter au calendrier
+        </button>
+      )}
+      {showReminder && (
+        <button onClick={() => void handleAddReminder()} className={btn}>
+          <Bell className="w-3 h-3" />
+          Créer un rappel
+        </button>
+      )}
+    </div>
+  );
+}
+
+function MessageBlock({ message }: { message: Message }) {
+  const isUser = message.role === "user";
+  const isWelcome = message.id === "welcome";
+
+  if (isWelcome) {
+    return (
+      <div className="flex gap-3">
+        <div className="shrink-0 w-6 h-6 rounded-full border border-[var(--border-2)] bg-[var(--surface-1)] flex items-center justify-center mt-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)]" />
+        </div>
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)]">ASSISTANT</span>
+          </div>
+          <div className="text-[14px] text-[var(--text-2)] leading-relaxed">
+            <Markdown>{message.content}</Markdown>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+      <div
+        className={cn(
+          "relative max-w-[85%] rounded-lg p-3.5",
+          isUser
+            ? "bg-[var(--surface-2)] border-r-2 border-[var(--accent-warm)]"
+            : "bg-[var(--surface-1)] border-l-2 border-[var(--accent-cool)]"
+        )}
+      >
+        <div className="flex items-center gap-2 mb-1.5">
+          {!isUser && (
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)] shrink-0" />
+          )}
+          <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)]">
+            {isUser ? "TOI" : "ASSISTANT"}
+          </span>
+          <span className="text-[10px] font-mono text-[var(--text-3)]">
+            · {formatTime(message.timestamp)}
+          </span>
+        </div>
+        <div className="text-[14px] leading-relaxed text-[var(--text-1)]">
+          <Markdown>{message.content}</Markdown>
+        </div>
+        {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
+          <div className="mt-2 space-y-1.5 fade-in-up">
+            {message.toolCalls.map((tc) => (
+              <ToolCallResult key={tc.id} tool={tc} />
+            ))}
+          </div>
+        )}
+        <ActionChips message={message} />
+      </div>
+    </div>
+  );
+}
+
+function ToolCallResult({ tool }: { tool: ToolCall }) {
+  const [expanded, setExpanded] = useState(false);
+  const isError = tool.status === "error";
+  const isRunning = tool.status === "running";
+
+  return (
+    <div
+      className={cn(
+        "text-[11px] font-mono rounded border px-2.5 py-1.5",
+        isRunning && "tool-scan",
+        isRunning
+          ? "border-[var(--ai-tool-call)]/40 bg-[var(--ai-tool-call)]/5"
+          : isError
+            ? "border-[var(--danger)]/30 bg-[var(--danger)]/5"
+            : "border-[var(--accent-success)]/30 bg-[var(--accent-success)]/5"
+      )}
+    >
+      {isRunning ? (
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-tool-call)] animate-pulse" />
+            <span className="text-[var(--ai-tool-call)]">
+              ◈ {toolMeta[tool.name]?.label || tool.name}
+            </span>
+            <span className="text-[var(--text-4)]">running...</span>
+          </div>
+          <div className="mt-1.5 h-0.5 bg-[var(--border-1)] rounded-full overflow-hidden">
+            <div className="h-full bg-[var(--ai-tool-call)]/50 rounded-full tool-progress-bar" />
+          </div>
+          {expanded && tool.arguments && (
+            <div className="mt-2 text-[var(--text-3)] whitespace-pre-wrap break-all">
+              {tool.arguments}
+            </div>
+          )}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="mt-1 text-[var(--text-4)] hover:text-[var(--text-2)] transition-colors inline-flex items-center gap-0.5"
+          >
+            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {expanded ? "Masquer" : "Détails"}
+          </button>
+        </div>
+      ) : (
+        <div>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="w-full flex items-center gap-1.5 text-left"
+          >
+            <span className={isError ? "text-[var(--danger)]" : "text-[var(--accent-success)]"}>
+              {isError ? "✗" : "✓"}
+            </span>
+            <span className="text-[var(--text-2)]">{toolMeta[tool.name]?.label || tool.name}</span>
+            {tool.duration != null && (
+              <span className="text-[var(--text-4)]">· {tool.duration.toFixed(1)}s</span>
+            )}
+            {tool.resultCount != null && (
+              <span className="text-[var(--text-4)]">· {tool.resultCount} résultats</span>
+            )}
+            <span className="text-[var(--text-4)] ml-auto">
+              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </span>
+          </button>
+          {expanded && tool.result && (
+            <div className={cn(
+              "mt-2 pt-2 border-t border-[var(--border-1)] whitespace-pre-wrap break-all",
+              isError ? "text-[var(--danger)]" : "text-[var(--text-3)]"
+            )}>
+              {tool.result}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolCallTray({ tools }: { tools: ToolCall[] }) {
+  return (
+    <div className="flex gap-2 flex-wrap py-1">
+      {tools.map((t) => (
+        <ToolCallResult key={t.id} tool={t} />
+      ))}
+    </div>
+  );
+}
+
+function ThinkingIndicator({ index }: { index: number }) {
+  return (
+    <div className="flex items-center gap-2.5 pl-9">
+      <div className="flex items-center gap-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)] thinking-dot" />
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)] thinking-dot" style={{ animationDelay: "0.15s" }} />
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)] thinking-dot" style={{ animationDelay: "0.3s" }} />
+      </div>
+      <span className="text-[11px] font-mono text-[var(--text-4)] italic">
+        {FUNNY_THOUGHTS[index % FUNNY_THOUGHTS.length]}
+      </span>
+    </div>
+  );
+}
+
 interface ChatViewProps {
   sessionId?: string;
   resetSignal?: number;
@@ -308,9 +633,8 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingActive, setStreamingActive] = useState(false);
   const streamingActiveRef = useRef(false);
-  const [sessionId, setSessionId] = useState<string>("");
+  const [sessionId, setSessionId] = useState<string>(() => generateId());
   const [sessionTitle, setSessionTitle] = useState<string>("");
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const abortRef = useRef<(() => void) | null>(null);
   const loadSeqRef = useRef(0);
@@ -319,6 +643,7 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasTitleRef = useRef(false);
   const prevExternalSessionIdRef = useRef<string>("");
+  const prevSessionIdRef = useRef(sessionId);
 
   // Consentement IA : rien n'est envoyé au provider tant que l'utilisateur
   // n'a pas accepté l'écran de consentement (voir /privacy).
@@ -399,14 +724,12 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
   }, [externalSessionId]);
 
   useEffect(() => {
-    const newId = generateId();
-    setSessionId(newId);
-  }, []);
-
-  useEffect(() => {
     if (resetSignal === 0) return;
     const newId = generateId();
-    setSessionId(newId);
+    prevSessionIdRef.current = newId;
+    // Reset complet de la conversation déclenché par une prop externe (resetSignal) :
+    // c'est une synchronisation légitime avec un système externe (le parent ChatLayout).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSessionTitle("");
     hasTitleRef.current = false;
     setMessages([welcomeMessage]);
@@ -720,332 +1043,6 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
     return () => window.removeEventListener("keydown", handler);
   }, [loading, stop]);
 
-  function activeToolsList(tools: Record<string, ToolCall>): ToolCall[] {
-    return Object.values(tools);
-  }
-
-  function Hero({ onPrompt, disabled }: { onPrompt: (p: string) => void; disabled: boolean }) {
-    return (
-      <div className="flex flex-col items-center text-center">
-        <div className="-mx-6 sm:-mx-8 -mt-6 sm:-mt-16 relative flex items-center justify-center">
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-[200px] h-[200px] sm:w-[500px] sm:h-[500px] rounded-full bg-[var(--accent)]/8 blur-[60px] sm:blur-[100px] animate-breathe" />
-          </div>
-
-          {/* Outer ring — hidden on mobile */}
-          <div className="hidden sm:block absolute w-[420px] h-[420px] animate-orbit-ring pointer-events-none">
-            <div className="absolute inset-0 rounded-full border border-[var(--accent)]/15" />
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[var(--accent)] shadow-[0_0_8px_rgba(165,180,252,0.6)]" />
-            <div className="absolute bottom-[15%] right-[10%] w-1.5 h-1.5 rounded-full bg-[var(--accent)]/40" />
-          </div>
-
-          {/* Middle ring — hidden on mobile */}
-          <div className="hidden sm:block absolute w-[320px] h-[320px] animate-orbit-ring-reverse pointer-events-none">
-            <div className="absolute inset-0 rounded-full border border-[var(--accent-cool)]/15" />
-            <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)] shadow-[0_0_6px_rgba(122,162,247,0.5)]" />
-          </div>
-
-          {/* Inner ring — hidden on mobile */}
-          <div className="hidden sm:block absolute w-[220px] h-[220px] animate-orbit-ring-slow pointer-events-none">
-            <div className="absolute inset-0 rounded-full border border-[var(--accent-warm)]/15" />
-            <div className="absolute top-[10%] left-[20%] w-1 h-1 rounded-full bg-[var(--accent-warm)] shadow-[0_0_6px_rgba(212,163,115,0.5)]" />
-          </div>
-
-          <div className="relative">
-            <Image
-            src="/backstage-logo.png"
-            alt="BACKSTAGE"
-            width={500}
-            height={500}
-            priority
-            className="w-full max-w-[140px] sm:max-w-[500px] h-auto object-contain drop-shadow-[0_0_20px_rgba(165,180,252,0.25)] sm:drop-shadow-[0_0_40px_rgba(165,180,252,0.35)]"
-          />
-        </div>
-        </div>
-        <h1 className="text-xl sm:text-6xl font-black tracking-[0.12em] uppercase text-[var(--text-1)] mb-1 sm:mb-2 font-mono">
-          BACKSTAGE
-        </h1>
-        <p className="text-[11px] sm:text-[14px] text-[var(--text-2)] max-w-md leading-relaxed mb-4 sm:mb-8 font-mono tracking-wide">
-          Ton espace de contrôle personnel.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full">
-          {SUGGESTIONS.map((s) => (
-            <button
-              key={s.label}
-              onClick={() => void onPrompt(s.label)}
-              disabled={disabled}
-              className="flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-[var(--text-2)] bg-[var(--surface-1)] border border-[var(--border-1)] rounded-lg hover:border-[var(--border-2)] hover:text-[var(--text-1)] transition-colors duration-200 text-left disabled:opacity-40"
-            >
-              <s.icon className="w-3.5 h-3.5 shrink-0 text-[var(--text-3)]" />
-              <span className="line-clamp-2">{s.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  function containsEmailContent(text: string) {
-    return /@\w+\.\w+/.test(text) || /\b(email|mail|e-?mail|courriel|envoyer|écrire)\b/i.test(text);
-  }
-
-  function containsCalendarContent(text: string) {
-    return /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})\b/.test(text)
-      || /\b(calend(?:er|ar|rier|rier)|agenda|rendez-?vous|meeting|réunion|event|rdv|séance|séminaire)\b/i.test(text)
-      || /\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\b/i.test(text);
-  }
-
-  function containsReminderContent(text: string) {
-    return /\b(rappel?|remind|todo|à faire|tâche|task|noter|mémoriser|pense à|n'oublie)\b/i.test(text);
-  }
-
-  function ActionChips({ message }: { message: Message }) {
-    const isAssistant = message.role === "assistant" && message.id !== "welcome";
-    if (!isAssistant || !message.content) return null;
-
-    const content = message.content;
-    const showMail = containsEmailContent(content);
-    const showCalendar = containsCalendarContent(content);
-    const showReminder = containsReminderContent(content);
-
-    const handleCopy = async () => {
-      try {
-        await navigator.clipboard.writeText(content);
-        setCopiedId(message.id);
-        setTimeout(() => setCopiedId(null), 2000);
-      } catch {
-        // clipboard not available
-      }
-    };
-
-    const handleAddReminder = async () => {
-      try {
-        const { createReminder } = await import("@/app/actions/reminders");
-        await createReminder({
-          title: content.slice(0, 120),
-          notes: content.slice(0, 2000),
-          dueAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-        });
-        toast.show({ message: "Rappel créé", tone: "success", duration: 2500 });
-      } catch {
-        toast.show({ message: "Impossible de créer le rappel", tone: "danger", duration: 3000 });
-      }
-    };
-
-    const handleAddCalendar = async () => {
-      try {
-        const start = new Date(Date.now() + 60 * 60 * 1000);
-        const end = new Date(start.getTime() + 60 * 60 * 1000);
-        const res = await api.calendar.create({
-          summary: content.slice(0, 80),
-          start: start.toISOString(),
-          end: end.toISOString(),
-        });
-        if (!res.success) throw new Error("Échec de l'ajout");
-        toast.show({ message: "Événement ajouté au calendrier", tone: "success", duration: 2500 });
-      } catch (err) {
-        toast.show({
-          message: err instanceof Error ? err.message : "Impossible d'ajouter au calendrier",
-          tone: "danger",
-          duration: 3000,
-        });
-      }
-    };
-
-    const btn =
-      "inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--border-2)] hover:text-[var(--text-2)] transition-colors duration-200";
-
-    return (
-      <div className="mt-2 flex flex-wrap gap-1.5 fade-in-action-chips">
-        <button onClick={handleCopy} className={btn}>
-          {copiedId === message.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-          {copiedId === message.id ? "Copié" : "Copier"}
-        </button>
-        {showMail && (
-          <a href={`mailto:?body=${encodeURIComponent(content)}`} className={btn}>
-            <Mail className="w-3 h-3" />
-            Voir le mail
-          </a>
-        )}
-        {showCalendar && (
-          <button onClick={() => void handleAddCalendar()} className={`${btn} hover:border-[var(--accent-warm)]/40 hover:text-[var(--accent-warm)]`}>
-            <CalendarPlus className="w-3 h-3" />
-            Ajouter au calendrier
-          </button>
-        )}
-        {showReminder && (
-          <button onClick={() => void handleAddReminder()} className={btn}>
-            <Bell className="w-3 h-3" />
-            Créer un rappel
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  function MessageBlock({ message }: { message: Message }) {
-    const isUser = message.role === "user";
-    const isWelcome = message.id === "welcome";
-
-    if (isWelcome) {
-      return (
-        <div className="flex gap-3">
-          <div className="shrink-0 w-6 h-6 rounded-full border border-[var(--border-2)] bg-[var(--surface-1)] flex items-center justify-center mt-0.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)]">ASSISTANT</span>
-            </div>
-            <div className="text-[14px] text-[var(--text-2)] leading-relaxed">
-              <Markdown>{message.content}</Markdown>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
-        <div
-          className={cn(
-            "relative max-w-[85%] rounded-lg p-3.5",
-            isUser
-              ? "bg-[var(--surface-2)] border-r-2 border-[var(--accent-warm)]"
-              : "bg-[var(--surface-1)] border-l-2 border-[var(--accent-cool)]"
-          )}
-        >
-          <div className="flex items-center gap-2 mb-1.5">
-            {!isUser && (
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)] shrink-0" />
-            )}
-            <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)]">
-              {isUser ? "TOI" : "ASSISTANT"}
-            </span>
-            <span className="text-[10px] font-mono text-[var(--text-3)]">
-              · {formatTime(message.timestamp)}
-            </span>
-          </div>
-            <div className={cn(
-            "text-[14px] leading-relaxed",
-            isUser ? "text-[var(--text-1)]" : "text-[var(--text-1)]"
-          )}>
-            <Markdown>{message.content}</Markdown>
-          </div>
-          {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
-            <div className="mt-2 space-y-1.5 fade-in-up">
-              {message.toolCalls.map((tc) => (
-                <ToolCallResult key={tc.id} tool={tc} />
-              ))}
-            </div>
-          )}
-          <ActionChips message={message} />
-        </div>
-      </div>
-    );
-  }
-
-  function ToolCallResult({ tool }: { tool: ToolCall }) {
-    const [expanded, setExpanded] = useState(false);
-    const isError = tool.status === "error";
-    const isRunning = tool.status === "running";
-
-    return (
-      <div
-        className={cn(
-          "text-[11px] font-mono rounded border px-2.5 py-1.5",
-          isRunning && "tool-scan",
-          isRunning
-            ? "border-[var(--ai-tool-call)]/40 bg-[var(--ai-tool-call)]/5"
-            : isError
-              ? "border-[var(--danger)]/30 bg-[var(--danger)]/5"
-              : "border-[var(--accent-success)]/30 bg-[var(--accent-success)]/5"
-        )}
-      >
-        {isRunning ? (
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-tool-call)] animate-pulse" />
-              <span className="text-[var(--ai-tool-call)]">
-                ◈ {toolMeta[tool.name]?.label || tool.name}
-              </span>
-              <span className="text-[var(--text-4)]">running...</span>
-            </div>
-            <div className="mt-1.5 h-0.5 bg-[var(--border-1)] rounded-full overflow-hidden">
-              <div className="h-full bg-[var(--ai-tool-call)]/50 rounded-full tool-progress-bar" />
-            </div>
-            {expanded && tool.arguments && (
-              <div className="mt-2 text-[var(--text-3)] whitespace-pre-wrap break-all">
-                {tool.arguments}
-              </div>
-            )}
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="mt-1 text-[var(--text-4)] hover:text-[var(--text-2)] transition-colors inline-flex items-center gap-0.5"
-            >
-              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              {expanded ? "Masquer" : "Détails"}
-            </button>
-          </div>
-        ) : (
-          <div>
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="w-full flex items-center gap-1.5 text-left"
-            >
-              <span className={isError ? "text-[var(--danger)]" : "text-[var(--accent-success)]"}>
-                {isError ? "✗" : "✓"}
-              </span>
-              <span className="text-[var(--text-2)]">{toolMeta[tool.name]?.label || tool.name}</span>
-              {tool.duration != null && (
-                <span className="text-[var(--text-4)]">· {tool.duration.toFixed(1)}s</span>
-              )}
-              {tool.resultCount != null && (
-                <span className="text-[var(--text-4)]">· {tool.resultCount} résultats</span>
-              )}
-              <span className="text-[var(--text-4)] ml-auto">
-                {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </span>
-            </button>
-            {expanded && tool.result && (
-              <div className={cn(
-                "mt-2 pt-2 border-t border-[var(--border-1)] whitespace-pre-wrap break-all",
-                isError ? "text-[var(--danger)]" : "text-[var(--text-3)]"
-              )}>
-                {tool.result}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function ToolCallTray({ tools }: { tools: ToolCall[] }) {
-    return (
-      <div className="flex gap-2 flex-wrap py-1">
-        {tools.map((t) => (
-          <ToolCallResult key={t.id} tool={t} />
-        ))}
-      </div>
-    );
-  }
-
-  function ThinkingIndicator({ index }: { index: number }) {
-    return (
-      <div className="flex items-center gap-2.5 pl-9">
-        <div className="flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)] thinking-dot" />
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)] thinking-dot" style={{ animationDelay: "0.15s" }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)] thinking-dot" style={{ animationDelay: "0.3s" }} />
-        </div>
-        <span className="text-[11px] font-mono text-[var(--text-4)] italic">
-          {FUNNY_THOUGHTS[index % FUNNY_THOUGHTS.length]}
-        </span>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full min-h-0 relative">
       {consent.loaded && !consent.accepted && (
@@ -1123,10 +1120,10 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
                   </div>
                 </div>
               )}
-              {loading && !streamingActive && (activeToolsList(activeToolsRef.current).length > 0 ? (
+              {loading && !streamingActive && (activeToolsList(chatCtx.activeTools).length > 0 ? (
                 <div key="loading-tools" className="fade-in-up">
                   <div className="pl-9">
-                    <ToolCallTray tools={activeToolsList(activeToolsRef.current)} />
+                    <ToolCallTray tools={activeToolsList(chatCtx.activeTools)} />
                   </div>
                 </div>
               ) : (
