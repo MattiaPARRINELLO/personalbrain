@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 
 interface MarkdownProps {
@@ -7,7 +8,10 @@ interface MarkdownProps {
   className?: string;
 }
 
-export function Markdown({ children, className }: MarkdownProps) {
+// Memoïsé : le parsing react-markdown + remark-gfm est cher. Un message dont
+// le contenu n'a pas changé ne doit jamais être re-parse (re-rendus de la
+// conversation à chaque frappe pendant la saisie).
+export const Markdown = memo(function Markdown({ children, className }: MarkdownProps) {
   return (
     <div className={cn("text-[13px] leading-relaxed text-[var(--text-1)]", className)}>
       <ReactMarkdown
@@ -64,4 +68,4 @@ export function Markdown({ children, className }: MarkdownProps) {
       </ReactMarkdown>
     </div>
   );
-}
+});

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, memo } from "react";
 import {
   Sparkles,
   Globe,
@@ -449,7 +449,10 @@ function ActionChips({ message }: { message: Message }) {
   );
 }
 
-function MessageBlock({ message }: { message: Message }) {
+// Memoïsé : la saisie (setInput) re-rend ChatView à chaque frappe, mais les
+// messages existants sont des références stables — on évite de re-parser tout
+// le markdown de la conversation à chaque keypress.
+const MessageBlock = memo(function MessageBlock({ message }: { message: Message }) {
   const isUser = message.role === "user";
   const isWelcome = message.id === "welcome";
 
@@ -506,7 +509,7 @@ function MessageBlock({ message }: { message: Message }) {
       </div>
     </div>
   );
-}
+});
 
 function ToolCallResult({ tool }: { tool: ToolCall }) {
   const [expanded, setExpanded] = useState(false);
