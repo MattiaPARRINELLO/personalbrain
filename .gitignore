@@ -60,3 +60,6 @@ next-env.d.ts
 /android/captures/
 /android/local.properties
 
+# Firebase — clé API Android (contenant des identifiants, ne jamais committer)
+/android/app/google-services.json
+
