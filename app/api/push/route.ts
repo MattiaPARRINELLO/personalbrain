@@ -85,17 +85,7 @@ export async function PUT(request: Request) {
       }
     }
 
-    let fcmResult: { sent?: number; failed?: number; error?: string } = {};
-    try {
-      const { sendFcmPushToAll: fcm } = await import("@/lib/fcm");
-      await fcm(payload);
-      fcmResult = { sent: 1 };
-    } catch (err) {
-      fcmResult = { failed: 1, error: err instanceof Error ? err.message : String(err) };
-      console.error("[push test] Échec FCM:", fcmResult.error);
-    }
-
-    return NextResponse.json({ sent: succeeded.length, failed: errors.length, count: subs.length, endpoints: succeeded, errors, fcm: fcmResult });
+    return NextResponse.json({ sent: succeeded.length, failed: errors.length, count: subs.length, endpoints: succeeded, errors });
   } catch (err) {
     console.error("[push test]", err instanceof Error ? err.message : String(err));
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
@@ -111,9 +101,7 @@ export async function DELETE(request: Request) {
       for (const sub of subs) {
         await removeSubscription(sub.endpoint);
       }
-      const { writeJsonAtomic } = await import("@/lib/storage");
-      await writeJsonAtomic("push-subscriptions-capacitor.json", { tokens: [] });
-      return NextResponse.json({ ok: true, cleared: subs.length + " web push + capacitor" });
+      return NextResponse.json({ ok: true, cleared: subs.length + " web push" });
     }
     if (!endpoint) {
       return NextResponse.json({ error: "endpoint requis" }, { status: 400 });

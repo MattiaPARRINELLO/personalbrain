@@ -4,7 +4,6 @@ import withBundleAnalyzer from "@next/bundle-analyzer";
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: process.cwd(),
-  serverExternalPackages: ["firebase-admin"],
   async headers() {
     const headers = [
       { key: "X-Frame-Options", value: "DENY" },

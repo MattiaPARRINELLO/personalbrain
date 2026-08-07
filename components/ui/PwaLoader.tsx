@@ -3,10 +3,6 @@
 import Image from "next/image";
 import { useEffect, useState, useCallback } from "react";
 
-function isCapacitor(): boolean {
-  return typeof window !== "undefined" && !!(window as unknown as Record<string, unknown>).Capacitor;
-}
-
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
@@ -98,9 +94,7 @@ export function PwaLoader() {
     if (!("serviceWorker" in navigator)) return;
 
     navigator.serviceWorker.register("/sw.js").then((reg) => {
-      if (!isCapacitor()) {
-        subscribeToPush();
-      }
+      subscribeToPush();
       reg.addEventListener("updatefound", () => {
         const sw = reg.installing;
         if (sw) {

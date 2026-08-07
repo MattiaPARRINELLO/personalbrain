@@ -4,7 +4,7 @@ import { verifyJwt, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/session-co
 export async function POST(request: NextRequest) {
   // Garde anti-CSRF : si la requête porte un header Origin (fetch cross-site,
   // formulaire), il doit correspondre au host de la requête. Les requêtes
-  // sans Origin (WebView Capacitor, appels serveur) restent autorisées.
+  // sans Origin (appels serveur) restent autorisées.
   const origin = request.headers.get("origin");
   if (origin) {
     let originHost = "";

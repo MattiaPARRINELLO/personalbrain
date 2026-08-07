@@ -54,12 +54,7 @@ PRODUCT.md
 *.tsbuildinfo
 next-env.d.ts
 
-# Capacitor
-/android/.gradle/
-/android/build/
-/android/captures/
-/android/local.properties
-
-# Firebase — clé API Android (contenant des identifiants, ne jamais committer)
+# Capacitor supprimé — le projet est PWA uniquement. Le fichier Firebase
+# android/app/google-services.json contient des identifiants : ne jamais committer.
 /android/app/google-services.json
 
