@@ -143,7 +143,7 @@ export function VoiceInput({ onResult, onInterim, onListeningChange, disabled }:
       disabled={disabled}
       className={`shrink-0 w-8 h-8 rounded-lg border transition-colors duration-200 flex items-center justify-center ${
         listening
-          ? "border-red-400/50 bg-red-500/20 text-red-400 animate-pulse"
+          ? "border-[var(--danger)]/50 bg-[var(--danger)]/20 text-[var(--danger)] animate-pulse"
           : "border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-[var(--border-2)]"
       }`}
       title={listening ? "Arrêter l'écoute" : "Commande vocale"}

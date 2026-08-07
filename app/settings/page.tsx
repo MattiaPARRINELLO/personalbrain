@@ -19,6 +19,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/Chrome";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { AccentPicker } from "@/components/ui/AccentPicker";
 import { api, type GoogleLinkStatus } from "@/lib/api-client";
 import { useCachedFetch } from "@/lib/cache";
@@ -248,12 +249,12 @@ export default function SettingsPage() {
               />
               <CardBody>
                 <div className="flex items-center gap-2">
-                  <input
+                  <Input
                     type="text"
                     value={leetUsername}
                     onChange={(e) => setLeetUsername(e.target.value)}
                     placeholder="ton-pseudo-leetcode"
-                    className="flex-1 px-3 py-1.5 text-[13px] rounded-md border border-[var(--border-1)] bg-[var(--surface-2)] text-[var(--text-1)] placeholder:text-[var(--text-4)] outline-none focus:border-[var(--accent)] transition-colors"
+                    className="flex-1 px-3 py-1.5 text-[13px]"
                   />
                   <Button
                     size="sm"

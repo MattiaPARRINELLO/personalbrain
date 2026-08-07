@@ -21,6 +21,7 @@ import { PageHeader, EmptyState } from "@/components/layout/Chrome";
 import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Input, Textarea } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
 import {
   loadWatchLater,
@@ -217,7 +218,7 @@ export default function WatchLaterPage() {
                     className={cn(
                       "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium font-mono uppercase tracking-wider transition-all duration-200 shrink-0",
                       active
-                        ? "bg-[var(--surface-3)] text-[var(--text-1)] shadow-sm"
+                        ? "bg-[var(--surface-3)] text-[var(--text-1)]"
                         : "text-[var(--text-3)] hover:text-[var(--text-1)]"
                     )}
                   >
@@ -230,12 +231,12 @@ export default function WatchLaterPage() {
             </div>
             <div className="flex-1 min-w-[200px] max-w-xs relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-3)]" />
-              <input
+              <Input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Filtrer par titre ou source…"
-                className="w-full pl-9 pr-3 py-1.5 bg-[var(--surface-1)] border border-[var(--border-1)] rounded-lg text-[12px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--border-2)] transition-colors"
+                className="pl-9 pr-3 py-1.5 rounded-lg text-[12px] focus:border-[var(--border-2)]"
               />
             </div>
           </div>
@@ -316,7 +317,7 @@ function ItemCard({
         isDragging
           ? "opacity-40 border-[var(--accent)]/40"
           : isDragOver
-            ? "border-[var(--accent)]/60 ring-2 ring-[var(--accent)]/20 scale-[1.01]"
+            ? "border-[var(--accent)]/60 scale-[1.01]"
             : "border-[var(--border-1)] hover:border-[var(--border-2)]"
       )}
     >
@@ -359,7 +360,7 @@ function ItemCard({
             />
           </div>
         ) : (
-          <div className="aspect-video rounded-lg bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)] border border-[var(--border-1)] mb-3 flex items-center justify-center text-[var(--text-3)] group-hover:text-[var(--accent)] transition-colors duration-300">
+          <div className="aspect-video rounded-lg bg-[var(--surface-2)] border border-[var(--border-1)] mb-3 flex items-center justify-center text-[var(--text-3)] group-hover:text-[var(--accent)] transition-colors duration-300">
             <Icon className="w-7 h-7" strokeWidth={1.5} />
           </div>
         )}
@@ -416,27 +417,25 @@ function AddItemForm({
         Nouveau lien
       </p>
       <div className="space-y-2.5">
-        <input
+        <Input
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://…"
           autoFocus
-          className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--accent)]/50 font-mono"
+          className="font-mono"
         />
-        <input
+        <Input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Titre"
-          className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13.5px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--accent)]/50"
         />
-        <textarea
+        <Textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Description (optionnel)"
           rows={2}
-          className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-2)] placeholder:text-[var(--text-3)] outline-none resize-none focus:border-[var(--accent)]/50"
         />
         <div className="flex flex-wrap gap-1.5">
           {(Object.keys(categoryMeta) as WatchLaterCategory[]).map((c) => {

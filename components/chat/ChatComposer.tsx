@@ -80,7 +80,7 @@ export function ChatComposer({
             <AtSign className="w-3.5 h-3.5" />
           </button>
           {showMentionMenu && (
-            <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--border-2)] bg-[var(--surface-1)] shadow-lg shadow-black/40 p-1 z-50">
+            <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--border-2)] bg-[var(--surface-1)] p-1 z-50">
               {[
                 { label: "@gmail", desc: "Rechercher dans les mails" },
                 { label: "@calendar", desc: "Consulter le calendrier" },

@@ -7,9 +7,17 @@ import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
+import { IconBadge } from "@/components/ui/IconBadge";
 import { loadLeetcode, syncLeetcode, getSmartSuggestion } from "@/app/actions/leetcode";
 import type { LeetcodeData } from "@/lib/types";
 import { Loader2, Flame, CheckCircle2, TrendingUp, Clock, Zap } from "lucide-react";
+
+const STATS = [
+  { key: "streak", icon: Flame, tone: "warm" as const, label: "Streak (jours)" },
+  { key: "solved", icon: CheckCircle2, tone: "success" as const, label: "Résolus" },
+  { key: "top", icon: TrendingUp, tone: "accent" as const, label: "Top" },
+  { key: "time", icon: Clock, tone: "neutral" as const, label: "Temps total" },
+];
 
 export default function LeetcodePage() {
   const [data, setData] = useState<LeetcodeData | null>(null);
@@ -80,7 +88,7 @@ export default function LeetcodePage() {
       <AppShell>
         <div className="space-y-4 p-6">
           <Skeleton className="h-8 w-48" />
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
           </div>
         </div>
@@ -101,6 +109,8 @@ export default function LeetcodePage() {
     );
   }
 
+  const statValues = [streak, totalSolved, `${topPercent}%`, `${hours}h${mins}`];
+
   const cx = 80, cy = 80, r = 60;
   const angleStep = (2 * Math.PI) / radarSkills.length;
   const points = radarSkills.map((_, i) => {
@@ -112,12 +122,13 @@ export default function LeetcodePage() {
     const vr = (skill.value / 100) * r;
     return { x: cx + vr * Math.cos(a), y: cy + vr * Math.sin(a) };
   });
-  const polygonPath = dataPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ") + "Z";
+  const dataPolygonPoints = dataPoints.map((p) => `${p.x},${p.y}`).join(" ");
 
   return (
     <AppShell>
       <div className="p-6 space-y-6">
         <PageHeader
+          eyebrow="Série de code"
           title="LeetCode"
           description="Suis ta progression et trouve le bon exercice au bon moment."
           actions={
@@ -129,31 +140,29 @@ export default function LeetcodePage() {
         />
 
         {error && (
-          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>
+          <div className="p-3 rounded-lg bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] text-sm">{error}</div>
         )}
 
-        <div className="grid grid-cols-4 gap-4">
-          <Card className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center"><Flame className="w-5 h-5 text-orange-400" /></div>
-            <div><div className="text-2xl font-bold font-mono text-[var(--fg)]">{streak}</div><div className="text-xs text-[var(--muted)]">Streak (jours)</div></div>
-          </Card>
-          <Card className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-emerald-400" /></div>
-            <div><div className="text-2xl font-bold font-mono text-[var(--fg)]">{totalSolved}</div><div className="text-xs text-[var(--muted)]">Résolus</div></div>
-          </Card>
-          <Card className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center"><TrendingUp className="w-5 h-5 text-blue-400" /></div>
-            <div><div className="text-2xl font-bold font-mono text-[var(--fg)]">{topPercent}%</div><div className="text-xs text-[var(--muted)]">Top</div></div>
-          </Card>
-          <Card className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center"><Clock className="w-5 h-5 text-purple-400" /></div>
-            <div><div className="text-2xl font-bold font-mono text-[var(--fg)]">{hours}h{mins}</div><div className="text-xs text-[var(--muted)]">Temps total</div></div>
-          </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {STATS.map((stat, i) => {
+            const Icon = stat.icon;
+            return (
+              <Card key={stat.key} className="p-4 flex items-center gap-3">
+                <IconBadge tone={stat.tone} className="w-10 h-10">
+                  <Icon className="w-5 h-5" />
+                </IconBadge>
+                <div>
+                  <div className="text-2xl font-bold font-mono text-[var(--text-1)] tabular-nums">{statValues[i]}</div>
+                  <div className="text-xs text-[var(--text-3)]">{stat.label}</div>
+                </div>
+              </Card>
+            );
+          })}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="p-5">
-            <h3 className="flex items-center gap-2 text-sm font-semibold mb-4">
+            <h3 className="text-[11px] font-mono uppercase tracking-[0.16em] text-[var(--text-3)] mb-4">
               Radar Compétences
             </h3>
             {radarSkills.length > 0 ? (
@@ -176,7 +185,7 @@ export default function LeetcodePage() {
                     {points.map((p, i) => (
                       <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="var(--border-2)" strokeWidth="0.5" />
                     ))}
-                    <polygon points={polygonPath} fill="var(--accent)" fillOpacity="0.15" stroke="var(--accent)" strokeWidth="1.5" />
+                    <polygon points={dataPolygonPoints} fill="var(--accent)" fillOpacity="0.15" stroke="var(--accent)" strokeWidth="1.5" />
                     {dataPoints.map((p, i) => (
                       <circle key={i} cx={p.x} cy={p.y} r="3" fill="var(--accent)" />
                     ))}
@@ -186,7 +195,7 @@ export default function LeetcodePage() {
                       const ly = cy + (r + 14) * Math.sin(a);
                       return (
                         <text key={i} x={lx} y={ly} textAnchor="middle" dominantBaseline="middle"
-                          fontSize="6" fill="var(--muted)" fontFamily="Geist Sans, sans-serif">
+                          fontSize="6" fill="var(--text-3)" fontFamily="var(--font-sans)">
                           {skill.name}
                         </text>
                       );
@@ -195,32 +204,32 @@ export default function LeetcodePage() {
                 </svg>
               </div>
             ) : (
-              <p className="text-sm text-[var(--muted)] text-center py-8">Pas assez de données</p>
+              <p className="text-sm text-[var(--text-3)] text-center py-8">Pas assez de données</p>
             )}
           </Card>
 
           <Card className="p-5">
-            <h3 className="flex items-center gap-2 text-sm font-semibold mb-4">
+            <h3 className="text-[11px] font-mono uppercase tracking-[0.16em] text-[var(--text-3)] mb-4">
               Problème du jour
             </h3>
             {recentExercises.length > 0 ? (
               <div className="space-y-3">
                 <div className="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border-2)]">
-                  <div className="text-sm font-medium text-[var(--fg)]">{recentExercises[0].title}</div>
+                  <div className="text-sm font-medium text-[var(--text-1)]">{recentExercises[0].title}</div>
                   <div className="flex items-center gap-2 mt-1">
                     <Pill tone={recentExercises[0].difficulty === "Easy" ? "success" : recentExercises[0].difficulty === "Medium" ? "warm" : "danger"}>
                       {recentExercises[0].difficulty || "?"}
                     </Pill>
                     {recentExercises[0].duration && (
-                      <span className="text-xs text-[var(--muted)]">{recentExercises[0].duration} min</span>
+                      <span className="text-xs text-[var(--text-3)]">{recentExercises[0].duration} min</span>
                     )}
                   </div>
-                  <p className="text-xs text-[var(--muted)] mt-2">Dernier exercice résolu</p>
+                  <p className="text-xs text-[var(--text-3)] mt-2">Dernier exercice résolu</p>
                 </div>
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-sm text-[var(--muted)] mb-3">Aucun exercice enregistré</p>
+                <p className="text-sm text-[var(--text-3)] mb-3">Aucun exercice enregistré</p>
                 <Button onClick={handleSmartSchedule} disabled={smartLoading} variant="secondary" size="sm">
                   {smartLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                   Smart Scheduler
@@ -240,27 +249,27 @@ export default function LeetcodePage() {
         </div>
 
         <Card className="p-5">
-          <h3 className="flex items-center gap-2 text-sm font-semibold mb-4">
-              Derniers exercices
+          <h3 className="text-[11px] font-mono uppercase tracking-[0.16em] text-[var(--text-3)] mb-4">
+            Derniers exercices
           </h3>
           {recentExercises.length === 0 ? (
-            <p className="text-sm text-[var(--muted)] text-center py-4">Aucun exercice résolu pour le moment.</p>
+            <p className="text-sm text-[var(--text-3)] text-center py-4">Aucun exercice résolu pour le moment.</p>
           ) : (
             <div className="space-y-2">
               {recentExercises.map((ex) => (
                 <div key={ex.id} className="flex items-center justify-between p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border-2)]">
                   <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--success)] shrink-0" />
                     <div>
-                      <div className="text-sm font-medium text-[var(--fg)]">{ex.title}</div>
-                      <div className="text-xs text-[var(--muted)]">{new Date(ex.createdAt).toLocaleDateString("fr-FR")}</div>
+                      <div className="text-sm font-medium text-[var(--text-1)]">{ex.title}</div>
+                      <div className="text-xs text-[var(--text-3)]">{new Date(ex.createdAt).toLocaleDateString("fr-FR")}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {ex.difficulty && (
                       <Pill tone={ex.difficulty === "Easy" ? "success" : ex.difficulty === "Medium" ? "warm" : "danger"}>{ex.difficulty}</Pill>
                     )}
-                    {ex.duration && <span className="text-xs text-[var(--muted)]">{ex.duration} min</span>}
+                    {ex.duration && <span className="text-xs text-[var(--text-3)]">{ex.duration} min</span>}
                   </div>
                 </div>
               ))}
@@ -271,5 +280,3 @@ export default function LeetcodePage() {
     </AppShell>
   );
 }
-
-

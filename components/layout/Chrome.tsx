@@ -170,7 +170,7 @@ export function MobileTopBar() {
   return (
     <div className="lg:hidden flex items-center justify-between h-12 px-3 border-b border-[var(--border-1)] bg-[var(--surface-1)]">
       <div className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-md border border-[var(--border-2)] flex items-center justify-center bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)] overflow-hidden">
+        <div className="w-6 h-6 rounded-md border border-[var(--border-2)] flex items-center justify-center bg-[var(--surface-2)] overflow-hidden">
           <Image
             src="/backstage-logo-simple.png"
             alt="BACKSTAGE"
@@ -284,18 +284,18 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 mb-8 pb-6 border-b border-[var(--border-1)]">
+    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 mb-8 pb-6 border-b border-[var(--border-1)]">
       <div className="min-w-0">
         {eyebrow && (
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)] font-mono mb-2">
+          <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-[var(--accent)] mb-2">
             {eyebrow}
           </p>
         )}
-        <h1 className="text-[28px] font-semibold tracking-tight text-[var(--text-1)] text-balance leading-tight">
+        <h1 className="text-[30px] sm:text-[34px] font-display font-black tracking-tight text-[var(--text-1)] text-balance leading-[1.08]">
           {title}
         </h1>
         {description && (
-          <p className="text-[14px] text-[var(--text-2)] mt-2 max-w-2xl leading-relaxed">
+          <p className="text-[14px] text-[var(--text-2)] mt-2.5 max-w-2xl leading-relaxed">
             {description}
           </p>
         )}

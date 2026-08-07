@@ -54,18 +54,47 @@ function extractHeader(headers: GmailHeader[], name: string): string {
   return headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
 }
 
-function extractBody(parts: GmailPart[] | undefined, mimeType: string | undefined, body: { data?: string } | undefined): string {
-  if (mimeType === "text/plain" && body?.data) return decodeBase64Url(body.data);
+// Les emails HTML-only n'ont pas de version texte : on extrait le texte du HTML
+// plutôt que de renvoyer un contenu vide ou du HTML brut illisible.
+function extractTextFromHtml(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|tr|li|h[1-6]|table)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function findBodyPart(
+  parts: GmailPart[] | undefined,
+  mimeType: string | undefined,
+  body: { data?: string } | undefined,
+  target: "text/plain" | "text/html"
+): string {
+  if (mimeType === target && body?.data) return decodeBase64Url(body.data);
   if (!parts) return "";
   for (const part of parts) {
-    if (part.mimeType === "text/plain" && part.body?.data) return decodeBase64Url(part.body.data);
-  }
-  for (const part of parts) {
-    if (part.mimeType === "text/html" && part.body?.data) {
-      return decodeBase64Url(part.body.data);
-    }
+    const found = findBodyPart(part.parts, part.mimeType, part.body, target);
+    if (found) return found;
   }
   return "";
+}
+
+export function extractBody(parts: GmailPart[] | undefined, mimeType: string | undefined, body: { data?: string } | undefined): string {
+  const plain = findBodyPart(parts, mimeType, body, "text/plain");
+  if (plain) return plain;
+  const html = findBodyPart(parts, mimeType, body, "text/html");
+  return html ? extractTextFromHtml(html) : "";
 }
 
 // Timeout de sécurité : les APIs Google ne doivent pas pendre indéfiniment.

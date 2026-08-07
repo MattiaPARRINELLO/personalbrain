@@ -493,7 +493,7 @@ export function CommandPalette() {
       />
 
       {/* Card */}
-      <div className="relative w-full max-w-xl mx-4 rounded-2xl border border-[var(--border-2)] bg-[var(--surface-1)] shadow-2xl shadow-black/50 overflow-hidden slide-up">
+      <div className="relative w-full max-w-xl mx-4 rounded-2xl border border-[var(--border-2)] bg-[var(--surface-1)] overflow-hidden slide-up">
         {/* Feedback overlay */}
         {feedback && (
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-[var(--surface-1)]/95 backdrop-blur-sm fade-in">

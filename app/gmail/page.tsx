@@ -35,6 +35,7 @@ export default function GmailPage() {
     <AppShell>
       <div className="max-w-4xl mx-auto p-6">
         <PageHeader
+          eyebrow="Boîte de réception"
           title="Gmail"
           actions={
             <a

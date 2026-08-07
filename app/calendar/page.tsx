@@ -13,6 +13,7 @@ import { PageHeader, EmptyState } from "@/components/layout/Chrome";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Input, Textarea, Field } from "@/components/ui/Input";
 import { api, type CalendarEvent } from "@/lib/api-client";
 import { useCachedFetch } from "@/lib/cache";
 import { cn } from "@/lib/utils";
@@ -464,8 +465,8 @@ export default function CalendarPage() {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-lg mx-4 rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)] shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--background)]/70 backdrop-blur-sm">
+          <div className="w-full max-w-lg mx-4 rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)]">
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-1)]">
               <h3 className="text-[14px] font-semibold text-[var(--text-1)]">
                 {isCreating ? "Nouvel événement" : "Modifier l'événement"}
@@ -479,70 +480,50 @@ export default function CalendarPage() {
             </div>
 
             <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-3)] mb-1.5">
-                  Titre
-                </label>
-                <input
+              <Field label="Titre">
+                <Input
                   type="text"
                   value={editForm.summary}
                   onChange={(e) => setEditForm((f) => ({ ...f, summary: e.target.value }))}
                   placeholder="Titre de l'événement"
-                  className="w-full h-9 px-3 rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)] text-[13px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--accent)]/50 transition-colors"
                 />
-              </div>
+              </Field>
 
               {isCreating && (
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-3)] mb-1.5">
-                      Début
-                    </label>
-                    <input
+                  <Field label="Début">
+                    <Input
                       type="datetime-local"
                       value={toDatetimeLocal(editing.start)}
                       onChange={(e) => setEditing((evt) => (evt ? { ...evt, start: new Date(e.target.value).toISOString() } : null))}
-                      className="w-full h-9 px-3 rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)] text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50 transition-colors"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-3)] mb-1.5">
-                      Fin
-                    </label>
-                    <input
+                  </Field>
+                  <Field label="Fin">
+                    <Input
                       type="datetime-local"
                       value={toDatetimeLocal(editing.end)}
                       onChange={(e) => setEditing((evt) => (evt ? { ...evt, end: new Date(e.target.value).toISOString() } : null))}
-                      className="w-full h-9 px-3 rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)] text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50 transition-colors"
                     />
-                  </div>
+                  </Field>
                 </div>
               )}
 
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-3)] mb-1.5">
-                  Lieu
-                </label>
-                <input
+              <Field label="Lieu">
+                <Input
                   type="text"
                   value={editForm.location}
                   onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))}
                   placeholder="Salle, lien, adresse…"
-                  className="w-full h-9 px-3 rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)] text-[13px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--accent)]/50 transition-colors"
                 />
-              </div>
+              </Field>
 
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-3)] mb-1.5">
-                  Description
-                </label>
-                <textarea
+              <Field label="Description">
+                <Textarea
                   value={editForm.description}
                   onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
                   rows={3}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)] text-[13px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--accent)]/50 transition-colors resize-none"
                 />
-              </div>
+              </Field>
 
               <div>
                 <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-3)] mb-2">

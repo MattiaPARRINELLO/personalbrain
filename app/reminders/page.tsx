@@ -18,6 +18,7 @@ import { PageHeader, EmptyState } from "@/components/layout/Chrome";
 import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Input, Textarea } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
 import {
   loadReminders,
@@ -253,7 +254,7 @@ export default function RemindersPage() {
             <div className="relative">
               <div
                 aria-hidden
-                className="absolute left-[7px] top-0 bottom-0 w-px bg-gradient-to-b from-[var(--border-1)] via-[var(--border-2)] to-transparent"
+                className="absolute left-[7px] top-0 bottom-0 w-px bg-[var(--border-2)]"
               />
               <div className="space-y-8">
                 {timeline.map((bucket) => (
@@ -263,7 +264,7 @@ export default function RemindersPage() {
                         className={cn(
                           "relative z-10 w-[15px] h-[15px] rounded-full border-2",
                           bucket.bucket === "today"
-                            ? "border-[var(--accent)] bg-[var(--accent)] shadow-[0_0_0_3px_var(--accent)]/20"
+                            ? "border-[var(--accent)] bg-[var(--accent)]"
                             : bucket.bucket === "past"
                               ? "border-[var(--danger)] bg-[var(--danger)]"
                               : "border-[var(--border-3)] bg-[var(--surface-2)]"
@@ -470,30 +471,28 @@ function ReminderForm({
         {initial ? "Modifier le rappel" : "Nouveau rappel"}
       </p>
       <div className="space-y-2.5">
-        <input
+        <Input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Titre du rappel"
           autoFocus
-          className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13.5px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--accent)]/50"
         />
-        <textarea
+        <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Notes (optionnel)"
           rows={2}
-          className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-2)] placeholder:text-[var(--text-3)] outline-none resize-none focus:border-[var(--accent)]/50"
         />
         <div className="flex items-center gap-2">
           <label className="text-[11px] text-[var(--text-3)] font-mono uppercase tracking-wider shrink-0">
             Échéance
           </label>
-          <input
+          <Input
             type="datetime-local"
             value={dueAt}
             onChange={(e) => setDueAt(e.target.value)}
-            className="flex-1 bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[12.5px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50 font-mono"
+            className="flex-1 text-[12.5px] font-mono"
           />
         </div>
         <div className="flex items-center gap-2 flex-wrap">

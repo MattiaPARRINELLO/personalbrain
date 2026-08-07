@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import Image from "next/image";
-import { getSession } from "@/lib/session";
 import { getLeetcode, getMemory, getPhotoShoots } from "@/lib/storage";
 import { Reveal } from "@/components/landing/Reveal";
 import { HeroTerminal } from "@/components/landing/HeroTerminal";
@@ -101,11 +99,6 @@ const STAT_LABELS = [
 ] as const;
 
 export default async function Home() {
-  const session = await getSession();
-  if (session) {
-    redirect("/chat");
-  }
-
   const [leetcode, memory, shoots] = await Promise.all([
     getLeetcode(),
     getMemory(),
