@@ -4,6 +4,7 @@ import {
   Palette,
   Mail,
   CalendarRange,
+  ListTodo,
   LogOut,
   Check,
   Globe,
@@ -21,7 +22,7 @@ import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { AccentPicker } from "@/components/ui/AccentPicker";
-import { api, type GoogleLinkStatus } from "@/lib/api-client";
+import { api, type GoogleLinkStatus, type MicrosoftTodoStatus } from "@/lib/api-client";
 import { useCachedFetch } from "@/lib/cache";
 
 const GOOGLE_STATUS_KEY = "google:status";
@@ -30,10 +31,20 @@ async function fetchGoogleStatus(): Promise<GoogleLinkStatus> {
   return api.googleStatus();
 }
 
+async function fetchMicrosoftStatus(): Promise<MicrosoftTodoStatus> {
+  return api.microsoftStatus();
+}
+
 export default function SettingsPage() {
   const { data: status, loading } = useCachedFetch<GoogleLinkStatus>(
     GOOGLE_STATUS_KEY,
     fetchGoogleStatus,
+    { ttl: 60 * 1000 }
+  );
+
+  const { data: msStatus, loading: msLoading } = useCachedFetch<MicrosoftTodoStatus>(
+    "microsoft:status",
+    fetchMicrosoftStatus,
     { ttl: 60 * 1000 }
   );
 
@@ -237,6 +248,55 @@ export default function SettingsPage() {
                       {status?.calendar ? "Reconnecter" : "Connecter"}
                     </a>
                   </div>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Microsoft To Do"
+                subtitle="Tes reminders Samsung se synchronisent ici. Connecte ton compte Microsoft pour les lire dans Rappels."
+                action={<ListTodo className="w-4 h-4 text-[var(--text-3)]" />}
+              />
+              <CardBody>
+                <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)]/40">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-9 h-9 rounded-lg flex items-center justify-center border"
+                      style={{
+                        borderColor: msStatus?.linked
+                          ? "var(--success)"
+                          : "var(--border-2)",
+                        color: msStatus?.linked
+                          ? "var(--success)"
+                          : "var(--text-3)",
+                      }}
+                    >
+                      {msStatus?.linked ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <ListTodo className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-medium text-[var(--text-1)]">
+                        Microsoft To Do
+                      </p>
+                      <p className="text-[11px] text-[var(--text-3)]">
+                        {msLoading && !msStatus
+                          ? "Vérification…"
+                          : msStatus?.linked
+                            ? "Connecté"
+                            : "Non connecté"}
+                      </p>
+                    </div>
+                  </div>
+                  <a
+                    href="/api/auth/microsoft"
+                    className="text-[11px] font-medium text-[var(--accent)] hover:underline"
+                  >
+                    {msStatus?.linked ? "Reconnecter" : "Connecter"}
+                  </a>
                 </div>
               </CardBody>
             </Card>
