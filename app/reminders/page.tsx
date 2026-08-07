@@ -30,6 +30,7 @@ import {
 import type { Reminder, ReminderRecurrence, ReminderStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatRelative, toLocalInputValue, fromLocalInputValue, isOverdue } from "@/lib/date";
+import { MicrosoftTodoPanel } from "@/components/MicrosoftTodoPanel";
 import {
   fireBrowserNotification,
   getNotificationPermission,
@@ -325,6 +326,8 @@ export default function RemindersPage() {
               )}
             </div>
           )}
+
+          <MicrosoftTodoPanel />
         </div>
       </div>
     </AppShell>

@@ -1,10 +1,19 @@
-import type { GmailMessage, GoogleCalendarEvent as CalendarEvent } from "./types";
+import type {
+  GmailMessage,
+  GoogleCalendarEvent as CalendarEvent,
+  MicrosoftTodoList,
+  MicrosoftTodoTask,
+} from "./types";
 
-export type { GmailMessage, CalendarEvent };
+export type { GmailMessage, CalendarEvent, MicrosoftTodoList, MicrosoftTodoTask };
 
 export type GoogleLinkStatus = {
   gmail: boolean;
   calendar: boolean;
+};
+
+export type MicrosoftTodoStatus = {
+  linked: boolean;
 };
 
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
@@ -32,6 +41,21 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   googleStatus: () => jsonFetch<GoogleLinkStatus>("/api/auth/google/status"),
+
+  microsoftStatus: () => jsonFetch<MicrosoftTodoStatus>("/api/auth/microsoft/status"),
+
+  todo: {
+    lists: () => jsonFetch<{ lists?: MicrosoftTodoList[]; error?: string }>("/api/todo"),
+    tasks: (listId: string) =>
+      jsonFetch<{ tasks?: MicrosoftTodoTask[]; error?: string }>(
+        `/api/todo?listId=${encodeURIComponent(listId)}`
+      ),
+    complete: (listId: string, taskId: string, completed: boolean) =>
+      jsonFetch<{ success: boolean }>("/api/todo", {
+        method: "PATCH",
+        body: JSON.stringify({ listId, taskId, completed }),
+      }),
+  },
 
   gmail: {
     list: (query?: string) => {
