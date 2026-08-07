@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Search, Plus, Trash2, MessageSquare, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/Input";
 
 type ChatSession = {
   id: string;
@@ -141,7 +142,7 @@ export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession,
     <div className={cn(
       "w-60 shrink-0 h-full flex-col border-r border-[var(--border-1)] bg-[var(--surface-1)]",
       "hidden lg:flex",
-      mobileOpen && "fixed inset-y-0 left-0 z-40 flex shadow-2xl"
+      mobileOpen && "fixed inset-y-0 left-0 z-40 flex"
     )}>
       <div className="flex flex-col items-center pb-2">
         <div className="relative group/logo">
@@ -151,7 +152,7 @@ export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession,
             width={120}
             height={120}
             priority
-            className="w-[100px] h-[100px] object-contain drop-shadow-[0_0_12px_rgba(165,180,252,0.18)] transition-all duration-500 ease-out group-hover/logo:drop-shadow-[0_0_20px_rgba(165,180,252,0.30)] group-hover/logo:translate-y-[-3px]"
+            className="w-[100px] h-[100px] object-contain transition-all duration-500 ease-out group-hover/logo:translate-y-[-3px]"
           />
         </div>
         <h1 className="mt-2 text-[13px] font-black tracking-[0.25em] uppercase text-[var(--text-1)] font-mono">
@@ -181,12 +182,12 @@ export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession,
 
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--text-4)]" />
-          <input
+          <Input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher..."
-            className="w-full pl-7.5 pr-2.5 py-1.5 text-[12px] text-[var(--text-2)] bg-[var(--surface-2)] border border-[var(--border-1)] rounded-md placeholder:text-[var(--text-4)] outline-none focus:border-[var(--border-2)] transition-colors duration-200"
+            className="pl-7 pr-2.5 py-1.5 text-[12px] text-[var(--text-2)] bg-[var(--surface-2)]"
           />
         </div>
       </div>

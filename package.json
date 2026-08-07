@@ -16,7 +16,8 @@
     "cap:run": "bun run build && bunx cap sync && bunx cap run android",
     "cap:dev:sync": "CAP_DEV=true bunx cap sync",
     "cron:reminders": "bun scripts/cron-scheduler.ts reminders",
-    "cron:daily-brief": "bun scripts/cron-scheduler.ts daily-brief"
+    "cron:daily-brief": "bun scripts/cron-scheduler.ts daily-brief",
+    "reset:passkey": "bun scripts/reset-passkey.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.109.1",

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Search, ArrowUpRight, Music, Brain, Mail, Bell, Bookmark, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { EmptyState } from "@/components/layout/Chrome";
+import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 import { unifiedSearch, type UnifiedSearchResult } from "@/app/actions/search";
 import type { ConcertEvent, MemoryFact, Email, Reminder, WatchLaterItem, Accreditation } from "@/lib/types";
@@ -75,13 +76,13 @@ export function SearchView() {
         <div className="shrink-0 p-4 sm:p-6 border-b border-[var(--border-1)]">
           <div className="relative max-w-2xl">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-3)] pointer-events-none" />
-            <input
+            <Input
               ref={inputRef}
               type="text"
               value={query}
               onChange={(e) => handleChange(e.target.value)}
               placeholder="Rechercher dans les concerts, emails, rappels, mémoire, accréditations, watch-later…"
-              className="w-full h-11 pl-10 pr-4 rounded-xl border border-[var(--border-2)] bg-[var(--surface-2)] text-[13px] text-[var(--text-1)] placeholder:text-[var(--text-4)] outline-none focus:border-[var(--accent)] transition-colors"
+              className="h-11 pl-10 pr-4 rounded-xl text-[13px] bg-[var(--surface-2)] focus:border-[var(--accent)]"
             />
             {loading && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border border-[var(--accent)] border-r-transparent animate-spin" />

@@ -9,6 +9,8 @@ import { PageHeader, EmptyState } from "@/components/layout/Chrome";
 import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Input, Textarea } from "@/components/ui/Input";
+import { IconButton } from "@/components/ui/IconButton";
 import {
   loadPhotoShoots, createPhotoShoot, editPhotoShoot, removePhotoShoot,
 } from "@/app/actions/photography";
@@ -412,21 +414,21 @@ function ShootCard({
 
       {shoot.status === "sent" && (
         <div className="px-3 pb-3 space-y-2" onClick={(e) => e.stopPropagation()}>
-          <input
+          <Input
             type="url"
             value={sentLink}
             onChange={(e) => setSentLink(e.target.value)}
             placeholder="Lien galerie"
-            className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-2 py-1.5 text-[12px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
+            className="px-2 py-1.5 text-[12px]"
           />
           <div className="flex items-center gap-2">
-            <input
+            <Input
               type="number"
               value={sentCount}
               onChange={(e) => setSentCount(Number(e.target.value))}
               min={0}
               placeholder="Nb photos"
-              className="w-20 bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-2 py-1.5 text-[12px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
+              className="w-20 px-2 py-1.5 text-[12px]"
             />
             <Button variant="primary" size="sm" onClick={handleSend} disabled={!sentLink.trim()}>
               {shoot.galleryLink ? "Mettre à jour" : "Valider"}
@@ -437,21 +439,21 @@ function ShootCard({
 
       {showSentForm && shoot.status !== "sent" && (
         <div className="px-3 pb-3 space-y-2" onClick={(e) => e.stopPropagation()}>
-          <input
+          <Input
             type="url"
             value={sentLink}
             onChange={(e) => setSentLink(e.target.value)}
             placeholder="Lien galerie"
-            className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-2 py-1.5 text-[12px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
+            className="px-2 py-1.5 text-[12px]"
           />
           <div className="flex items-center gap-2">
-            <input
+            <Input
               type="number"
               value={sentCount}
               onChange={(e) => setSentCount(Number(e.target.value))}
               min={0}
               placeholder="Nb photos"
-              className="w-20 bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-2 py-1.5 text-[12px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
+              className="w-20 px-2 py-1.5 text-[12px]"
             />
             <Button variant="primary" size="sm" onClick={handleSend} disabled={!sentLink.trim()}>
               Envoyer
@@ -479,12 +481,15 @@ function ShootCard({
             </Button>
           )}
         </div>
-        <button
+        <IconButton
+          label="Supprimer"
+          size="xs"
+          tone="danger"
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-4)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors"
+          className="text-[var(--text-4)] hover:text-[var(--danger)]"
         >
           <X className="w-3 h-3" />
-        </button>
+        </IconButton>
       </div>
     </div>
   );
@@ -537,7 +542,7 @@ function DetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#000]/60"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--background)]/70 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -580,51 +585,47 @@ function DetailModal({
 
           {editing ? (
             <div className="space-y-3">
-              <input
+              <Input
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
                 placeholder="Titre"
               />
               <div className="flex flex-col sm:flex-row gap-3">
-                <input
+                <Input
                   type="date"
                   value={editDate}
                   onChange={(e) => setEditDate(e.target.value)}
-                  className="w-full sm:flex-1 bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
+                  className="w-full sm:flex-1"
                 />
-                <input
+                <Input
                   type="text"
                   value={editClient}
                   onChange={(e) => setEditClient(e.target.value)}
-                  className="w-full sm:flex-1 bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
+                  className="w-full sm:flex-1"
                   placeholder="Client"
                 />
               </div>
-              <textarea
+              <Textarea
                 value={editNotes}
                 onChange={(e) => setEditNotes(e.target.value)}
                 rows={3}
-                className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50 resize-none"
                 placeholder="Notes"
               />
               {shoot.status === "sent" && (
                 <div className="space-y-3 pt-1">
-                  <input
+                  <Input
                     type="url"
                     value={editGalleryLink}
                     onChange={(e) => setEditGalleryLink(e.target.value)}
                     placeholder="Lien galerie"
-                    className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
                   />
-                  <input
+                  <Input
                     type="number"
                     value={editPhotosSent}
                     onChange={(e) => setEditPhotosSent(Number(e.target.value))}
                     min={0}
                     placeholder="Nombre de photos"
-                    className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
                   />
                 </div>
               )}
@@ -682,34 +683,30 @@ function AddShootForm({
   return (
     <div className="border border-[var(--border-1)] rounded-lg p-4 space-y-3 bg-[var(--surface-2)]">
       <h3 className="text-[13px] font-semibold text-[var(--text-1)]">Nouveau shooting</h3>
-      <input
+      <Input
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Titre du shooting"
-        className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--accent)]/50"
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <input
+        <Input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none focus:border-[var(--accent)]/50"
         />
-        <input
+        <Input
           type="text"
           value={client}
           onChange={(e) => setClient(e.target.value)}
           placeholder="Client"
-          className="bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--accent)]/50"
         />
       </div>
-      <input
+      <Input
         type="text"
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         placeholder="Notes (optionnel)"
-        className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--accent)]/50"
       />
       <div className="flex items-center justify-end gap-1.5">
         <Button variant="ghost" size="sm" onClick={onCancel}>Annuler</Button>

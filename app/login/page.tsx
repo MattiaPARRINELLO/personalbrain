@@ -1,15 +1,42 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/browser";
-import { Fingerprint, Loader2, ShieldCheck, AlertCircle, Sparkles, Smartphone, ExternalLink } from "lucide-react";
+import { Fingerprint, Loader2, ShieldCheck, AlertCircle, Check, Smartphone, ExternalLink } from "lucide-react";
 import { isCapacitor, isWebAuthnSupported } from "@/lib/capacitor";
-import { openAuthInBrowser, onCapTokenReceived, setCapSessionCookie, parseTokenFromFragment } from "@/lib/capacitor-auth";
+import { openAuthInBrowser } from "@/lib/capacitor-auth";
+
+type Phase = "checking" | "idle" | "scanning" | "verified" | "error";
+
+const RING_R = 95;
+
+const PHASE_STATUS: Record<Phase, string> = {
+  checking: "VÉRIFICATION DE TA CLÉ…",
+  idle: "SYSTÈME PRÊT — TOUCHE L'EMPREINTE",
+  scanning: "SCAN EN COURS…",
+  verified: "CLÉ VÉRIFIÉE — OUVERTURE…",
+  error: "",
+};
+
+const PHASE_LIGHT: Record<Phase, string> = {
+  checking: "var(--text-4)",
+  idle: "var(--text-3)",
+  scanning: "var(--accent)",
+  verified: "var(--success)",
+  error: "var(--danger)",
+};
+
+const TICKS = [
+  "top-0 left-0 border-t-2 border-l-2 rounded-tl",
+  "top-0 right-0 border-t-2 border-r-2 rounded-tr",
+  "bottom-0 left-0 border-b-2 border-l-2 rounded-bl",
+  "bottom-0 right-0 border-b-2 border-r-2 rounded-br",
+];
 
 function LoginForm() {
   const router = useRouter();
@@ -20,7 +47,18 @@ function LoginForm() {
   const [status, setStatus] = useState<"idle" | "loading" | "registering" | "authenticating">("idle");
   const [needsRegistration, setNeedsRegistration] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [verified, setVerified] = useState(false);
   const [isCapacitorApp] = useState(() => isCapacitor() && !isWebAuthnSupported());
+  const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const burstAnchor = useRef<HTMLButtonElement | null>(null);
+  const [burstOrigin, setBurstOrigin] = useState<{ x: number; y: number } | null>(null);
+
+  useEffect(
+    () => () => {
+      if (redirectTimer.current) clearTimeout(redirectTimer.current);
+    },
+    []
+  );
 
   const exchangeTokenAndClose = useCallback(async () => {
     try {
@@ -73,10 +111,30 @@ function LoginForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, isCapMode]);
 
+  const completeAuth = useCallback(() => {
+    setVerified(true);
+    setBurstOrigin(null);
+    if (burstAnchor.current) {
+      const rect = burstAnchor.current.getBoundingClientRect();
+      setBurstOrigin({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
+    }
+    redirectTimer.current = setTimeout(() => {
+      if (isCapMode) {
+        void exchangeTokenAndClose();
+      } else {
+        router.replace("/chat");
+      }
+    }, 1500);
+  }, [isCapMode, exchangeTokenAndClose, router]);
+
   async function handleRegister() {
     if (isCapacitorApp) {
       return openAuthInBrowser();
     }
+    if (status !== "idle" || verified) return;
 
     setStatus("registering");
     setError(null);
@@ -95,11 +153,7 @@ function LoginForm() {
       });
       const verifyData = (await verifyRes.json()) as { verified?: boolean; error?: string };
       if (verifyData.verified) {
-        if (isCapMode) {
-          await exchangeTokenAndClose();
-        } else {
-          router.replace("/chat");
-        }
+        completeAuth();
       } else {
         setError(verifyData.error ?? "L'enregistrement a échoué.");
         setStatus("idle");
@@ -114,6 +168,7 @@ function LoginForm() {
     if (isCapacitorApp) {
       return openAuthInBrowser();
     }
+    if (status !== "idle" || verified) return;
 
     setStatus("authenticating");
     setError(null);
@@ -134,11 +189,7 @@ function LoginForm() {
       });
       const verifyData = (await verifyRes.json()) as { verified?: boolean; error?: string };
       if (verifyData.verified) {
-        if (isCapMode) {
-          await exchangeTokenAndClose();
-        } else {
-          router.replace("/chat");
-        }
+        completeAuth();
       } else {
         setError(verifyData.error ?? "L'authentification a échoué.");
         setStatus("idle");
@@ -149,7 +200,17 @@ function LoginForm() {
     }
   }
 
-  const isBusy = status !== "idle";
+  const phase: Phase = verified
+    ? "verified"
+    : status === "registering" || status === "authenticating"
+      ? "scanning"
+      : error
+        ? "error"
+        : needsRegistration === null
+          ? "checking"
+          : "idle";
+
+  const isBusy = status !== "idle" || verified;
   const label = isCapacitorApp
     ? "Ouvrir l'authentification"
     : needsRegistration === null
@@ -159,55 +220,154 @@ function LoginForm() {
         : "Se connecter avec Face ID / Touch ID";
 
   return (
-    <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-[var(--border-2)] bg-gradient-to-br from-[var(--surface-2)] to-[var(--surface-3)] mb-5 relative">
-            <Sparkles className="w-5 h-5 text-[var(--accent)]" />
-            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-[var(--accent)] breathe" />
-          </div>
-          <h1 className="text-[20px] font-semibold tracking-tight text-[var(--text-1)]">
-            <span className="gradient-text-ai">BACKSTAGE</span>
-          </h1>
-          <p className="text-[12.5px] text-[var(--text-3)] mt-1.5 leading-relaxed">
-            Accès privé. Authentification sans mot de passe.
-          </p>
-        </div>
+    <div className="relative z-10 flex min-h-screen items-center justify-center px-4 overflow-hidden">
+      {/* Repères de tirage */}
+      <div className="fixed inset-4 pointer-events-none z-0" aria-hidden>
+        {TICKS.map((tick) => (
+          <span
+            key={tick}
+            className={`login-tick absolute w-3.5 h-3.5 border-[var(--border-3)] ${tick}`}
+          />
+        ))}
+      </div>
 
-        <div className="p-6 rounded-2xl border border-[var(--border-1)] bg-[var(--surface-1)]/60 backdrop-blur">
-          <button
-            onClick={needsRegistration ? handleRegister : handleAuthenticate}
-            disabled={isBusy || needsRegistration === null}
-            className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-[var(--accent)] text-[#0a0a0b] font-medium text-[13px] hover:brightness-110 active:brightness-95 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+      <div className="login-load relative z-10 flex flex-col items-center w-full max-w-sm text-center">
+        {/* En-tête */}
+        <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-[var(--text-4)]">
+          — Accès privé —
+        </p>
+        <h1 className="mt-4 font-mono font-black tracking-[0.28em] text-[17px] gradient-text-ai">
+          BACKSTAGE
+        </h1>
+        <p className="mt-2.5 text-[12.5px] leading-relaxed text-[var(--text-3)]">
+          Ton visage, ta clé. Aucun mot de passe à retenir.
+        </p>
+
+        {/* L'anneau biométrique — la signature */}
+        <button
+          type="button"
+          ref={burstAnchor}
+          aria-label={label}
+          onClick={() => (needsRegistration ? handleRegister() : handleAuthenticate())}
+          disabled={isBusy || needsRegistration === null}
+          data-phase={phase}
+          className="login-ring relative mt-12 w-48 h-48 rounded-full disabled:cursor-not-allowed hover:scale-[1.03] active:scale-95 transition-transform duration-300"
+        >
+          <svg viewBox="0 0 200 200" className="w-full h-full" aria-hidden>
+            <circle
+              cx="100"
+              cy="100"
+              r={RING_R}
+              fill="none"
+              strokeWidth="1.5"
+              stroke="currentColor"
+              opacity="0.12"
+            />
+            <circle
+              cx="100"
+              cy="100"
+              r={RING_R}
+              fill="none"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              stroke="currentColor"
+              className="login-progress-arc"
+            />
+          </svg>
+
+          <span className="login-scan-beam" aria-hidden />
+          <span className="login-shockwave" aria-hidden />
+
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="login-fingerprint">
+              <Fingerprint className="w-11 h-11" strokeWidth={1.25} />
+            </span>
+            <span className="login-check">
+              <Check className="w-10 h-10" strokeWidth={1.5} />
+            </span>
+          </span>
+        </button>
+
+        {/* Explosion d'accès — ancre au centre de l'anneau (hors du bouton :
+            un transform sur l'ancêtre casserait le position: fixed) */}
+        {burstOrigin && (
+          <span
+            className="login-burst"
+            style={{ top: burstOrigin.y, left: burstOrigin.x }}
+            aria-hidden
           >
-            {isBusy ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : isCapacitorApp ? (
-              <ExternalLink className="w-4 h-4" />
-            ) : (
-              <Fingerprint className="w-4 h-4" />
-            )}
-            {label}
-          </button>
+            <span className="login-burst-flash" />
+            <span className="login-burst-ring" />
+            <span className="login-burst-ring" />
+            <span className="login-burst-ring" />
+          </span>
+        )}
 
-          {error && (
-            <div className="mt-4 flex items-start gap-2 text-[11.5px] text-[var(--danger)] leading-relaxed fade-in">
+        {/* Ligne de statut */}
+        <div className="mt-9 min-h-[22px] flex items-center justify-center gap-2.5 px-4">
+          <span
+            className="w-1.5 h-1.5 shrink-0 transition-colors duration-300"
+            style={{ backgroundColor: PHASE_LIGHT[phase] }}
+            aria-hidden
+          />
+          {phase === "error" ? (
+            <span className="flex items-start gap-1.5 text-[12px] text-[var(--danger)] leading-relaxed max-w-[300px] text-left">
               <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>{error}</span>
-            </div>
-          )}
-
-          {isCapacitorApp && (
-            <div className="mt-4 flex items-start gap-2 text-[11.5px] text-[var(--text-3)] leading-relaxed">
-              <Smartphone className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--accent-cool)]" />
-              <span>L&apos;authentification s&apos;ouvre dans ton navigateur, reviens ensuite dans l&apos;app.</span>
-            </div>
+            </span>
+          ) : (
+            <span
+              className={`text-[10.5px] font-mono uppercase tracking-[0.2em] ${
+                phase === "scanning" || phase === "verified"
+                  ? "text-[var(--accent)]"
+                  : phase === "checking"
+                    ? "text-[var(--text-4)]"
+                    : "text-[var(--text-3)]"
+              }`}
+            >
+              {PHASE_STATUS[phase]}
+            </span>
           )}
         </div>
 
-        <p className="text-[10px] text-[var(--text-4)] mt-6 text-center font-mono uppercase tracking-wider">
-          <ShieldCheck className="w-3 h-3 inline-block mr-1 -mt-0.5" />
-          Authentification par clé d&apos;accès
+        {phase === "idle" && (
+          <p className="mt-2 text-[10px] font-mono uppercase tracking-[0.18em] text-[var(--text-4)] fade-in">
+            Face ID · Touch ID · Clé de sécurité
+          </p>
+        )}
+
+        {/* Action secondaire */}
+        <button
+          type="button"
+          onClick={() => (needsRegistration ? handleRegister() : handleAuthenticate())}
+          disabled={isBusy || needsRegistration === null}
+          className="mt-8 px-7 py-3 border border-[var(--border-2)] text-[11px] font-mono uppercase tracking-[0.18em] text-[var(--text-2)] hover:border-[var(--border-3)] hover:text-[var(--text-1)] hover:border-[var(--warm)]/60 transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isBusy ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              {verified ? "Ouverture…" : label}
+            </span>
+          ) : isCapacitorApp ? (
+            <span className="inline-flex items-center gap-2">
+              <ExternalLink className="w-3.5 h-3.5" />
+              {label}
+            </span>
+          ) : (
+            label
+          )}
+        </button>
+
+        {isCapacitorApp && (
+          <div className="mt-5 flex items-start gap-2 text-[11.5px] text-[var(--text-3)] leading-relaxed">
+            <Smartphone className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--accent-cool)]" />
+            <span>L&apos;authentification s&apos;ouvre dans ton navigateur, reviens ensuite dans l&apos;app.</span>
+          </div>
+        )}
+
+        <p className="text-[9.5px] text-[var(--text-4)] mt-10 text-center font-mono uppercase tracking-[0.2em]">
+          <ShieldCheck className="w-3 h-3 inline-block mr-1.5 -mt-0.5" />
+          Clé d&apos;accès WebAuthn · Sans mot de passe
         </p>
       </div>
     </div>

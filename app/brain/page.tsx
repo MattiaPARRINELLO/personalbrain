@@ -7,6 +7,8 @@ import { PageHeader, EmptyState } from "@/components/layout/Chrome";
 import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Input, Textarea } from "@/components/ui/Input";
+import { IconButton } from "@/components/ui/IconButton";
 import { useToast } from "@/components/ui/Toast";
 import { loadBrain, loadMemoryRelationships, rememberFact, editMemoryFact, forgetFact } from "@/app/actions/brain";
 import dynamic from "next/dynamic";
@@ -241,12 +243,12 @@ export default function BrainPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-3)]" />
-                  <input
+                  <Input
                     type="search"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Rechercher dans la mémoire…"
-                    className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-lg pl-9 pr-3 py-2 text-[13px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--accent)]/50 transition-colors"
+                    className="pl-9"
                   />
                 </div>
                 <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-1)]">
@@ -394,9 +396,9 @@ function groupByCategory(facts: MemoryFact[]): Record<MemoryCategory, MemoryFact
 
 function ProfileCard({ profile }: { profile: MemoryData["profile"] }) {
   return (
-    <div className="mb-6 p-5 rounded-2xl border border-[var(--border-1)] bg-gradient-to-br from-[var(--surface-2)]/40 to-[var(--surface-1)]/30">
+    <div className="mb-6 p-5 rounded-2xl border border-[var(--border-1)] bg-[var(--surface-1)]">
       <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--accent)]/20 to-[var(--warm)]/10 border border-[var(--border-2)] flex items-center justify-center text-[var(--accent)] font-semibold text-[16px]">
+        <div className="w-12 h-12 rounded-xl bg-[var(--surface-2)] border border-[var(--border-2)] flex items-center justify-center text-[var(--accent)] font-semibold text-[16px]">
           {profile.name.slice(0, 1).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
@@ -432,20 +434,12 @@ function FactRow({ fact, onEdit, onDelete }: { fact: MemoryFact; onEdit: () => v
         )}
       </div>
       <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={onEdit}
-          className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] transition-colors"
-          title="Modifier"
-        >
+        <IconButton label="Modifier" onClick={onEdit}>
           <Pencil className="w-3 h-3" />
-        </button>
-        <button
-          onClick={onDelete}
-          className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors"
-          title="Supprimer"
-        >
+        </IconButton>
+        <IconButton label="Supprimer" tone="danger" onClick={onDelete}>
           <Trash2 className="w-3 h-3" />
-        </button>
+        </IconButton>
       </div>
     </div>
   );
@@ -465,11 +459,10 @@ function EditFactForm({
 
   return (
     <div className="p-4 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 fade-in">
-      <textarea
+      <Textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
         rows={2}
-        className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13.5px] text-[var(--text-1)] outline-none resize-none focus:border-[var(--accent)]/50"
       />
       <div className="flex items-center justify-between mt-3 gap-2">
         <div className="flex flex-wrap gap-1.5">
@@ -522,13 +515,12 @@ function AddFactForm({
       <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--accent)] font-mono mb-3">
         Nouveau fait à mémoriser
       </p>
-      <textarea
+      <Textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
         placeholder="Ex : Préfère coder en TypeScript avec des fonctions pures."
         rows={2}
         autoFocus
-        className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13.5px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none resize-none focus:border-[var(--accent)]/50"
       />
       <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
         <div className="flex flex-wrap gap-1.5">

@@ -69,7 +69,7 @@ export function KeyboardShortcuts() {
       onClick={() => setOpen(false)}
     >
       <div
-        className="w-[480px] max-w-[90vw] max-h-[80vh] overflow-y-auto rounded-2xl border border-[var(--border-1)] bg-[var(--surface-1)] p-6 shadow-2xl"
+        className="w-[480px] max-w-[90vw] max-h-[80vh] overflow-y-auto rounded-2xl border border-[var(--border-1)] bg-[var(--surface-1)] p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-[13px] font-semibold text-[var(--text-1)] mb-1">Raccourcis clavier</h2>

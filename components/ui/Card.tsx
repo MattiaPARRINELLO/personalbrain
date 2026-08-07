@@ -5,14 +5,12 @@ import { cn } from "@/lib/utils";
 
 type CardProps = HTMLAttributes<HTMLDivElement> & {
   variant?: "default" | "elevated" | "ghost";
-  glow?: boolean;
   hover?: boolean;
 };
 
 export function Card({
   className,
   variant = "default",
-  glow = false,
   hover = false,
   children,
   ...rest
@@ -25,7 +23,6 @@ export function Card({
         variant === "elevated" && "bg-[var(--surface-2)] border-[var(--border-2)]",
         variant === "ghost" && "bg-transparent border-transparent",
         hover && "hover:border-[var(--border-2)]",
-        glow && "shadow-[0_0_60px_-30px_rgba(165,180,252,0.4)]",
         className
       )}
       {...rest}

@@ -7,7 +7,7 @@ export function Skeleton({ className, ...rest }: HTMLAttributes<HTMLDivElement>)
   return (
     <div
       className={cn(
-        "rounded-md bg-gradient-to-r from-[var(--surface-2)] via-[var(--surface-3)] to-[var(--surface-2)] bg-[length:200%_100%] animate-[shimmer_1.6s_ease-in-out_infinite]",
+        "rounded-md bg-[var(--surface-2)] border border-[var(--border-1)] animate-pulse",
         className
       )}
       {...rest}
