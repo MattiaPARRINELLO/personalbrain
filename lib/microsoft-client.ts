@@ -212,3 +212,48 @@ export async function isMicrosoftLinked(): Promise<boolean> {
   const tokens = await loadMicrosoftTokens();
   return !!tokens?.refresh_token;
 }
+
+type GraphListResponse<T> = { value: T[] };
+
+// Liste par défaut "Tâches" : c'est le point d'entrée de la sync Samsung Reminder.
+export async function getDefaultTodoListId(): Promise<string> {
+  const data = await microsoftGraphFetch<GraphListResponse<MicrosoftTodoList>>(
+    "/me/todo/lists?$top=100"
+  );
+  const tasks = data.value.find((l) => l.wellknownListName === "tasks") ?? data.value[0];
+  if (!tasks) {
+    throw new Error("Aucune liste Microsoft To Do disponible");
+  }
+  return tasks.id;
+}
+
+export type MicrosoftCreateTaskInput = {
+  title: string;
+  dueAt?: string;
+  notes?: string;
+};
+
+export async function createMicrosoftTodoTask(
+  listId: string,
+  input: MicrosoftCreateTaskInput
+): Promise<MicrosoftTodoTask> {
+  const body: Record<string, unknown> = {
+    title: input.title,
+    status: "notStarted",
+  };
+  if (input.dueAt) {
+    body.dueDateTime = { dateTime: new Date(input.dueAt).toISOString(), timeZone: "UTC" };
+  }
+  if (input.notes) {
+    body.body = { contentType: "text", content: input.notes };
+  }
+
+  return microsoftGraphFetch<MicrosoftTodoTask>(
+    `/me/todo/lists/${encodeURIComponent(listId)}/tasks`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
+}

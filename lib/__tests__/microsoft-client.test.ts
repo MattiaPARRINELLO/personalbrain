@@ -24,6 +24,8 @@ import {
   isMicrosoftLinked,
   getMicrosoftTokensFromCode,
   getMicrosoftAccessToken,
+  getDefaultTodoListId,
+  createMicrosoftTodoTask,
 } from "../microsoft-client";
 
 const ORIGINAL_ENV = { ...process.env };
@@ -210,6 +212,117 @@ describe("microsoft-client", () => {
       await expect(getMicrosoftAccessToken()).rejects.toThrow(
         "a echoue apres 3 tentatives",
       );
+    });
+  });
+
+  describe("getDefaultTodoListId", () => {
+    beforeEach(() => {
+      mockReadFile.mockResolvedValue(
+        JSON.stringify({
+          access_token: "valid",
+          refresh_token: "refresh",
+          expiry_date: Date.now() + 3_600_000,
+        }),
+      );
+    });
+
+    it("should prefer the well-known tasks list", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          value: [
+            { id: "list-1", displayName: "Perso", wellknownListName: "none" },
+            { id: "list-tasks", displayName: "Tâches", wellknownListName: "tasks" },
+          ],
+        }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      expect(await getDefaultTodoListId()).toBe("list-tasks");
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/me/todo/lists"),
+        expect.anything(),
+      );
+    });
+
+    it("should fall back to the first list when no tasks list exists", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            value: [{ id: "list-1", displayName: "Perso", wellknownListName: "none" }],
+          }),
+        }),
+      );
+
+      expect(await getDefaultTodoListId()).toBe("list-1");
+    });
+
+    it("should throw when there are no lists", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({ value: [] }),
+        }),
+      );
+
+      await expect(getDefaultTodoListId()).rejects.toThrow("Aucune liste");
+    });
+  });
+
+  describe("createMicrosoftTodoTask", () => {
+    beforeEach(() => {
+      mockReadFile.mockResolvedValue(
+        JSON.stringify({
+          access_token: "valid",
+          refresh_token: "refresh",
+          expiry_date: Date.now() + 3_600_000,
+        }),
+      );
+    });
+
+    it("should POST title, due date (UTC) and notes to the list", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ id: "task-1", title: "Acheter du pain", status: "notStarted" }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const task = await createMicrosoftTodoTask("list-1", {
+        title: "Acheter du pain",
+        dueAt: "2026-08-08T08:00:00.000Z",
+        notes: "Boulangerie",
+      });
+
+      expect(task.id).toBe("task-1");
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(String(url)).toContain("/me/todo/lists/list-1/tasks");
+      expect(init.method).toBe("POST");
+      const body = JSON.parse(init.body as string);
+      expect(body).toEqual({
+        title: "Acheter du pain",
+        status: "notStarted",
+        dueDateTime: { dateTime: "2026-08-08T08:00:00.000Z", timeZone: "UTC" },
+        body: { contentType: "text", content: "Boulangerie" },
+      });
+    });
+
+    it("should omit dueDateTime and body when absent", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ id: "task-2", title: "Sans date", status: "notStarted" }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await createMicrosoftTodoTask("list-1", { title: "Sans date" });
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(JSON.parse(init.body as string)).toEqual({
+        title: "Sans date",
+        status: "notStarted",
+      });
     });
   });
 });
