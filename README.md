@@ -22,7 +22,7 @@ Calendar, LeetCode, concerts) se répondent entre eux.
 - **Watch-later** : liens, articles, vidéos YouTube avec extraction d'aperçu (og:image)
 - **Agenda & Mail** : intégration Google via OAuth
 - **Accréditations** : gestion des accréditations photo concerts (suit mes shootings)
-- **Recherche web** : SearchAPI (Google) avec fallback DuckDuckGo
+- **Recherche web** : Brave Search avec fallback DuckDuckGo (outils IA du chat)
 - **PWA** : installable, fonctionne hors-ligne, service worker, manifest
 - **Thèmes & accent** : dark/light, couleur d'accent personnalisable, picker de thème
 
@@ -72,7 +72,7 @@ Calendar, LeetCode, concerts) se répondent entre eux.
 git clone https://github.com/MattiaPARRINELLO/backstage.git
 cd backstage
 bun install
-cp .env.example .env.local   # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OPENAI_API_KEY, ANTHROPIC_API_KEY, BRAVE_SEARCH_API_KEY
+cp .env.example .env.local   # renseigner IA_API_KEY, AUTH_SECRET, OAuth Google/Microsoft, VAPID…
 bun dev
 ```
 
@@ -80,24 +80,40 @@ L'app démarre sur [http://localhost:3000](http://localhost:3000).
 
 ### Variables d'environnement
 
-| Var                    | Rôle                                                |
-| ---------------------- | --------------------------------------------------- |
-| `GOOGLE_CLIENT_ID`     | OAuth Google (Calendar + Gmail)                     |
-| `GOOGLE_CLIENT_SECRET` | OAuth Google                                        |
-| `OPENAI_API_KEY`       | Modèles OpenAI (chat, raisonnement)                 |
-| `ANTHROPIC_API_KEY`    | Modèles Anthropic (chat, raisonnement)              |
-| `BRAVE_SEARCH_API_KEY` | Recherche web Brave (optionnel, fallback DDG)       |
-| `AUTH_SECRET`          | Session cookie signing (passkey + Google)           |
+| Var                         | Rôle                                                       |
+| --------------------------- | ---------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`       | Base URL de l'API IA (provider OpenCode)                   |
+| `IA_API_KEY`                | Clé API du provider IA                                     |
+| `AUTH_SECRET`               | Signe les JWT de session (passkey + Google + Microsoft)    |
+| `GOOGLE_CLIENT_ID`          | OAuth Google (Calendar + Gmail)                            |
+| `GOOGLE_CLIENT_SECRET`      | OAuth Google                                               |
+| `GOOGLE_REDIRECT_URI`       | Callback OAuth Google                                      |
+| `MICROSOFT_CLIENT_ID`       | OAuth Microsoft (sync reminders → Microsoft To Do)         |
+| `MICROSOFT_CLIENT_SECRET`   | Valeur du secret Microsoft (pas le Secret ID)              |
+| `MICROSOFT_REDIRECT_URI`    | Callback OAuth Microsoft                                   |
+| `OPENWEATHERMAP_API_KEY`    | Météo (brief quotidien, préparation concert)               |
+| `BRAVE_SEARCH_API_KEY`      | Recherche web Brave (optionnel, fallback DuckDuckGo)       |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Paire VAPID Web Push (notifications)                    |
+| `VAPID_PRIVATE_KEY`         | Paire VAPID Web Push                                       |
+| `VAPID_SUBJECT`             | Contact mailto pour Web Push                               |
+| `CRON_SECRET`               | Protège `/api/cron/*` (obligatoire en prod)                |
+| `SETUP_TOKEN`               | Bootstrap one-time du premier passkey (à retirer ensuite)  |
 
 ### Commandes
 
 ```bash
-bun dev          # dev server
-bun run build    # production build
-bun run start    # production server
-bun run lint     # eslint
-bun run test     # vitest (unit tests)
-bun run test:watch
+bun dev              # dev server
+bun run build        # production build
+bun run start        # production server
+bun run lint         # eslint (flat config)
+bunx tsc --noEmit    # type-check
+bun run test         # vitest (unit tests)
+bun run test:watch   # vitest (watch)
+bun run test:e2e     # playwright (e2e)
+bun run analyze      # build + bundle-analyzer
+bun run cron:reminders   # déclencheur reminders (scripts/cron-scheduler.ts)
+bun run cron:daily-brief # déclencheur brief du matin
+bun run reset:passkey    # reset des passkeys enregistrées
 ```
 
 ---
@@ -107,6 +123,8 @@ bun run test:watch
 ```
 app/
   ├─ (chat)            # Chat IA + AppShell
+  ├─ actions/          # Server Actions (une par domaine : memory, reminders, brain…)
+  ├─ api/              # Route handlers (SSE chat, auth, google, cron, push…)
   ├─ brain/            # Mémoire (faits, CRUD)
   ├─ reminders/        # Rappels + notifications natives
   ├─ watch-later/      # Liens, articles, vidéos
@@ -116,25 +134,32 @@ app/
   ├─ search/           # Recherche web + mémoire
   ├─ accreditations/   # Accréditations photo
   ├─ settings/         # Thème, accent, profil
-  └─ api/              # SSE chat, Google proxy
+  └─ …                 # photos, focus, leetcode, week, notif, offline…
 components/
   ├─ chat/             # ChatView, streaming, tool calls
-  ├─ layout/           # AppShell, Chrome, RightPanel
-  ├─ ui/               # Primitives (Markdown, CommandPalette, KeyboardShortcuts, AccentPicker, ThemeApplier, PwaLoader, OfflineBanner)
+  ├─ layout/           # AppShell, Chrome, ContextPanel
+  ├─ ui/               # Primitives (Markdown, CommandPalette, KeyboardShortcuts, AccentPicker…)
   └─ widgets/          # Calendar, Gmail, LeetCode, Accreditations
 lib/
-  ├─ ai-providers.ts   # Streaming OpenAI + Anthropic + reasoning
-  ├─ google-actions.ts # Wrappers Calendar + Gmail
-  ├─ storage.ts        # Persistance JSON, web search
+  ├─ storage-core.ts   # Moteur JSON : écritures atomiques, verrous, backups
+  ├─ storage/          # CRUD par domaine (reminders, memory, concerts, gallery…)
+  ├─ types/            # Types métier par domaine (ré-exportés via types.ts)
+  ├─ ai-providers.ts   # Dispatch OpenAI/Anthropic (barrel)
+  ├─ ai-providers/     # Adapteurs openai.ts, anthropic.ts, types.ts, config.ts
+  ├─ web.ts            # Recherche web, meta de pages, garde-fou anti-SSRF
+  ├─ google-client.ts  # OAuth Google + refresh tokens
+  ├─ microsoft-client.ts # OAuth Microsoft + Graph todo
+  ├─ session-core.ts   # JWT session (Node fs)
+  ├─ session-edge.ts   # JWT session (edge runtime)
   ├─ cache.ts          # TTL, SWR, optimistic updates
   ├─ server-cache.ts   # Cache côté serveur (process memory)
   ├─ daily-brief.ts    # Brief du matin
-  ├─ offline.ts        # IndexedDB + queue offline
-  └─ types.ts          # Types métier (memory, activity, reminders…)
+  └─ offline.ts        # IndexedDB + queue offline
 public/
   ├─ sw.js             # Service worker
   ├─ manifest.json     # PWA manifest
   └─ icons/            # SVG icons
+scripts/               # cron-scheduler, reset-passkey, QA (playwright)
 ```
 
 ---
