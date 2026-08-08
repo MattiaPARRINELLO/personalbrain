@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, type GoogleLinkStatus } from "@/lib/api-client";
-import { useCachedFetch, refreshCache } from "@/lib/cache";
+import { useCachedFetch } from "@/lib/cache";
 
 type NavItem = {
   href: string;
@@ -130,42 +130,6 @@ export function LeftNav() {
   );
 }
 
-function GoogleStatusDot({
-  service,
-  connected,
-  label,
-}: {
-  service: "gmail" | "calendar";
-  connected: boolean | null;
-  label: string;
-}) {
-  const Icon = service === "gmail" ? Mail : CalendarRange;
-  if (connected === null) {
-    return (
-      <div
-        title={`${label} : vérification…`}
-        className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-4)]"
-      >
-        <span className="w-2 h-2 rounded-full bg-[var(--text-4)] animate-pulse" />
-      </div>
-    );
-  }
-  return (
-    <a
-      href={`/api/auth/google?type=${service}`}
-      title={connected ? `${label} lié` : `Lier ${label} (clic pour connecter)`}
-      className={cn(
-        "w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 border",
-        connected
-          ? "border-[var(--success)]/30 bg-[var(--success)]/8 text-[var(--success)] hover:border-[var(--success)]/50"
-          : "border-[var(--border-1)] bg-transparent text-[var(--text-4)] hover:text-[var(--text-1)] hover:border-[var(--border-3)]"
-      )}
-    >
-      {connected ? <Check className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
-    </a>
-  );
-}
-
 export function MobileTopBar() {
   return (
     <div className="lg:hidden flex items-center justify-between h-12 px-3 border-b border-[var(--border-1)] bg-[var(--surface-1)]">
@@ -202,7 +166,6 @@ function GoogleMobileStatus() {
     { ttl: 60 * 1000 }
   );
   if (!status) return null;
-  const linked = [status.gmail && "Gmail", status.calendar && "Calendrier"].filter(Boolean);
   return (
     <div className="flex items-center gap-1">
       {status.gmail && status.calendar ? (

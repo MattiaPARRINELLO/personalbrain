@@ -13,7 +13,7 @@ const { mockSetCredentials, mockRefreshAccessToken } = vi.hoisted(() => ({
 
 vi.mock("google-auth-library", () => {
   class MockOAuth2Client {
-    constructor(...args: unknown[]) {}
+    constructor() {}
     setCredentials = mockSetCredentials;
     refreshAccessToken = mockRefreshAccessToken;
   }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 
 // La signature edge utilise AUTH_SECRET (pas data/.auth-secret)
 const TEST_SECRET = "test-secret-thirtytwo-chars-long-for-hmac!!";

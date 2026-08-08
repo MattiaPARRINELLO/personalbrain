@@ -650,7 +650,6 @@ describe("storage - prepareConcert", () => {
       } as Response);
 
     const storage = await getStorage();
-    const data = await storage.getMemory();
     await storage.addAccreditation({ artist: "Muse", venue: "Stade", concertDate: "2026-07-15" });
     await storage.updateConcertEvents([{ id: "c1", artist: "Muse", venue: "Stade", date: "2026-07-15", status: "shooted" }]);
 

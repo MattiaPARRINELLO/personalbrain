@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ListTodo, Check, Loader2, Square } from "lucide-react";
+import { ListTodo, Loader2, Square } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { api, type MicrosoftTodoList, type MicrosoftTodoTask } from "@/lib/api-client";

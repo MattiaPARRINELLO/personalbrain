@@ -36,10 +36,6 @@ const TICKS = [
   "bottom-0 right-0 border-b-2 border-r-2 rounded-br",
 ];
 
-function isWebAuthnSupported(): boolean {
-  return typeof window !== "undefined" && !!window.PublicKeyCredential;
-}
-
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
