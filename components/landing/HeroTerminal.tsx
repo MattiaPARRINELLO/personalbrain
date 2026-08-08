@@ -10,15 +10,15 @@ type Step =
 
 const SCRIPT: Step[] = [
   { kind: "user", text: "Qui a joué au Zénith vendredi dernier, et mon agenda de la semaine ?" },
-  { kind: "tool", label: "gmail.search", detail: 'from:"zenith.fr" after:2026/07/31 — 3 résultats' },
+  { kind: "tool", label: "gmail.search", detail: 'from:"zenith.fr" after:2026/07/31 · 3 résultats' },
   { kind: "tool", label: "calendar.read", detail: "Semaine du 03/08 → 4 shoots, 2 retours client" },
-  { kind: "assistant", text: "Vendredi : **M83** au Zénith, set complet à 22h. Tu as shooté 214 photos — 12 sont encore en sélection. Ton prochain rendu client est mercredi 12h." },
+  { kind: "assistant", text: "Vendredi : **M83** au Zénith, set complet à 22h. Tu as shooté 214 photos, 12 sont encore en sélection. Ton prochain rendu client est mercredi 12h." },
   { kind: "tool", label: "brain.remember", detail: "« M83 → shoot Zénith 31/07 » mémorisé (confiance 96%)" },
 ];
 
 const FINAL_USER = "Et je peux avoir un rappel pour livrer les photos de M83 ?";
-const FINAL_TOOL = { kind: "tool" as const, label: "reminder.create", detail: "Mer. 12/08 11:00 — « Livrer sélection M83 » (push + email)" };
-const FINAL_AI = "C'est noté. Je te préviens mercredi matin, et si les photos sont prêtes avant, dis-le-moi — j'annule le rappel.";
+const FINAL_TOOL = { kind: "tool" as const, label: "reminder.create", detail: "Mer. 12/08 11:00 · « Livrer sélection M83 » (push + email)" };
+const FINAL_AI = "C'est noté. Je te préviens mercredi matin, et si les photos sont prêtes avant, dis-le-moi, j'annule le rappel.";
 
 function StepView({ step }: { step: Step }) {
   if (step.kind === "user") {
@@ -132,7 +132,7 @@ export function HeroTerminal() {
         <span className="w-2.5 h-2.5 rounded-full bg-[#fbbf24]/70" />
         <span className="w-2.5 h-2.5 rounded-full bg-[#4ade80]/70" />
         <span className="ml-3 text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-4)]">
-          backstage — session privée
+          backstage · session privée
         </span>
         <span className="ml-auto flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider text-[var(--accent-success)]">
           <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-success)] animate-pulse-dot" />
