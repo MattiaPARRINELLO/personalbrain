@@ -50,7 +50,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## Data layer
 
 - All domain data stored as JSON files in `data/` (gitignored except `.gitkeep`)
-- `lib/storage.ts` exports typed CRUD functions — atomic writes (`.tmp` + rename), 30min backups to `data/backups/`
+- `lib/storage-core.ts` = moteur JSON (écritures atomiques `.tmp` + rename, locks par fichier, backups 30min vers `data/backups/`) — exports `writeJsonAtomic`, `readJsonSafe`, `mutateJson`, `readOrCreate`, `maybeBackup`
+- `lib/storage/` = CRUD par domaine (concerts, gallery, leetcode, memory, emails, calendar, reminders, watch-later, activity, accreditations, chat-history, photo-shoots, intentions) ; `lib/storage.ts` est un barrel qui ré-exporte tout (surface publique historique inchangée)
+- `lib/web.ts` = recherche web (Brave + fallback DuckDuckGo), méta de pages, garde-fou anti-SSRF
 - `lib/config.ts` reads `data/config.json` (model selection, per-user settings)
 - Tests mock `process.cwd()` to a temp dir (see `lib/__tests__/storage.test.ts`)
 
