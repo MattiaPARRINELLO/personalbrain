@@ -137,7 +137,7 @@ export function DayTimeline({ steps }: { steps: DayStep[] }) {
 
   return (
     <section ref={sectionRef} className="relative">
-      {/* Ligne de progression — la signature du scroll */}
+      {/* Ligne de progression, la signature du scroll */}
       <div className="absolute left-[52px] sm:left-[186px] top-2 bottom-2 w-px bg-[var(--border-2)]" aria-hidden />
       <div
         aria-hidden

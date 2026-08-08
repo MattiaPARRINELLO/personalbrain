@@ -7,24 +7,24 @@ const SHOOT_COLUMNS = [
     label: "Shooted",
     count: 6,
     cards: [
-      { title: "M83 — Zénith", meta: "31/07 · 214 photos" },
-      { title: "Justice — Lollapalooza", meta: "02/08 · 186 photos" },
+      { title: "M83 · Zénith", meta: "31/07 · 214 photos" },
+      { title: "Justice · Lollapalooza", meta: "02/08 · 186 photos" },
     ],
   },
   {
     label: "Selecting",
     count: 4,
-    cards: [{ title: "Air — Bercy", meta: "24/07 · 132 photos" }],
+    cards: [{ title: "Air · Bercy", meta: "24/07 · 132 photos" }],
   },
   {
     label: "Editing",
     count: 3,
-    cards: [{ title: "Phoenix — Salle Pleyel", meta: "18/07 · 98 photos" }],
+    cards: [{ title: "Phoenix · Salle Pleyel", meta: "18/07 · 98 photos" }],
   },
   {
     label: "Delivered",
     count: 12,
-    cards: [{ title: "Daft Punk Tribute — La Cigale", meta: "Livré · 3.2 Go" }],
+    cards: [{ title: "Daft Punk Tribute · La Cigale", meta: "Livré · 3.2 Go" }],
   },
 ] as const;
 
@@ -34,7 +34,7 @@ export function KanbanMock() {
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border-1)] bg-[var(--surface-2)]">
         <span className="w-2 h-2 rounded-full bg-[var(--warm)]" />
         <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-3)]">
-          kanban — shoots
+          kanban · shoots
         </span>
         <span className="ml-auto text-[9px] font-mono uppercase tracking-wider text-[var(--text-4)]">
           25 shoots · 4 étapes
@@ -87,7 +87,7 @@ export function StreakMock() {
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border-1)] bg-[var(--surface-2)]">
         <span className="w-2 h-2 rounded-full bg-[var(--accent-success)]" />
         <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-3)]">
-          practice — leetcode
+          practice · leetcode
         </span>
       </div>
       <div className="px-4 py-4 flex items-center gap-4">
@@ -154,7 +154,7 @@ export function StreakMock() {
 const FACTS = [
   { cat: "code", label: "Code", text: "Préfère le TypeScript et les fonctions pures.", tone: "text-[var(--accent-cool)]" },
   { cat: "photo", label: "Photo", text: "Shoote en RAW, garde les sets complets.", tone: "text-[var(--warm)]" },
-  { cat: "vie", label: "Vie", text: "Concert de M83 le 31/07 — Zénith.", tone: "text-[var(--accent-success)]" },
+  { cat: "vie", label: "Vie", text: "Concert de M83 le 31/07 · Zénith.", tone: "text-[var(--accent-success)]" },
 ] as const;
 
 export function MemoryMock() {
@@ -163,7 +163,7 @@ export function MemoryMock() {
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border-1)] bg-[var(--surface-2)]">
         <span className="w-2 h-2 rounded-full bg-[var(--ai-thinking)]" />
         <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-3)]">
-          cerveau — mémoire
+          cerveau · mémoire
         </span>
         <span className="ml-auto text-[9px] font-mono uppercase tracking-wider text-[var(--text-4)]">
           128 faits
@@ -220,7 +220,7 @@ export function GmailMock() {
       <div className="flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-success)]" />
         <span className="text-[9px] font-mono uppercase tracking-[0.18em] text-[var(--text-3)]">
-          gmail — tri automatique
+          gmail · tri automatique
         </span>
       </div>
       <div className="mt-3 space-y-2">
@@ -229,7 +229,7 @@ export function GmailMock() {
             ZÉ
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] text-[var(--text-1)] truncate">Zénith — accréditation M83</p>
+            <p className="text-[11px] text-[var(--text-1)] truncate">Zénith · accréditation M83</p>
             <p className="text-[9.5px] text-[var(--text-4)] truncate">Important · à traiter</p>
           </div>
           <span className="text-[9px] font-mono text-[var(--accent)] shrink-0">vu</span>
@@ -239,7 +239,7 @@ export function GmailMock() {
             NE
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] text-[var(--text-2)] truncate">Newsletter — offre objectifs</p>
+            <p className="text-[11px] text-[var(--text-2)] truncate">Newsletter · offre objectifs</p>
             <p className="text-[9.5px] text-[var(--text-4)] truncate">Lu · archivé</p>
           </div>
           <span className="text-[9px] font-mono text-[var(--text-4)] shrink-0">lu</span>
@@ -277,7 +277,7 @@ export function StreakDayMock() {
       </div>
       <div>
         <p className="text-[11.5px] text-[var(--text-1)] font-medium">
-          Problem #114 — Valid Parentheses
+          Problem #114 · Valid Parentheses
         </p>
         <p className="mt-1 text-[10px] leading-relaxed text-[var(--text-3)]">
           Bloqué sur l'approche pile → l'IA t'a montré le pattern, pas la solution.
@@ -293,20 +293,20 @@ export function MemoryFactMock() {
       <div className="flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)]" />
         <span className="text-[9px] font-mono uppercase tracking-[0.18em] text-[var(--text-3)]">
-          cerveau — récap
+          cerveau · récap
         </span>
       </div>
       <div className="mt-3 space-y-1.5">
         <div className="flex items-center gap-2 rounded-lg border border-[var(--border-1)] bg-[var(--surface-1)] px-3 py-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-[var(--warm)]" />
           <span className="text-[10.5px] text-[var(--text-2)]">
-            M83 shooté au Zénith — <span className="text-[var(--text-1)]">ajouté</span>
+            M83 shooté au Zénith · <span className="text-[var(--text-1)]">ajouté</span>
           </span>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-[var(--border-1)] bg-[var(--surface-1)] px-3 py-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)]" />
           <span className="text-[10.5px] text-[var(--text-2)]">
-            Préférence : RAW + sets complets — <span className="text-[var(--text-1)]">rappelé</span>
+            Préférence : RAW + sets complets · <span className="text-[var(--text-1)]">rappelé</span>
           </span>
         </div>
       </div>

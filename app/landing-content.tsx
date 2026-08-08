@@ -17,12 +17,12 @@ export const CAPABILITIES = [
   {
     n: "02",
     title: "Il se souvient de ce qui compte",
-    desc: "Faits, préférences, relations : une mémoire durable, consultable et éditable. Chaque réponse est personnalisée par ce que tu lui as confié — jamais par une hypothèse.",
+    desc: "Faits, préférences, relations : une mémoire durable, consultable et éditable. Chaque réponse est personnalisée par ce que tu lui as confié, jamais par une hypothèse.",
   },
   {
     n: "03",
     title: "Il te tient au courant",
-    desc: "Rappels récurrents, notifications push web et Android, brief du matin. Quand ça compte, il revient vers toi — sans jamais spammer.",
+    desc: "Rappels récurrents, notifications push, brief du matin. Quand ça compte, il revient vers toi, sans jamais spammer.",
   },
 ];
 
@@ -48,7 +48,7 @@ export const DAY_STEPS = [
   {
     time: "07:30",
     title: "Le brief. Il prépare ta journée.",
-    desc: "Rappels du jour, emails importants, agenda. Tout est trié et hiérarchisé avant que tu ouvres les yeux — tu décides juste par où commencer.",
+    desc: "Rappels du jour, emails importants, agenda. Tout est trié et hiérarchisé avant que tu ouvres les yeux, tu décides juste par où commencer.",
     accent: "var(--accent)",
     artifact: <BriefMock />,
   },
@@ -62,21 +62,21 @@ export const DAY_STEPS = [
   {
     time: "14:00",
     title: "Le shoot. Les photos rentrent, la méthode reste.",
-    desc: "Retour de concert : les 214 photos rejoignent le kanban. La sélection, le rendu, la date de livraison — chaque étape a sa place, rien ne se perd.",
+    desc: "Retour de concert : les 214 photos rejoignent le kanban. La sélection, le rendu, la date de livraison, chaque étape a sa place, rien ne se perd.",
     accent: "var(--warm)",
     artifact: <KanbanMock />,
   },
   {
     time: "21:30",
     title: "La série. Un problème par jour, zéro blocage.",
-    desc: "Le streak tient la discipline, l'IA débloque quand tu coinces — avec le pattern, pas la solution. Le code s'améliore sans que tu t'en aperçoives.",
+    desc: "Le streak tient la discipline, l'IA débloque quand tu coinces, avec le pattern, pas la solution. Le code s'améliore sans que tu t'en aperçoives.",
     accent: "var(--accent-success)",
     artifact: <StreakDayMock />,
   },
   {
     time: "23:00",
     title: "Le récap. Rien ne se perd dans la nuit.",
-    desc: "Ce qui compte est mémorisé, le brief de demain est prêt, les rappels sont programmés. Tu fermes l'écran — demain est déjà organisé.",
+    desc: "Ce qui compte est mémorisé, le brief de demain est prêt, les rappels sont programmés. Tu fermes l'écran, demain est déjà organisé.",
     accent: "var(--ai-thinking)",
     artifact: <MemoryFactMock />,
   },

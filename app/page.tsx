@@ -100,7 +100,7 @@ export default async function Home() {
             <p className="mx-auto mt-6 max-w-2xl text-[15px] sm:text-[16px] leading-relaxed text-[var(--text-2)]">
               Gmail, agenda, rappels, mémoire, recherche : BACKSTAGE branche l'IA sur
               <span className="text-[var(--text-1)]"> tes outils</span>, pas sur des promesses.
-              Tu parles, il agit — et il se souvient de qui tu es.
+              Tu parles, il agit, et il se souvient de qui tu es.
             </p>
           </Reveal>
 
@@ -128,12 +128,12 @@ export default async function Home() {
               <span className="w-1 h-1 rounded-full bg-[var(--border-3)]" aria-hidden />
               <span>Passkeys (WebAuthn)</span>
               <span className="w-1 h-1 rounded-full bg-[var(--border-3)]" aria-hidden />
-              <span>PWA · Android</span>
+              <span>PWA</span>
             </div>
           </Reveal>
         </div>
 
-        {/* Terminal — la signature */}
+        {/* Terminal, la signature */}
         <div className="max-w-3xl mx-auto w-full px-5 sm:px-8 pb-16 sm:pb-24">
           <Reveal delay={400}>
             <HeroTerminal />
@@ -183,13 +183,13 @@ export default async function Home() {
         <div className="max-w-4xl mx-auto w-full px-5 sm:px-8 py-20 sm:py-28">
           <Reveal>
             <p className="text-[11px] font-mono uppercase tracking-[0.25em] text-[var(--accent)]">
-              — Une journée avec BACKSTAGE —
+              · Une journée avec BACKSTAGE ·
             </p>
             <h2 className="mt-4 max-w-2xl text-3xl sm:text-5xl font-display font-black tracking-tight text-[var(--text-1)] text-balance">
               Défile avec moi. C'est ta journée, tenue par un seul outil.
             </h2>
             <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-[var(--text-2)]">
-              Du réveil au coucher, chaque moment a son geste — et BACKSTAGE tient
+              Du réveil au coucher, chaque moment a son geste, et BACKSTAGE tient
               la chaîne. Les interfaces ci-dessous sont celles du produit, en vrai.
             </p>
           </Reveal>
@@ -205,7 +205,7 @@ export default async function Home() {
         <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 py-20 sm:py-28">
           <Reveal>
             <p className="text-[11px] font-mono uppercase tracking-[0.25em] text-[var(--accent)]">
-              — Produit —
+              · Produit ·
             </p>
             <h2 className="mt-4 max-w-2xl text-3xl sm:text-5xl font-display font-black tracking-tight text-[var(--text-1)] text-balance">
               Un poste de contrôle unique pour ton travail et ta vie.
@@ -241,7 +241,7 @@ export default async function Home() {
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div>
                 <p className="text-[11px] font-mono uppercase tracking-[0.25em] text-[var(--accent)]">
-                  — Modules —
+                  · Modules ·
                 </p>
                 <h2 className="mt-4 text-3xl sm:text-4xl font-display font-black tracking-tight text-[var(--text-1)] text-balance">
                   Des outils qui ont déjà ta méthode.
@@ -318,14 +318,14 @@ export default async function Home() {
         <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 py-20 sm:py-28">
           <Reveal>
             <p className="text-[11px] font-mono uppercase tracking-[0.25em] text-[var(--accent)]">
-              — Vie privée —
+              · Vie privée ·
             </p>
             <h2 className="mt-4 max-w-xl text-3xl sm:text-4xl font-display font-black tracking-tight text-[var(--text-1)] text-balance">
               Un assistant qui ne fait rien dans ton dos.
             </h2>
             <p className="mt-4 max-w-lg text-[14px] leading-relaxed text-[var(--text-2)]">
               L'accès à tes comptes est explicite, chaque action est tracée, et la
-              suppression est réelle — pas un bouton décoratif.
+              suppression est réelle, pas un bouton décoratif.
             </p>
           </Reveal>
 
@@ -357,7 +357,7 @@ export default async function Home() {
               Ton cerveau a besoin d'un backstage.
             </h2>
             <p className="mx-auto mt-5 max-w-lg text-[14px] leading-relaxed text-[var(--text-2)]">
-              Entre ta série de code, ta prochaine livraison et le concert de vendredi —
+              Entre ta série de code, ta prochaine livraison et le concert de vendredi,
               un seul endroit pour tout garder en ordre.
             </p>
             <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -388,7 +388,7 @@ export default async function Home() {
               className="w-4 h-4 object-contain"
             />
             <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-4)]">
-              Backstage — second cerveau personnel
+              Backstage · second cerveau personnel
             </span>
           </div>
           <div className="flex items-center gap-6">
