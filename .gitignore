@@ -40,10 +40,6 @@ yarn-error.log*
 # personal data
 /data
 
-# design/product notes
-DESIGN.md
-PRODUCT.md
-
 # vercel
 .vercel
 
