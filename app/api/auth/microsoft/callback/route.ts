@@ -12,9 +12,12 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
   const error = searchParams.get("error");
+  const errorDescription = searchParams.get("error_description");
 
   if (error) {
-    return NextResponse.json({ error: `Microsoft OAuth error: ${error}` }, { status: 400 });
+    const detail = errorDescription ? ` (${errorDescription})` : "";
+    console.error(`[api/auth/microsoft/callback] OAuth error: ${error}${detail}`);
+    return NextResponse.json({ error: `Microsoft OAuth error: ${error}${detail}` }, { status: 400 });
   }
 
   if (!code) {
