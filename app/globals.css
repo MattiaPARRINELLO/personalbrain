@@ -231,6 +231,15 @@ textarea::placeholder {
     background-size: 16px 16px;
   }
 
+  .dot-grid-row {
+    opacity: 0.05;
+    transition: opacity 600ms ease;
+  }
+
+  .dot-grid-row-on {
+    opacity: 0.5;
+  }
+
   .shimmer {
     background: linear-gradient(
       90deg,

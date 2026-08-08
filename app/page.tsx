@@ -4,10 +4,9 @@ import { getLeetcode, getMemory, getPhotoShoots } from "@/lib/storage";
 import { Reveal } from "@/components/landing/Reveal";
 import { HeroTerminal } from "@/components/landing/HeroTerminal";
 import { DayTimeline } from "@/components/landing/DayTimeline";
-import { ScrollStats } from "@/components/landing/ScrollStats";
-import { TiltSection } from "@/components/landing/TiltSection";
+import { NarrativeStats } from "@/components/landing/NarrativeStats";
 import { ScrollTitle } from "@/components/landing/ScrollTitle";
-import { DotGrid3D } from "@/components/landing/DotGrid3D";
+import { DotGrid } from "@/components/landing/DotGrid";
 import {
   KanbanMock,
   StreakMock,
@@ -32,7 +31,7 @@ export default async function Home() {
   return (
     <main className="min-h-screen flex flex-col overflow-x-hidden">
       <ScrollTitle />
-      <DotGrid3D />
+      <DotGrid />
       {/* ================= Header ================= */}
       <header className="sticky top-0 z-50 border-b border-[var(--border-1)] bg-[var(--background)]/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 h-14 flex items-center justify-between">
@@ -168,14 +167,14 @@ export default async function Home() {
       <section>
         <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 py-12 sm:py-14">
           <Reveal>
-            <ScrollStats stats={STATS} />
+            <NarrativeStats stats={STATS} />
           </Reveal>
         </div>
       </section>
 
       {/* ================= Une journée ================= */}
       <section id="journee" className="scroll-mt-20 border-t border-[var(--border-1)]">
-        <TiltSection className="max-w-4xl mx-auto w-full px-5 sm:px-8 py-20 sm:py-28">
+        <div className="max-w-4xl mx-auto w-full px-5 sm:px-8 py-20 sm:py-28">
           <Reveal>
             <p className="text-[11px] font-mono uppercase tracking-[0.25em] text-[var(--accent)]">
               · Une journée avec BACKSTAGE ·
@@ -192,12 +191,12 @@ export default async function Home() {
           <div className="mt-16">
             <DayTimeline steps={DAY_STEPS} />
           </div>
-        </TiltSection>
+        </div>
       </section>
 
       {/* ================= Produit / Capacités ================= */}
       <section id="produit" className="scroll-mt-20">
-        <TiltSection className="max-w-6xl mx-auto w-full px-5 sm:px-8 py-20 sm:py-28">
+        <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 py-20 sm:py-28">
           <Reveal>
             <p className="text-[11px] font-mono uppercase tracking-[0.25em] text-[var(--accent)]">
               · Produit ·
@@ -226,12 +225,12 @@ export default async function Home() {
               </Reveal>
             ))}
           </div>
-        </TiltSection>
+        </div>
       </section>
 
       {/* ================= Modules ================= */}
       <section id="modules" className="scroll-mt-20 border-t border-[var(--border-1)] bg-[var(--surface-1)]/40">
-        <TiltSection className="max-w-6xl mx-auto w-full px-5 sm:px-8 py-20 sm:py-28">
+        <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 py-20 sm:py-28">
           <Reveal>
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div>
@@ -305,12 +304,12 @@ export default async function Home() {
               </div>
             </Reveal>
           </div>
-        </TiltSection>
+        </div>
       </section>
 
       {/* ================= Vie privée ================= */}
       <section id="vie-privee" className="scroll-mt-20">
-        <TiltSection className="max-w-6xl mx-auto w-full px-5 sm:px-8 py-20 sm:py-28">
+        <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 py-20 sm:py-28">
           <Reveal>
             <p className="text-[11px] font-mono uppercase tracking-[0.25em] text-[var(--accent)]">
               · Vie privée ·
@@ -341,7 +340,7 @@ export default async function Home() {
               </Reveal>
             ))}
           </div>
-        </TiltSection>
+        </div>
       </section>
 
       {/* ================= CTA final ================= */}
