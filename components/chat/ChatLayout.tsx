@@ -6,7 +6,6 @@ import { SessionSidebar } from "@/components/chat/SessionSidebar";
 import { ContextPanel } from "@/components/layout/ContextPanel";
 import { ChatProvider } from "@/lib/chat-context";
 import { MessageSquare } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export function ChatLayout() {
   const [activeSessionId, setActiveSessionId] = useState<string>("");

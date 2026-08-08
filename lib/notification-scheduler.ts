@@ -48,7 +48,7 @@ async function markReminderNotified(id: string): Promise<void> {
   }
 }
 
-export async function sendPushToAll(payload: string, tag?: string): Promise<boolean> {
+export async function sendPushToAll(payload: string, _tag?: string): Promise<boolean> {
   const subs = await getSubscriptions();
   let webSent = false;
   if (subs.length > 0) {

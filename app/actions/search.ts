@@ -5,7 +5,6 @@ import { requireSession } from "@/lib/session";
 import {
   getConcerts,
   getMemory,
-  getEmails,
   getReminders,
   getWatchLater,
   getAccreditations,

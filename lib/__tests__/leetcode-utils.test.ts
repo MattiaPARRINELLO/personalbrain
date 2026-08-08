@@ -5,10 +5,6 @@ function ev(start: string) {
   return { id: "e1", title: "t", date: start, type: "meeting" as const };
 }
 
-function ms(date: string) {
-  return new Date(date).getTime();
-}
-
 describe("findFreeSlots", () => {
   it("retourne un slot jusqu'à 23:59 si aucun event", () => {
     const now = new Date("2026-07-12T10:00:00");

@@ -4,7 +4,7 @@ import { requireSession } from "@/lib/session";
 
 import { getLeetcode, saveLeetcode, addLeetcodeExercise, logActivity, getCalendar } from "@/lib/storage";
 import { fetchLeetCodeProfile } from "@/lib/leetcode-api";
-import type { LeetcodeData, LeetcodeExercise, CalendarEvent } from "@/lib/types";
+import type { LeetcodeData, LeetcodeExercise } from "@/lib/types";
 import { findFreeSlots } from "@/lib/leetcode-utils";
 
 export async function loadLeetcode(): Promise<LeetcodeData> {

@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Mock } from "vitest";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);

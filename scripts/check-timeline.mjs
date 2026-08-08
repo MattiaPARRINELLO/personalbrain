@@ -8,7 +8,6 @@ await page.evaluate(() => document.querySelector("#journee")?.scrollIntoView());
 await page.waitForTimeout(800);
 const data = await page.evaluate(() => {
   const section = document.querySelector("#journee");
-  const line = section?.querySelector(".absolute.left-\\[52px\\]") ;
   // récupère la ligne de progression via sa hauteur animée
   const rows = Array.from(section?.querySelectorAll(".grid-cols-\\[auto_1fr\\]") ?? []);
   const rects = rows.map((r) => {

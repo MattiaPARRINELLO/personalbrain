@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
-import { Camera, ArrowRight, Image } from "lucide-react";
+import { Camera, ArrowRight, Image as ImageIcon } from "lucide-react";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { loadPhotoShoots } from "@/app/actions/photography";
@@ -104,7 +104,7 @@ export function AccreditationsWidget() {
                     <span>{formatDate(shoot.date)}</span>
                     {shoot.photosSent != null && (
                       <span className="flex items-center gap-1">
-                        <Image className="w-2.5 h-2.5" />
+                        <ImageIcon className="w-2.5 h-2.5" />
                         {shoot.photosSent}
                       </span>
                     )}

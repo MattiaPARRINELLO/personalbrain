@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -20,7 +20,6 @@ const CACHE_FILE = path.join(DATA_DIR, "server-cache.json");
 describe("server-cache", () => {
   beforeAll(() => {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-    const origCwd = process.cwd;
     process.cwd = () => DIR;
   });
 
