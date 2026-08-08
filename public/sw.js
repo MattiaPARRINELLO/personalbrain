@@ -40,9 +40,10 @@ self.addEventListener("pushsubscriptionchange", (event) => {
       })
   );
 });
-const CACHE = "backstage-v4";
+const CACHE = "backstage-v5";
 const STATIC_ASSETS = [
   "/",
+  "/login",
   "/offline",
   "/manifest.json",
   "/backstage-logo-simple.png",

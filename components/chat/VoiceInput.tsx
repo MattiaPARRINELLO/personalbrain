@@ -141,7 +141,7 @@ export function VoiceInput({ onResult, onInterim, onListeningChange, disabled }:
       type="button"
       onClick={toggleListening}
       disabled={disabled}
-      className={`shrink-0 w-8 h-8 rounded-lg border transition-colors duration-200 flex items-center justify-center ${
+      className={`shrink-0 w-10 h-10 rounded-lg border transition-colors duration-200 flex items-center justify-center ${
         listening
           ? "border-[var(--danger)]/50 bg-[var(--danger)]/20 text-[var(--danger)] animate-pulse"
           : "border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-[var(--border-2)]"

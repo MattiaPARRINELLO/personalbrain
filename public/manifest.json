@@ -2,10 +2,10 @@
   "name": "BACKSTAGE",
   "short_name": "BACKSTAGE",
   "description": "Second cerveau IA personnel — code, photo, mémoire",
-  "start_url": "/",
+  "start_url": "/chat",
   "display": "standalone",
   "background_color": "#0a0a0b",
-  "theme_color": "#a5b4fc",
+  "theme_color": "#0a0a0b",
   "orientation": "portrait-primary",
   "categories": [
     "productivity",

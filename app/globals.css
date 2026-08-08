@@ -97,6 +97,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: "ss01", "cv11";
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {

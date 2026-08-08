@@ -76,6 +76,18 @@ export function CommandPalette() {
     return () => document.removeEventListener("keydown", handler);
   }, [open]);
 
+  /* ----- ouverture depuis un bouton (mobile) ----- */
+  useEffect(() => {
+    const openPalette = () => {
+      setInput("");
+      setFeedback(null);
+      setSelectedIdx(0);
+      setOpen(true);
+    };
+    window.addEventListener("backstage:open-palette", openPalette);
+    return () => window.removeEventListener("backstage:open-palette", openPalette);
+  }, []);
+
   /* ----- auto-focus on open ----- */
   useEffect(() => {
     if (open) {
@@ -285,10 +297,10 @@ export function CommandPalette() {
               setInput("");
               setFeedback(null);
             }}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
+            className="w-10 h-10 -mr-2 rounded-lg flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
             aria-label="Fermer"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 

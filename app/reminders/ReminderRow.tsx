@@ -73,17 +73,19 @@ export function ReminderRow({
       <div className="shrink-0 flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <button
           onClick={onEdit}
-          className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] transition-colors"
+          className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-3)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] transition-colors"
           title="Modifier"
+          aria-label="Modifier le rappel"
         >
-          <Pencil className="w-3 h-3" />
+          <Pencil className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={onDelete}
-          className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors"
+          className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-3)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors"
           title="Supprimer"
+          aria-label="Supprimer le rappel"
         >
-          <Trash2 className="w-3 h-3" />
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
     </li>
