@@ -188,7 +188,11 @@ export async function getMicrosoftAccessToken(): Promise<string> {
   return tokens.access_token;
 }
 
-export async function microsoftGraphFetch<T>(graphPath: string, init?: RequestInit): Promise<T> {
+export async function microsoftGraphFetch<T>(
+  graphPath: string,
+  init?: RequestInit,
+  opts?: { notFoundAsNull?: boolean }
+): Promise<T> {
   const accessToken = await getMicrosoftAccessToken();
 
   const res = await fetch(`${GRAPH_BASE}${graphPath}`, {
@@ -200,6 +204,8 @@ export async function microsoftGraphFetch<T>(graphPath: string, init?: RequestIn
     signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
   });
 
+  if (res.status === 204) return null as T;
+  if (opts?.notFoundAsNull && res.status === 404) return null as T;
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Microsoft Graph error ${res.status}: ${text.slice(0, 300)}`);
@@ -255,5 +261,59 @@ export async function createMicrosoftTodoTask(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }
+  );
+}
+
+export type MicrosoftUpdateTaskInput = {
+  title?: string;
+  // null supprime la date côté MS
+  dueAt?: string | null;
+  notes?: string | null;
+  status?: "notStarted" | "completed";
+};
+
+export async function updateMicrosoftTodoTask(
+  listId: string,
+  taskId: string,
+  input: MicrosoftUpdateTaskInput
+): Promise<MicrosoftTodoTask> {
+  const body: Record<string, unknown> = {};
+  if (input.title !== undefined) body.title = input.title;
+  if (input.dueAt !== undefined) {
+    body.dueDateTime = input.dueAt
+      ? { dateTime: new Date(input.dueAt).toISOString(), timeZone: "UTC" }
+      : null;
+  }
+  if (input.notes !== undefined) {
+    body.body = input.notes ? { contentType: "text", content: input.notes } : null;
+  }
+  if (input.status !== undefined) body.status = input.status;
+
+  return microsoftGraphFetch<MicrosoftTodoTask>(
+    `/me/todo/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+export async function deleteMicrosoftTodoTask(listId: string, taskId: string): Promise<void> {
+  await microsoftGraphFetch<null>(
+    `/me/todo/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`,
+    { method: "DELETE" }
+  );
+}
+
+// Retourne null si la tâche n'existe plus (supprimée côté MS).
+export async function getMicrosoftTodoTask(
+  listId: string,
+  taskId: string
+): Promise<MicrosoftTodoTask | null> {
+  return microsoftGraphFetch<MicrosoftTodoTask | null>(
+    `/me/todo/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`,
+    undefined,
+    { notFoundAsNull: true }
   );
 }

@@ -366,8 +366,11 @@ async function readOrCreateUnlocked<T>(filename: string, fallback: T): Promise<T
       await writeJsonAtomicUnlocked(filename, recovered);
       return recovered;
     }
-    await writeJsonAtomicUnlocked(filename, fallback);
-    return fallback;
+    // Clone du fallback : les mutateurs (mutateJson) peuvent le muter en place,
+    // et il ne doit JAMAIS devenir un état partagé entre deux appels.
+    const fresh = structuredClone(fallback);
+    await writeJsonAtomicUnlocked(filename, fresh);
+    return fresh;
   }
 }
 
@@ -380,8 +383,9 @@ async function readOrCreate<T>(filename: string, fallback: T): Promise<T> {
       await writeJsonAtomic(filename, recovered);
       return recovered;
     }
-    await writeJsonAtomic(filename, fallback);
-    return fallback;
+    const fresh = structuredClone(fallback);
+    await writeJsonAtomic(filename, fresh);
+    return fresh;
   }
 }
 
@@ -959,6 +963,7 @@ export async function addReminder(input: {
     dueAt: input.dueAt,
     status: "pending",
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     recurrence: input.recurrence,
   };
   await mutateJson<RemindersData>("reminders.json", defaultReminders, (data) => {
@@ -967,12 +972,12 @@ export async function addReminder(input: {
   return reminder;
 }
 
-export async function updateReminder(id: string, updates: Partial<Pick<Reminder, "title" | "notes" | "dueAt" | "status" | "notifiedAt" | "recurrence">>): Promise<Reminder | null> {
+export async function updateReminder(id: string, updates: Partial<Pick<Reminder, "title" | "notes" | "dueAt" | "status" | "notifiedAt" | "recurrence" | "microsoftTaskId" | "microsoftListId">>): Promise<Reminder | null> {
   let updated: Reminder | null = null;
   await mutateJson<RemindersData>("reminders.json", defaultReminders, (data) => {
     const idx = data.reminders.findIndex((r) => r.id === id);
     if (idx < 0) return null;
-    data.reminders[idx] = { ...data.reminders[idx], ...updates };
+    data.reminders[idx] = { ...data.reminders[idx], ...updates, updatedAt: new Date().toISOString() };
     updated = data.reminders[idx];
   });
   return updated;

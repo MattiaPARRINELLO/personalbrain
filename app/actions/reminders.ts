@@ -12,12 +12,12 @@ import {
   logActivity,
 } from "@/lib/storage";
 import type { Reminder, RemindersData } from "@/lib/types";
-import { invalidateServerCachePattern } from "@/lib/server-cache";
 import {
-  createMicrosoftTodoTask,
-  getDefaultTodoListId,
-  isMicrosoftLinked,
-} from "@/lib/microsoft-client";
+  pushNewReminderToMicrosoft,
+  pushReminderUpdateToMicrosoft,
+  pushReminderDeleteToMicrosoft,
+  reconcileRemindersWithMicrosoft,
+} from "@/lib/reminder-sync";
 
 const recurrenceSchema = z.enum(["daily", "weekly", "monthly"]);
 
@@ -42,6 +42,8 @@ const updateReminderSchema = z
 
 export async function loadReminders(): Promise<RemindersData> {
   await requireSession();
+  // Applique les changements faits côté Microsoft To Do (sync bidirectionnelle).
+  await reconcileRemindersWithMicrosoft();
   return getReminders();
 }
 
@@ -58,29 +60,9 @@ export async function createReminder(input: {
   }
   const reminder = await addReminder(parsed.data);
   await logActivity("reminder_created", `Rappel créé : ${reminder.title}`, reminder.dueAt);
-  await syncReminderToMicrosoft(reminder);
   revalidatePath("/reminders");
-  return reminder;
-}
-
-// Crée la tâche équivalente dans Microsoft To Do (qui se sync vers Samsung Reminder).
-// Fire-and-forget : la création locale ne doit jamais échouer à cause de MS.
-async function syncReminderToMicrosoft(reminder: Reminder): Promise<void> {
-  try {
-    if (!(await isMicrosoftLinked())) return;
-    const listId = await getDefaultTodoListId();
-    await createMicrosoftTodoTask(listId, {
-      title: reminder.title,
-      dueAt: reminder.dueAt,
-      notes: reminder.notes,
-    });
-    invalidateServerCachePattern(/^todo:tasks/);
-  } catch (err) {
-    console.warn(
-      "[reminders] Sync Microsoft To Do échouée:",
-      err instanceof Error ? err.message : err
-    );
-  }
+  // Crée la tâche équivalente dans Microsoft To Do (→ Samsung Reminder) et la lie.
+  return pushNewReminderToMicrosoft(reminder);
 }
 
 export async function editReminder(
@@ -94,7 +76,11 @@ export async function editReminder(
     throw new Error(parsed.error.issues[0]?.message ?? "Payload invalide");
   }
   const r = await updateReminder(id, parsed.data);
-  if (r) await logActivity("reminder_updated", `Rappel modifié : ${r.title}`, r.status);
+  if (r) {
+    await logActivity("reminder_updated", `Rappel modifié : ${r.title}`, r.status);
+    // Propage la modification vers Microsoft To Do (titre, date, notes, statut).
+    await pushReminderUpdateToMicrosoft(r);
+  }
   revalidatePath("/reminders");
   return r;
 }
@@ -102,6 +88,10 @@ export async function editReminder(
 export async function removeReminder(id: string): Promise<boolean> {
   await requireSession();
   if (!id || typeof id !== "string") throw new Error("Identifiant requis");
+  // Supprime d'abord côté MS (si lié), puis localement.
+  const data = await getReminders();
+  const target = data.reminders.find((r) => r.id === id);
+  if (target) await pushReminderDeleteToMicrosoft(target);
   const ok = await deleteReminder(id);
   if (ok) await logActivity("reminder_deleted", "Rappel supprimé", id);
   revalidatePath("/reminders");
@@ -117,6 +107,7 @@ export async function markReminderStatus(
   const parsedStatus = reminderStatusSchema.safeParse(status);
   if (!parsedStatus.success) throw new Error("Statut invalide");
   const r = await updateReminder(id, { status: parsedStatus.data });
+  if (r) await pushReminderUpdateToMicrosoft(r);
   revalidatePath("/reminders");
   return r;
 }
