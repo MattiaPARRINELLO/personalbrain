@@ -1,18 +1,22 @@
 "use client";
 
 import { useState, useTransition, useEffect, useMemo } from "react";
-import { Plus, Pencil, Trash2, Check, X, Brain, Code2, Camera, Heart, User, Search, Sparkles, BarChart3, Share2 } from "lucide-react";
+import { Plus, Brain, Search, Sparkles, Share2, Code2, Camera, Heart, User } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader, EmptyState } from "@/components/layout/Chrome";
-import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Input, Textarea } from "@/components/ui/Input";
-import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
 import { loadBrain, loadMemoryRelationships, rememberFact, editMemoryFact, forgetFact } from "@/app/actions/brain";
 import dynamic from "next/dynamic";
-import type { MemoryData, MemoryCategory, MemoryFact, MemoryRelationship } from "@/lib/types";
+import type { MemoryData, MemoryCategory, MemoryRelationship } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { categoryMeta, ALL_FILTERS, groupByCategory, type Filter } from "./memory-utils";
+import { StatCard } from "./StatCard";
+import { ProfileCard } from "./ProfileCard";
+import { FactRow } from "./FactRow";
+import { EditFactForm, AddFactForm } from "./FactForms";
 
 const KnowledgeGraph = dynamic(
   () => import("@/components/brain/KnowledgeGraph").then((m) => ({ default: m.KnowledgeGraph })),
@@ -25,24 +29,6 @@ const KnowledgeGraph = dynamic(
     ),
   }
 );
-import { cn } from "@/lib/utils";
-
-const categoryMeta: Record<MemoryCategory, { label: string; icon: typeof Code2; tone: "accent" | "warm" | "success" | "muted" }> = {
-  dev: { label: "Code", icon: Code2, tone: "accent" },
-  photo: { label: "Photo", icon: Camera, tone: "warm" },
-  life: { label: "Vie", icon: Heart, tone: "success" },
-  preference: { label: "Préférence", icon: User, tone: "muted" },
-};
-
-type Filter = "all" | MemoryCategory;
-
-const ALL_FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "Tout" },
-  { id: "dev", label: "Code" },
-  { id: "photo", label: "Photo" },
-  { id: "life", label: "Vie" },
-  { id: "preference", label: "Préférences" },
-];
 
 export default function BrainPage() {
   const [data, setData] = useState<MemoryData | null>(null);
@@ -344,216 +330,9 @@ export default function BrainPage() {
   );
 }
 
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  tone,
-}: {
-  label: string;
-  value: number;
-  icon: typeof BarChart3;
-  tone: "accent" | "warm" | "success" | "muted";
-}) {
-  const toneClass =
-    tone === "accent"
-      ? "text-[var(--accent-soft)] bg-[var(--accent)]/10 border-[var(--accent)]/20"
-      : tone === "warm"
-        ? "text-[var(--warm)] bg-[var(--warm)]/10 border-[var(--warm)]/20"
-        : tone === "success"
-          ? "text-[var(--accent-success)] bg-[var(--accent-success)]/10 border-[var(--accent-success)]/20"
-          : "text-[var(--text-2)] bg-[var(--surface-2)]/60 border-[var(--border-2)]";
-  return (
-    <div className="rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)]/40 p-3.5 flex items-center gap-3 hover:border-[var(--border-2)] transition-colors">
-      <div className={cn("w-8 h-8 rounded-lg border flex items-center justify-center shrink-0", toneClass)}>
-        <Icon className="w-4 h-4" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-3)] font-mono">
-          {label}
-        </p>
-        <p className="text-[18px] font-semibold text-[var(--text-1)] leading-tight tabular-nums">
-          {value}
-        </p>
-      </div>
-    </div>
-  );
-}
 
-function groupByCategory(facts: MemoryFact[]): Record<MemoryCategory, MemoryFact[]> {
-  const out: Record<MemoryCategory, MemoryFact[]> = {
-    dev: [],
-    photo: [],
-    life: [],
-    preference: [],
-  };
-  for (const f of facts) out[f.category].push(f);
-  for (const k of Object.keys(out) as MemoryCategory[]) {
-    out[k].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-  }
-  return out;
-}
 
-function ProfileCard({ profile }: { profile: MemoryData["profile"] }) {
-  return (
-    <div className="mb-6 p-5 rounded-2xl border border-[var(--border-1)] bg-[var(--surface-1)]">
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-xl bg-[var(--surface-2)] border border-[var(--border-2)] flex items-center justify-center text-[var(--accent)] font-semibold text-[16px]">
-          {profile.name.slice(0, 1).toUpperCase()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-3)] font-mono">Profil</p>
-          <h3 className="text-[15px] font-medium text-[var(--text-1)] mt-0.5">{profile.name}</h3>
-          {profile.preferences.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2.5">
-              {profile.preferences.map((p) => (
-                <Pill key={p} tone="muted" dot>
-                  {p}
-                </Pill>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function FactRow({ fact, onEdit, onDelete }: { fact: MemoryFact; onEdit: () => void; onDelete: () => void }) {
-  return (
-    <div className="group flex items-start gap-3 p-4 rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)]/40 hover:border-[var(--border-2)] hover:bg-[var(--surface-2)]/50 transition-all duration-200">
-      <span className="shrink-0 w-1 self-stretch rounded-full bg-[var(--accent)]/30" />
-      <div className="flex-1 min-w-0">
-        <p className="text-[13.5px] text-[var(--text-1)] leading-relaxed">
-          {fact.content}
-        </p>
-        {fact.source === "auto-extract" && fact.confidence !== undefined && (
-          <p className="text-[10px] text-[var(--text-4)] font-mono mt-1.5 uppercase tracking-wider">
-            mémorisé auto · confiance {Math.round(fact.confidence * 100)}%
-          </p>
-        )}
-      </div>
-      <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <IconButton label="Modifier" onClick={onEdit}>
-          <Pencil className="w-3 h-3" />
-        </IconButton>
-        <IconButton label="Supprimer" tone="danger" onClick={onDelete}>
-          <Trash2 className="w-3 h-3" />
-        </IconButton>
-      </div>
-    </div>
-  );
-}
 
-function EditFactForm({
-  fact,
-  onSave,
-  onCancel,
-}: {
-  fact: MemoryFact;
-  onSave: (id: string, content: string, category: MemoryCategory) => void;
-  onCancel: () => void;
-}) {
-  const [content, setContent] = useState(fact.content);
-  const [category, setCategory] = useState<MemoryCategory>(fact.category);
 
-  return (
-    <div className="p-4 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 fade-in">
-      <Textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        rows={2}
-      />
-      <div className="flex items-center justify-between mt-3 gap-2">
-        <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(categoryMeta) as MemoryCategory[]).map((c) => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider border transition-colors",
-                category === c
-                  ? "border-[var(--accent)]/40 text-[var(--accent)] bg-[var(--accent)]/10"
-                  : "border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)]"
-              )}
-            >
-              {categoryMeta[c].label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <Button variant="ghost" size="sm" onClick={onCancel} leftIcon={<X className="w-3.5 h-3.5" />}>
-            Annuler
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => onSave(fact.id, content, category)}
-            disabled={!content.trim()}
-            leftIcon={<Check className="w-3.5 h-3.5" />}
-          >
-            Sauver
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function AddFactForm({
-  onCancel,
-  onSubmit,
-}: {
-  onCancel: () => void;
-  onSubmit: (content: string, category: MemoryCategory) => void;
-}) {
-  const [content, setContent] = useState("");
-  const [category, setCategory] = useState<MemoryCategory>("life");
-
-  return (
-    <div className="mb-6 p-4 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 fade-in">
-      <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--accent)] font-mono mb-3">
-        Nouveau fait à mémoriser
-      </p>
-      <Textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="Ex : Préfère coder en TypeScript avec des fonctions pures."
-        rows={2}
-        autoFocus
-      />
-      <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
-        <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(categoryMeta) as MemoryCategory[]).map((c) => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider border transition-colors",
-                category === c
-                  ? "border-[var(--accent)]/40 text-[var(--accent)] bg-[var(--accent)]/10"
-                  : "border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)]"
-              )}
-            >
-              {categoryMeta[c].label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            Annuler
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => onSubmit(content, category)}
-            disabled={!content.trim()}
-            leftIcon={<Plus className="w-3.5 h-3.5" />}
-          >
-            Mémoriser
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
