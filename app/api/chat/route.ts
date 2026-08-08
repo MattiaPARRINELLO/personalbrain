@@ -13,40 +13,7 @@ import { getModel } from "@/lib/config";
 import type { ChatMessage, MemoryCategory, Accreditation } from "@/lib/types";
 import { autoExtractMemoryFacts } from "@/app/actions/brain";
 import { getSession } from "@/lib/session";
-
-const rateLimitMap = new Map<string, { tokens: number; lastRefill: number }>();
-const RATE_LIMIT_MAX = 30;
-const RATE_LIMIT_WINDOW_MS = 60_000;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const existing = rateLimitMap.get(ip);
-
-  if (!existing) {
-    rateLimitMap.set(ip, { tokens: RATE_LIMIT_MAX - 1, lastRefill: now });
-    return true;
-  }
-
-  const elapsed = now - existing.lastRefill;
-  const refill = Math.floor((elapsed / RATE_LIMIT_WINDOW_MS) * RATE_LIMIT_MAX);
-  if (refill > 0) {
-    existing.tokens = Math.min(existing.tokens + refill, RATE_LIMIT_MAX);
-    existing.lastRefill = now;
-  }
-
-  if (existing.tokens <= 0) return false;
-  existing.tokens--;
-  return true;
-}
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, bucket] of rateLimitMap) {
-    if (now - bucket.lastRefill > RATE_LIMIT_WINDOW_MS * 2) {
-      rateLimitMap.delete(ip);
-    }
-  }
-}, 60_000).unref();
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const tools: UnifiedTool[] = [
   {
