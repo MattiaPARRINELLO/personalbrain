@@ -40,9 +40,10 @@ self.addEventListener("pushsubscriptionchange", (event) => {
       })
   );
 });
-const CACHE = "backstage-v3";
+const CACHE = "backstage-v4";
 const STATIC_ASSETS = [
   "/",
+  "/offline",
   "/manifest.json",
   "/backstage-logo-simple.png",
   "/icons/icon-192.png",
@@ -146,49 +147,24 @@ self.addEventListener("fetch", (event) => {
 
   if (url.pathname.startsWith("/api/")) return;
 
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        const networkFetch = fetch(event.request).then((res) => {
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE).then((cache) => cache.put(event.request, clone));
-          }
-          return res;
-        }).catch(() => caches.match("/"));
-        return cached || networkFetch;
-      })
-    );
-    return;
-  }
-
-  if (
-    url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/icons/") ||
-    url.pathname.startsWith("/fonts/") ||
-    url.pathname.endsWith(".png") ||
-    url.pathname.endsWith(".svg") ||
-    url.pathname.endsWith(".ico") ||
-    url.pathname.endsWith(".woff2")
-  ) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        const networkFetch = fetch(event.request)
-          .then((res) => {
-            if (res.ok) {
-              const clone = res.clone();
-              caches.open(CACHE).then((cache) => cache.put(event.request, clone));
-            }
-            return res;
-          })
-          .catch(() => cached || Response.error());
-        return cached || networkFetch;
-      })
-    );
-    return;
-  }
-
+  // Network-first : le reseau prime toujours, le cache n'est qu'un fallback
+  // offline. Le cache-first sur les navigations servait un vieux HTML dont
+  // les chunks /_next/static/<buildId> n'existaient plus apres recompilation
+  // -> le client Next rechargeait la page en boucle.
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request).then((cached) => cached || Response.error()))
+    fetch(event.request)
+      .then((res) => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, clone));
+        }
+        return res;
+      })
+      .catch(() =>
+        caches
+          .match(event.request)
+          .then((cached) => cached || caches.match("/offline"))
+          .then((fallback) => fallback || Response.error())
+      )
   );
 });
