@@ -12,6 +12,12 @@ import {
   logActivity,
 } from "@/lib/storage";
 import type { Reminder, RemindersData } from "@/lib/types";
+import { invalidateServerCachePattern } from "@/lib/server-cache";
+import {
+  createMicrosoftTodoTask,
+  getDefaultTodoListId,
+  isMicrosoftLinked,
+} from "@/lib/microsoft-client";
 
 const recurrenceSchema = z.enum(["daily", "weekly", "monthly"]);
 
@@ -52,8 +58,29 @@ export async function createReminder(input: {
   }
   const reminder = await addReminder(parsed.data);
   await logActivity("reminder_created", `Rappel créé : ${reminder.title}`, reminder.dueAt);
+  await syncReminderToMicrosoft(reminder);
   revalidatePath("/reminders");
   return reminder;
+}
+
+// Crée la tâche équivalente dans Microsoft To Do (qui se sync vers Samsung Reminder).
+// Fire-and-forget : la création locale ne doit jamais échouer à cause de MS.
+async function syncReminderToMicrosoft(reminder: Reminder): Promise<void> {
+  try {
+    if (!(await isMicrosoftLinked())) return;
+    const listId = await getDefaultTodoListId();
+    await createMicrosoftTodoTask(listId, {
+      title: reminder.title,
+      dueAt: reminder.dueAt,
+      notes: reminder.notes,
+    });
+    invalidateServerCachePattern(/^todo:tasks/);
+  } catch (err) {
+    console.warn(
+      "[reminders] Sync Microsoft To Do échouée:",
+      err instanceof Error ? err.message : err
+    );
+  }
 }
 
 export async function editReminder(
