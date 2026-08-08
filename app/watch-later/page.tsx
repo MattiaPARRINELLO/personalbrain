@@ -1,27 +1,12 @@
 "use client";
 
 import { useEffect, useState, useTransition, useMemo, useRef, useCallback } from "react";
-import {
-  Plus,
-  ExternalLink,
-  Trash2,
-  Play,
-  FileText,
-  Image as ImageIcon,
-  Music2,
-  Globe,
-  Filter,
-  X,
-  Check,
-  Search,
-  GripVertical,
-} from "lucide-react";
+import { Plus, Search, Play, Filter } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader, EmptyState } from "@/components/layout/Chrome";
-import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Input, Textarea } from "@/components/ui/Input";
+import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
 import {
   loadWatchLater,
@@ -31,26 +16,9 @@ import {
 } from "@/app/actions/watch-later";
 import type { WatchLaterCategory, WatchLaterItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { formatRelative } from "@/lib/date";
-
-const categoryMeta: Record<WatchLaterCategory, { label: string; icon: typeof Play; tone: "accent" | "warm" | "success" | "muted" | "danger" }> = {
-  video: { label: "Vidéos", icon: Play, tone: "accent" },
-  article: { label: "Écrits", icon: FileText, tone: "success" },
-  photo: { label: "Photos", icon: ImageIcon, tone: "warm" },
-  music: { label: "Musique", icon: Music2, tone: "muted" },
-  other: { label: "Autres", icon: Globe, tone: "muted" },
-};
-
-const FILTER_ORDER: { id: "all" | WatchLaterCategory; label: string; icon: typeof Play }[] = [
-  { id: "all", label: "Tout", icon: Filter },
-  { id: "video", label: "Vidéos", icon: Play },
-  { id: "article", label: "Articles", icon: FileText },
-  { id: "photo", label: "Photos", icon: ImageIcon },
-  { id: "music", label: "Musique", icon: Music2 },
-  { id: "other", label: "Autres", icon: Globe },
-];
-
-type FilterId = "all" | WatchLaterCategory;
+import { FILTER_ORDER, type FilterId } from "./meta";
+import { ItemCard } from "./ItemCard";
+import { AddItemForm } from "./AddItemForm";
 
 export default function WatchLaterPage() {
   const [items, setItems] = useState<WatchLaterItem[] | null>(null);
@@ -284,195 +252,5 @@ export default function WatchLaterPage() {
   );
 }
 
-function ItemCard({
-  item,
-  isDragging,
-  isDragOver,
-  onDelete,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-}: {
-  item: WatchLaterItem;
-  isDragging: boolean;
-  isDragOver: boolean;
-  onDelete: () => void;
-  onDragStart: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
-}) {
-  const meta = categoryMeta[item.category];
-  const Icon = meta.icon;
-  return (
-    <article
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
-      className={cn(
-        "group relative flex flex-col rounded-2xl border bg-[var(--surface-1)]/40 hover:bg-[var(--surface-2)]/60 transition-all duration-200 overflow-hidden cursor-grab active:cursor-grabbing",
-        isDragging
-          ? "opacity-40 border-[var(--accent)]/40"
-          : isDragOver
-            ? "border-[var(--accent)]/60 scale-[1.01]"
-            : "border-[var(--border-1)] hover:border-[var(--border-2)]"
-      )}
-    >
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <Pill tone={meta.tone} dot>
-          <Icon className="w-2.5 h-2.5" />
-          {meta.label}
-        </Pill>
-        <div className="flex items-center gap-0.5">
-          <button
-            onClick={onDelete}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-4)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors opacity-0 group-hover:opacity-100"
-            title="Supprimer"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-          <span className="w-6 h-7 flex items-center justify-center text-[var(--text-4)] opacity-0 group-hover:opacity-100 transition-opacity">
-            <GripVertical className="w-3.5 h-3.5" />
-          </span>
-        </div>
-      </div>
 
-      <a
-        href={item.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        draggable={false}
-        onDragStart={(e) => e.preventDefault()}
-        className="px-4 pb-3 flex-1 flex flex-col"
-      >
-        {item.thumbnail ? (
-          <div className="aspect-video rounded-lg overflow-hidden bg-[var(--surface-2)] mb-3 border border-[var(--border-1)]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={item.thumbnail}
-              alt=""
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-        ) : (
-          <div className="aspect-video rounded-lg bg-[var(--surface-2)] border border-[var(--border-1)] mb-3 flex items-center justify-center text-[var(--text-3)] group-hover:text-[var(--accent)] transition-colors duration-300">
-            <Icon className="w-7 h-7" strokeWidth={1.5} />
-          </div>
-        )}
-        <h3 className="text-[13.5px] font-medium text-[var(--text-1)] leading-snug line-clamp-2 group-hover:text-[var(--accent)] transition-colors">
-          {item.title}
-        </h3>
-        {item.description && (
-          <p className="text-[11.5px] text-[var(--text-3)] mt-1.5 line-clamp-2 leading-relaxed">
-            {item.description}
-          </p>
-        )}
-      </a>
 
-      <div className="flex items-center justify-between px-4 py-2.5 border-t border-[var(--border-1)] text-[10px] text-[var(--text-4)] font-mono">
-        <span className="truncate">{item.source}</span>
-        <span className="shrink-0 ml-2">{formatRelative(item.createdAt)}</span>
-      </div>
-
-      <a
-        href={item.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        draggable={false}
-        onDragStart={(e) => e.preventDefault()}
-        className="absolute top-3 right-12 w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] transition-colors opacity-0 group-hover:opacity-100"
-        title="Ouvrir"
-      >
-        <ExternalLink className="w-3 h-3" />
-      </a>
-    </article>
-  );
-}
-
-function AddItemForm({
-  onCancel,
-  onSubmit,
-}: {
-  onCancel: () => void;
-  onSubmit: (input: { url: string; title: string; description?: string; category?: WatchLaterCategory }) => void;
-}) {
-  const [url, setUrl] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<WatchLaterCategory>("other");
-
-  const handleSubmit = () => {
-    if (!url.trim() || !title.trim()) return;
-    onSubmit({ url: url.trim(), title: title.trim(), description: description.trim() || undefined, category });
-  };
-
-  return (
-    <div className="mb-6 p-4 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 fade-in">
-      <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--accent)] font-mono mb-3">
-        Nouveau lien
-      </p>
-      <div className="space-y-2.5">
-        <Input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://…"
-          autoFocus
-          className="font-mono"
-        />
-        <Input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Titre"
-        />
-        <Textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Description (optionnel)"
-          rows={2}
-        />
-        <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(categoryMeta) as WatchLaterCategory[]).map((c) => {
-            const meta = categoryMeta[c];
-            const Icon = meta.icon;
-            return (
-              <button
-                key={c}
-                onClick={() => setCategory(c)}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider border transition-colors",
-                  category === c
-                    ? "border-[var(--accent)]/40 text-[var(--accent)] bg-[var(--accent)]/10"
-                    : "border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)]"
-                )}
-              >
-                <Icon className="w-2.5 h-2.5" />
-                {meta.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <div className="flex items-center justify-end gap-1.5 mt-3">
-        <Button variant="ghost" size="sm" onClick={onCancel} leftIcon={<X className="w-3.5 h-3.5" />}>
-          Annuler
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleSubmit}
-          disabled={!url.trim() || !title.trim()}
-          leftIcon={<Check className="w-3.5 h-3.5" />}
-        >
-          Ajouter
-        </Button>
-      </div>
-    </div>
-  );
-}
