@@ -40,7 +40,7 @@ self.addEventListener("pushsubscriptionchange", (event) => {
       })
   );
 });
-const CACHE = "backstage-v2";
+const CACHE = "backstage-v3";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -173,18 +173,22 @@ self.addEventListener("fetch", (event) => {
   ) {
     event.respondWith(
       caches.match(event.request).then((cached) => {
-        const networkFetch = fetch(event.request).then((res) => {
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE).then((cache) => cache.put(event.request, clone));
-          }
-          return res;
-        });
+        const networkFetch = fetch(event.request)
+          .then((res) => {
+            if (res.ok) {
+              const clone = res.clone();
+              caches.open(CACHE).then((cache) => cache.put(event.request, clone));
+            }
+            return res;
+          })
+          .catch(() => cached || Response.error());
         return cached || networkFetch;
       })
     );
     return;
   }
 
-  event.respondWith(fetch(event.request));
+  event.respondWith(
+    fetch(event.request).catch(() => caches.match(event.request).then((cached) => cached || Response.error()))
+  );
 });
