@@ -43,6 +43,64 @@ function useSectionProgress(ref: React.RefObject<HTMLElement | null>) {
   return progress;
 }
 
+/* ---- Horloge réelle : positionne la journée dans le temps du visiteur ---- */
+
+function toMinutes(time: string) {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function useClockProgress(
+  times: string[],
+  sectionRef: React.RefObject<HTMLElement | null>
+) {
+  const [clock, setClock] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const minutes = times.map(toMinutes);
+    const first = minutes[0] ?? 0;
+    const last = minutes[minutes.length - 1] ?? first;
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const target = last > first ? Math.min(Math.max((nowMin - first) / (last - first), 0), 1) : 0;
+    let active = -1;
+    minutes.forEach((t, i) => {
+      if (nowMin >= t) active = i;
+    });
+    setActiveIndex(active);
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const raf = requestAnimationFrame(() => setClock(target));
+      return () => cancelAnimationFrame(raf);
+    }
+
+    // Démarre l'animation quand la section entre dans le viewport
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0].isIntersecting) return;
+        io.disconnect();
+        const t0 = performance.now();
+        const duration = 1400;
+        const tick = (t: number) => {
+          const p = Math.min((t - t0) / duration, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          setClock(eased * target);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+      { threshold: 0.15 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [times, sectionRef]);
+
+  return { clock, activeIndex };
+}
+
 function useStepReveal(ref: React.RefObject<HTMLElement | null>, index: number) {
   const [active, setActive] = useState(false);
   useEffect(() => {
@@ -70,10 +128,12 @@ function useStepReveal(ref: React.RefObject<HTMLElement | null>, index: number) 
 function DayStepRow({
   step,
   index,
+  active,
   onRef,
 }: {
   step: DayStep;
   index: number;
+  active: boolean;
   onRef: (el: HTMLDivElement | null, index: number) => void;
 }) {
   const rowRef = useRef<HTMLDivElement | null>(null);
@@ -107,12 +167,21 @@ function DayStepRow({
         <div
           className={cn(
             "rounded-2xl border bg-[var(--surface-1)] p-5 sm:p-6 transition-colors duration-500",
-            reveal ? "border-[var(--border-2)]" : "border-[var(--border-1)]"
+            reveal ? "border-[var(--border-2)]" : "border-[var(--border-1)]",
+            active && reveal && "border-[var(--accent)]/50"
           )}
         >
-          <h3 className="font-display text-[19px] sm:text-[21px] font-bold text-[var(--text-1)]">
-            {step.title}
-          </h3>
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="font-display text-[19px] sm:text-[21px] font-bold text-[var(--text-1)]">
+              {step.title}
+            </h3>
+            {active && (
+              <span className="inline-flex items-center gap-1.5 shrink-0 rounded-full border border-[var(--accent)]/40 bg-[var(--accent)]/10 px-2.5 py-1 text-[9px] font-mono uppercase tracking-[0.14em] text-[var(--accent)]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse-dot" />
+                en cours
+              </span>
+            )}
+          </div>
           <p className="mt-2 text-[13.5px] leading-relaxed text-[var(--text-3)]">{step.desc}</p>
           <div
             className={cn(
@@ -131,7 +200,14 @@ function DayStepRow({
 export function DayTimeline({ steps }: { steps: DayStep[] }) {
   const sectionRef = useRef<HTMLElement>(null);
   const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const progress = useSectionProgress(sectionRef);
+  const scrollProgress = useSectionProgress(sectionRef);
+  const { clock, activeIndex } = useClockProgress(
+    steps.map((s) => s.time),
+    sectionRef
+  );
+
+  // La ligne suit le scroll, mais ne recule jamais sous la position « réelle » de l'horloge
+  const progress = Math.max(scrollProgress, clock);
 
   const stepOffsets = steps.map((_, i) => i / Math.max(steps.length - 1, 1));
 
@@ -160,10 +236,18 @@ export function DayTimeline({ steps }: { steps: DayStep[] }) {
                     ? "0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent)"
                     : "none",
               }}
-            />
+            >
+              {activeIndex === i && (
+                <span
+                  className="absolute inset-0 rounded-full animate-ping opacity-40 bg-[var(--accent)]"
+                  style={{ animationDuration: "2s" }}
+                />
+              )}
+            </div>
             <DayStepRow
               step={step}
               index={i}
+              active={activeIndex === i}
               onRef={(el, idx) => {
                 stepRefs.current[idx] = el;
               }}
