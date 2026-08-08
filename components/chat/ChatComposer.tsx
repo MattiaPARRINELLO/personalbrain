@@ -74,10 +74,11 @@ export function ChatComposer({
         <div className="relative">
           <button
             onClick={() => setShowMentionMenu(!showMentionMenu)}
-            className="shrink-0 w-8 h-8 rounded-lg border border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-[var(--border-2)] flex items-center justify-center transition-colors duration-200"
+            className="shrink-0 w-10 h-10 rounded-lg border border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-[var(--border-2)] flex items-center justify-center transition-colors duration-200"
             title="Mentionner un module (@gmail, @calendar, @memory)"
+            aria-label="Mentionner un module"
           >
-            <AtSign className="w-3.5 h-3.5" />
+            <AtSign className="w-4 h-4" />
           </button>
           {showMentionMenu && (
             <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--border-2)] bg-[var(--surface-1)] p-1 z-50">
@@ -110,10 +111,11 @@ export function ChatComposer({
         />
         <button
           onClick={handleFileUpload}
-          className="shrink-0 w-8 h-8 rounded-lg border border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-[var(--border-2)] flex items-center justify-center transition-colors duration-200"
+          className="shrink-0 w-10 h-10 rounded-lg border border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-[var(--border-2)] flex items-center justify-center transition-colors duration-200"
           title="Uploader un fichier"
+          aria-label="Uploader un fichier"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-4 h-4" />
         </button>
         <input
           ref={fileInputRef}
@@ -129,6 +131,7 @@ export function ChatComposer({
         <textarea
           ref={ref}
           value={displayValue}
+          enterKeyHint="send"
           onChange={(e) => {
             onChange(e.target.value);
             setVoiceLive("");
@@ -139,24 +142,26 @@ export function ChatComposer({
           onKeyDown={onKey}
           placeholder={voiceActive ? "Parle maintenant…" : "Envoyer un message…"}
           rows={1}
-          className="flex-1 bg-transparent text-[14px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none resize-none font-sans px-3 py-2 max-h-[200px]"
+          className="flex-1 bg-transparent text-[14px] text-[var(--text-1)] placeholder:text-[var(--text-3)] outline-none resize-none font-sans px-3 py-2.5 max-h-[200px]"
         />
         {isLoading ? (
           <button
             onClick={onStop}
-            className="shrink-0 w-9 h-9 rounded-xl bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] flex items-center justify-center hover:bg-[var(--danger)]/15 transition-colors"
+            className="shrink-0 w-10 h-10 rounded-xl bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] flex items-center justify-center hover:bg-[var(--danger)]/15 transition-colors"
             title="Arrêter"
+            aria-label="Arrêter"
           >
-            <Square className="w-3.5 h-3.5" />
+            <Square className="w-4 h-4" />
           </button>
         ) : (
           <button
             onClick={onSubmit}
             disabled={!displayValue.trim()}
-            className="shrink-0 w-9 h-9 rounded-xl bg-[var(--accent)] text-[#0a0a0b] flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            title="Envoyer (Ctrl+Enter)"
+            className="shrink-0 w-10 h-10 rounded-xl bg-[var(--accent)] text-[#0a0a0b] flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Envoyer"
+            aria-label="Envoyer"
           >
-            <Send className="w-3.5 h-3.5" strokeWidth={2} />
+            <Send className="w-4 h-4" strokeWidth={2} />
           </button>
         )}
       </div>

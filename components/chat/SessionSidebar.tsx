@@ -164,7 +164,7 @@ export function SessionSidebar({ activeSessionId, onSelectSession, onNewSession,
         {mobileOpen && onMobileClose && (
           <button
             onClick={onMobileClose}
-            className="absolute top-3 right-3 w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors lg:hidden"
+            className="absolute top-3 right-3 w-10 h-10 -mr-1.5 rounded-lg flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors lg:hidden"
           >
             <X className="w-3.5 h-3.5" />
           </button>

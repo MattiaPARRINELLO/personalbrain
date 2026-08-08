@@ -60,7 +60,7 @@ export function ContextPanel() {
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
-          className="xl:hidden fixed bottom-20 right-3 z-30 w-10 h-10 rounded-full bg-[var(--accent)]/20 border border-[var(--accent)]/40 text-[var(--accent-soft)] flex items-center justify-center backdrop-blur"
+          className="xl:hidden fixed bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] right-3 z-30 w-11 h-11 rounded-full bg-[var(--accent)]/20 border border-[var(--accent)]/40 text-[var(--accent-soft)] flex items-center justify-center backdrop-blur"
           aria-label="Ouvrir le contexte"
         >
           <Sparkles className="w-4 h-4 animate-pulse" />
@@ -73,9 +73,9 @@ export function ContextPanel() {
           "xl:relative xl:translate-x-0",
           collapsed ? "xl:w-12" : "xl:w-[340px]",
           mobileOpen
-            ? "fixed inset-x-0 bottom-0 top-auto z-40 w-full rounded-t-2xl border-l-0 border-t border-[var(--border-1)] shadow-2xl"
+            ? "fixed inset-x-0 bottom-0 top-auto z-40 w-full rounded-t-2xl border-l-0 border-t border-[var(--border-1)] pb-[env(safe-area-inset-bottom)]"
             : "hidden xl:flex",
-          mobileOpen && "max-h-[80vh]"
+          mobileOpen && "max-h-[82vh]"
         )}
       >
         <div className="flex items-center justify-between h-14 px-4 border-b border-[var(--border-1)] shrink-0">
@@ -96,15 +96,15 @@ export function ContextPanel() {
                 setCollapsed((c) => !c);
               }
             }}
-            className="ml-auto w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
+            className="ml-auto w-10 h-10 -mr-1.5 rounded-lg flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
             title={mobileOpen ? "Fermer" : collapsed ? "Étendre" : "Réduire"}
           >
-            {mobileOpen ? <X className="w-3.5 h-3.5" /> : collapsed ? <Settings2 className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
+            {mobileOpen ? <X className="w-4 h-4" /> : collapsed ? <Settings2 className="w-4 h-4" /> : <X className="w-4 h-4" />}
           </button>
         </div>
 
         {!collapsed && (
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 context-panel-body">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-3 space-y-3 context-panel-body">
             {activeContext ? (
               <ContextualView
                 contextKey={activeContext}

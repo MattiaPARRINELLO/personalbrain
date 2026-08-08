@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { PwaLoader } from "@/components/ui/PwaLoader";
@@ -35,6 +35,14 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0a0a0b",
+  interactiveWidget: "resizes-content",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -47,14 +55,12 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
       <head>
-        <meta name="theme-color" content="#a5b4fc" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="application-name" content="BACKSTAGE" />
         <link rel="icon" type="image/png" href="/backstage-logo-simple.png" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-
       </head>
       <body className="min-h-full relative font-sans">
         <PwaLoader />

@@ -492,7 +492,10 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
   }, []);
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    // Sur écran tactile (pas de clavier physique), Entrée envoie directement ;
+    // Shift+Entrée fait une nouvelle ligne. Sur desktop, Ctrl/Cmd+Entrée envoie.
+    const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey || (coarsePointer && !e.shiftKey))) {
       e.preventDefault();
       void send(input);
     } else if (e.key === "ArrowUp" && !input && messages.length > 1) {

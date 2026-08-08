@@ -90,7 +90,7 @@ export function ActivityView({ entries: initial }: { entries: ActivityEntry[] })
             <button
               onClick={refresh}
               disabled={loading}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] border border-[var(--border-1)] transition-colors"
+              className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] border border-[var(--border-1)] transition-colors"
               title="Rafraîchir"
             >
               <RotateCcw className={cn("w-4 h-4", loading && "animate-spin")} />

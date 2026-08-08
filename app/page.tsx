@@ -7,6 +7,7 @@ import { DayTimeline } from "@/components/landing/DayTimeline";
 import { NarrativeStats } from "@/components/landing/NarrativeStats";
 import { ScrollTitle } from "@/components/landing/ScrollTitle";
 import { DotGrid } from "@/components/landing/DotGrid";
+import { InstalledRedirect } from "@/components/landing/InstalledRedirect";
 import {
   KanbanMock,
   StreakMock,
@@ -30,6 +31,7 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen flex flex-col overflow-x-hidden">
+      <InstalledRedirect />
       <ScrollTitle />
       <DotGrid />
       {/* ================= Header ================= */}
@@ -93,7 +95,7 @@ export default async function Home() {
           </Reveal>
 
           <Reveal delay={80}>
-            <h1 className="mt-8 text-[42px] leading-[1.02] sm:text-7xl font-display font-black tracking-tight text-[var(--text-1)] text-balance">
+            <h1 className="mt-8 text-[38px] leading-[1.04] sm:text-7xl font-display font-black tracking-tight text-[var(--text-1)] text-balance">
               L'IA qui exécute.
               <br />
               <span className="gradient-text-ai">Pas un chatbot.</span>

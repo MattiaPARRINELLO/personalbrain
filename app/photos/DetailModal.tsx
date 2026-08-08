@@ -62,24 +62,24 @@ export function DetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--background)]/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto py-4 bg-[var(--background)]/70 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg mx-4 border border-[var(--border-1)] rounded-lg bg-[var(--surface-1)]"
+        className="w-full max-w-lg mx-4 my-auto border border-[var(--border-1)] rounded-lg bg-[var(--surface-1)] max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-1)]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-1)] shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: STATUS_FLOW[statusIndex(shoot.status)].color }} />
             <h2 className="text-[15px] font-semibold text-[var(--text-1)] truncate">{shoot.title}</h2>
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors">
+          <button onClick={onClose} className="w-10 h-10 -mr-2 rounded-lg flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors" aria-label="Fermer">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto overscroll-contain min-h-0">
           <div className="flex items-center gap-4 text-[12px] font-mono text-[var(--text-2)]">
             <div className="flex items-center gap-1.5">
               <span className="text-[var(--text-4)] uppercase tracking-wider">Date</span>

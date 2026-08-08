@@ -332,21 +332,22 @@ export default function CalendarPage() {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--background)]/70 backdrop-blur-sm">
-          <div className="w-full max-w-lg mx-4 rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)]">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-1)]">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto py-4 bg-[var(--background)]/70 backdrop-blur-sm">
+          <div className="w-full max-w-lg mx-4 my-auto rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)] max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-1)] shrink-0">
               <h3 className="text-[14px] font-semibold text-[var(--text-1)]">
                 {isCreating ? "Nouvel événement" : "Modifier l'événement"}
               </h3>
               <button
                 onClick={() => setEditing(null)}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
+                className="w-10 h-10 -mr-2 rounded-lg flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
+                aria-label="Fermer"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4 overflow-y-auto overscroll-contain min-h-0">
               <Field label="Titre">
                 <Input
                   type="text"
@@ -440,7 +441,7 @@ export default function CalendarPage() {
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-[var(--border-1)]">
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-[var(--border-1)] shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>
                 Annuler
               </Button>

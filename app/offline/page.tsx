@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { RetryButton } from "./RetryButton";
 
 export const metadata: Metadata = {
   title: "Hors-ligne — BACKSTAGE",
@@ -6,7 +7,7 @@ export const metadata: Metadata = {
 
 export default function OfflinePage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-6">
+    <div className="min-h-dvh flex items-center justify-center bg-[var(--background)] px-6 pb-[env(safe-area-inset-bottom)]">
       <div className="text-center max-w-sm">
         <div className="text-4xl mb-6 font-mono font-black tracking-tight text-[var(--accent)]">
           BACKSTAGE
@@ -19,6 +20,7 @@ export default function OfflinePage() {
           Les données en cache sont toujours accessibles.
           Reviens dès que la connexion est rétablie.
         </p>
+        <RetryButton />
       </div>
     </div>
   );

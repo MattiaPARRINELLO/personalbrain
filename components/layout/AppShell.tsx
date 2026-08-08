@@ -10,7 +10,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <ToastProvider>
-      <div className="relative z-10 flex h-screen overflow-hidden bg-[var(--background)]">
+      <div className="relative z-10 flex h-dvh overflow-hidden bg-[var(--background)]">
         <LeftNav />
         <div className="flex-1 flex flex-col min-w-0 h-full">
           <MobileTopBar />

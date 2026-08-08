@@ -71,7 +71,7 @@ export function ChatLayout() {
         <div className="flex-1 min-w-0 flex flex-col h-full min-h-0 relative">
           <button
             onClick={() => setMobileSessionsOpen(true)}
-            className="lg:hidden absolute top-2 left-2 z-10 w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
+            className="lg:hidden absolute top-2 left-2 z-10 w-10 h-10 -ml-1.5 rounded-lg flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
             aria-label="Liste des conversations"
           >
             <MessageSquare className="w-4 h-4" />

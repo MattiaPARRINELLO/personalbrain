@@ -31,7 +31,8 @@ export function OfflineBanner() {
   return (
     <div
       className={cn(
-        "fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] px-4 py-2 rounded-xl border text-[11px] font-mono transition-all duration-500",
+        "fixed left-1/2 -translate-x-1/2 z-[90] px-4 py-2.5 rounded-xl border text-[11px] font-mono transition-all duration-500",
+        "bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] lg:bottom-4",
         online
           ? "border-[var(--success)]/30 bg-[var(--success)]/10 text-[var(--success)]"
           : "border-[var(--warm)]/30 bg-[var(--warm)]/10 text-[var(--warm)]"
