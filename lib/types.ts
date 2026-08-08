@@ -113,6 +113,7 @@ export interface MicrosoftTodoTask {
   completedDateTime?: { dateTime: string; timeZone: string } | null;
   createdDateTime: string;
   lastModifiedDateTime: string;
+  body?: { contentType: string; content: string };
 }
 
 export interface Email {
@@ -152,6 +153,11 @@ export interface Reminder {
   createdAt: string;
   notifiedAt?: string;
   recurrence?: ReminderRecurrence;
+  // Liaison avec la tâche Microsoft To Do créée depuis backstage (sync bidirectionnelle)
+  microsoftTaskId?: string;
+  microsoftListId?: string;
+  // Dernière modification locale (utilisée par la réconciliation avec MS)
+  updatedAt?: string;
 }
 
 export interface RemindersData {
