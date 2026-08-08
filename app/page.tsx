@@ -4,7 +4,9 @@ import { getLeetcode, getMemory, getPhotoShoots } from "@/lib/storage";
 import { Reveal } from "@/components/landing/Reveal";
 import { HeroTerminal } from "@/components/landing/HeroTerminal";
 import { DayTimeline } from "@/components/landing/DayTimeline";
-import { AnimatedNumber } from "@/components/landing/AnimatedNumber";
+import { NarrativeStats } from "@/components/landing/NarrativeStats";
+import { ScrollTitle } from "@/components/landing/ScrollTitle";
+import { DotGrid } from "@/components/landing/DotGrid";
 import {
   KanbanMock,
   StreakMock,
@@ -28,6 +30,8 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen flex flex-col overflow-x-hidden">
+      <ScrollTitle />
+      <DotGrid />
       {/* ================= Header ================= */}
       <header className="sticky top-0 z-50 border-b border-[var(--border-1)] bg-[var(--background)]/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 h-14 flex items-center justify-between">
@@ -161,20 +165,10 @@ export default async function Home() {
 
       {/* ================= Stats réelles ================= */}
       <section>
-        <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 py-12 sm:py-14 grid grid-cols-2 lg:grid-cols-4 gap-px bg-[var(--border-1)] border border-[var(--border-1)] rounded-2xl overflow-hidden">
-          {STATS.map((stat, i) => (
-            <Reveal key={stat.label} delay={i * 80} className="h-full">
-              <div className="h-full bg-[var(--surface-1)] px-6 py-5 flex flex-col items-start justify-center">
-                <span className="font-display text-4xl sm:text-[44px] font-black tracking-tight text-[var(--text-1)] tabular-nums">
-                  <AnimatedNumber value={stat.value} />
-                  {stat.suffix}
-                </span>
-                <span className="mt-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-[var(--text-4)]">
-                  {stat.label}
-                </span>
-              </div>
-            </Reveal>
-          ))}
+        <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 py-12 sm:py-14">
+          <Reveal>
+            <NarrativeStats stats={STATS} />
+          </Reveal>
         </div>
       </section>
 
