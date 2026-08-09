@@ -57,8 +57,40 @@ export function ChatComposer({
     fileInputRef.current?.click();
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const v = e.target.value;
+    onChange(v);
+    setVoiceLive("");
+    const el = e.target;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+    // Sur mobile (bouton @ masqué), taper "@" ouvre le menu de mention.
+    setShowMentionMenu(/@[a-z]*$/i.test(v) && !v.endsWith(" "));
+  };
+
   return (
     <div className="relative">
+      {showMentionMenu && (
+        <div className="absolute bottom-full left-2 mb-2 w-56 rounded-xl border border-[var(--border-2)] bg-[var(--surface-1)] p-1 z-50">
+          <p className="px-2.5 pt-1.5 pb-1 text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)]">
+            Mentionner un module
+          </p>
+          {[
+            { label: "@gmail", desc: "Rechercher dans les mails" },
+            { label: "@calendar", desc: "Consulter le calendrier" },
+            { label: "@memory", desc: "Interroger la mémoire" },
+          ].map((m) => (
+            <button
+              key={m.label}
+              onClick={() => insertMention(m.label)}
+              className="w-full text-left px-3 py-2 rounded-lg hover:bg-[var(--surface-2)] transition-colors duration-150"
+            >
+              <span className="text-[13px] text-[var(--accent-cool)] font-mono">{m.label}</span>
+              <span className="block text-[11px] text-[var(--text-4)]">{m.desc}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div
         className={cn(
           "flex items-end gap-1 rounded-[24px] border bg-[var(--surface-2)]/70 backdrop-blur px-2 py-2 transition-colors duration-200",
@@ -70,7 +102,7 @@ export function ChatComposer({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div className="relative">
+        <div className="hidden sm:block">
           <button
             onClick={() => setShowMentionMenu(!showMentionMenu)}
             className={cn(
@@ -84,24 +116,6 @@ export function ChatComposer({
           >
             <AtSign className="w-[18px] h-[18px]" />
           </button>
-          {showMentionMenu && (
-            <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--border-2)] bg-[var(--surface-1)] p-1 z-50">
-              {[
-                { label: "@gmail", desc: "Rechercher dans les mails" },
-                { label: "@calendar", desc: "Consulter le calendrier" },
-                { label: "@memory", desc: "Interroger la mémoire" },
-              ].map((m) => (
-                <button
-                  key={m.label}
-                  onClick={() => insertMention(m.label)}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-[var(--surface-2)] transition-colors duration-150"
-                >
-                  <span className="text-[13px] text-[var(--accent-cool)] font-mono">{m.label}</span>
-                  <span className="block text-[11px] text-[var(--text-4)]">{m.desc}</span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         <VoiceInput
@@ -136,17 +150,13 @@ export function ChatComposer({
           ref={ref}
           value={displayValue}
           enterKeyHint="send"
-          onChange={(e) => {
-            onChange(e.target.value);
-            setVoiceLive("");
-            const el = e.target;
-            el.style.height = "auto";
-            el.style.height = Math.min(el.scrollHeight, 200) + "px";
-          }}
+          autoCapitalize="sentences"
+          autoCorrect="on"
+          onChange={handleChange}
           onKeyDown={onKey}
           placeholder={voiceActive ? "Parle maintenant…" : "Écris un message…"}
           rows={1}
-          className="flex-1 bg-transparent text-[15px] text-[var(--text-1)] placeholder:text-[var(--text-4)] outline-none resize-none font-sans px-2 py-2.5 max-h-[200px]"
+          className="flex-1 bg-transparent text-[16px] text-[var(--text-1)] placeholder:text-[var(--text-4)] outline-none resize-none font-sans px-2 py-2.5 max-h-[200px]"
         />
         {isLoading ? (
           <button
