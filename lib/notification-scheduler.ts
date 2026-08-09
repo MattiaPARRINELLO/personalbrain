@@ -48,7 +48,10 @@ async function markReminderNotified(id: string): Promise<void> {
   }
 }
 
-export async function sendPushToAll(payload: string, _tag?: string): Promise<boolean> {
+export async function sendPushToAll(
+  payload: string,
+  _tag?: string
+): Promise<{ sent: boolean; devices: number }> {
   const subs = await getSubscriptions();
   let webSent = false;
   if (subs.length > 0) {
@@ -88,7 +91,7 @@ export async function sendPushToAll(payload: string, _tag?: string): Promise<boo
     }
   }
 
-  return webSent;
+  return { sent: webSent, devices: subs.length };
 }
 
 export async function checkReminders() {
@@ -122,7 +125,7 @@ export async function checkReminders() {
 
       // On marque le rappel notifié SEULEMENT si l'envoi a réussi (web) :
       // sinon il sera retenté au prochain tick au lieu d'être perdu.
-      const sent = await sendPushToAll(payload, "reminder-" + r.id);
+      const { sent } = await sendPushToAll(payload, "reminder-" + r.id);
       if (sent) {
         notifiedReminders.add(r.id);
         await markReminderNotified(r.id);
@@ -155,7 +158,7 @@ export async function checkIntentions() {
       });
 
       // Marquée faite UNIQUEMENT si l'envoi a réussi, sinon retentée au tick suivant.
-      const sent = await sendPushToAll(payload, "intention-" + it.id);
+      const { sent } = await sendPushToAll(payload, "intention-" + it.id);
       if (sent) {
         await resolveIntention(it.id, "done");
       }
@@ -165,10 +168,10 @@ export async function checkIntentions() {
   }
 }
 
-export async function triggerDailyBrief() {
+export async function triggerDailyBrief(): Promise<{ sent: boolean; devices: number } | null> {
   try {
     const config = await getConfig();
-    if (!config.features.dailyBrief) return;
+    if (!config.features.dailyBrief) return null;
 
     const { readJsonSafe } = await import("./storage");
     const data = await readJsonSafe<{ briefs: { date: string; summary: string }[] }>("daily-briefs.json", { briefs: [] });
@@ -181,13 +184,13 @@ export async function triggerDailyBrief() {
       const summary = await generateDailyBrief();
       if (!summary) {
         console.log("[scheduler] Échec génération brief");
-        return;
+        return null;
       }
       const updated = await readJsonSafe<{ briefs: { date: string; summary: string }[] }>("daily-briefs.json", { briefs: [] });
       todayBrief = updated.briefs.find((b) => b.date === today);
       if (!todayBrief) {
         console.log("[scheduler] Brief généré mais introuvable après sauvegarde");
-        return;
+        return null;
       }
     }
 
@@ -202,9 +205,10 @@ export async function triggerDailyBrief() {
       vibrate: [100, 50, 100],
     });
 
-    await sendPushToAll(payload, "daily-brief");
+    return sendPushToAll(payload, "daily-brief");
   } catch (err) {
     console.error("[scheduler] triggerDailyBrief failed:", err);
+    return null;
   }
 }
 
