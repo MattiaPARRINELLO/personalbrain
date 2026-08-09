@@ -20,6 +20,7 @@ import {
   toolMeta,
 } from "@/components/chat/chat-data";
 import { MessageBlock, ToolCallTray, ThinkingIndicator, AssistantAvatar } from "@/components/chat/MessageBlocks";
+import { KeyboardSafe } from "@/components/ui/KeyboardSafe";
 
 function Hero({ onPrompt, disabled }: { onPrompt: (p: string) => void; disabled: boolean }) {
   return (
@@ -596,15 +597,17 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
 
       <div className="shrink-0 px-4 sm:px-6 pt-1 pb-3">
         <div className="max-w-3xl mx-auto">
-          <ChatComposer
-            value={input}
-            onChange={setInput}
-            onSubmit={() => void send(input)}
-            onStop={stop}
-            loading={loading}
-            inputRef={inputRef}
-            onKey={handleKey}
-          />
+          <KeyboardSafe>
+            <ChatComposer
+              value={input}
+              onChange={setInput}
+              onSubmit={() => void send(input)}
+              onStop={stop}
+              loading={loading}
+              inputRef={inputRef}
+              onKey={handleKey}
+            />
+          </KeyboardSafe>
           <p className="hidden sm:block text-[10px] text-[var(--text-4)] mt-2.5 text-center font-mono tracking-wide">
             Entrée envoie · Shift+Entrée nouvelle ligne · Ctrl+L effacer · Esc arrêter
           </p>
