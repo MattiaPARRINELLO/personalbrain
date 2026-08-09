@@ -207,7 +207,14 @@ export async function triggerDailyBrief(): Promise<
       vibrate: [100, 50, 100],
     });
 
-    return sendPushToAll(payload, "daily-brief");
+    const result = await sendPushToAll(payload, "daily-brief");
+    const { logActivity } = await import("./storage");
+    await logActivity(
+      "daily_brief_sent",
+      result.sent ? "Brief du jour envoyé" : "Brief du jour : envoi échoué",
+      `${result.devices} appareil(s) ciblé(s)`
+    );
+    return result;
   } catch (err) {
     console.error("[scheduler] triggerDailyBrief failed:", err);
     return { skipped: "erreur interne" };
