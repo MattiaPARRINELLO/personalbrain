@@ -141,14 +141,14 @@ export function VoiceInput({ onResult, onInterim, onListeningChange, disabled }:
       type="button"
       onClick={toggleListening}
       disabled={disabled}
-      className={`shrink-0 w-10 h-10 rounded-lg border transition-colors duration-200 flex items-center justify-center ${
+      className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-200 ${
         listening
-          ? "border-[var(--danger)]/50 bg-[var(--danger)]/20 text-[var(--danger)] animate-pulse"
-          : "border-[var(--border-1)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-[var(--border-2)]"
+          ? "bg-[var(--danger)]/20 text-[var(--danger)] animate-pulse"
+          : "text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-3)]"
       }`}
       title={listening ? "Arrêter l'écoute" : "Commande vocale"}
     >
-      {listening ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mic className="w-3.5 h-3.5" />}
+      {listening ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
     </button>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, memo } from "react";
+import Image from "next/image";
 import {
   Check,
   Copy,
@@ -9,13 +10,33 @@ import {
   Bell,
   ChevronDown,
   ChevronUp,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/ui/Markdown";
 import { api } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import type { Message, ToolCall } from "@/components/chat/types";
-import { formatTime, toolMeta, FUNNY_THOUGHTS } from "@/components/chat/chat-data";
+import { toolMeta, FUNNY_THOUGHTS } from "@/components/chat/chat-data";
+
+export function AssistantAvatar({ size = "md" }: { size?: "sm" | "md" }) {
+  return (
+    <div
+      className={cn(
+        "shrink-0 rounded-lg border border-[var(--border-2)] bg-[var(--surface-2)] flex items-center justify-center overflow-hidden",
+        size === "md" ? "w-7 h-7" : "w-6 h-6"
+      )}
+    >
+      <Image
+        src="/backstage-logo-simple.png"
+        alt="BACKSTAGE"
+        width={18}
+        height={18}
+        className={size === "md" ? "w-4 h-4 object-contain" : "w-3.5 h-3.5 object-contain"}
+      />
+    </div>
+  );
+}
 
 function containsEmailContent(text: string) {
   return /@\w+\.\w+/.test(text) || /\b(email|mail|e-?mail|courriel|envoyer|écrire)\b/i.test(text);
@@ -87,29 +108,29 @@ function ActionChips({ message }: { message: Message }) {
   };
 
   const btn =
-    "inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-[var(--text-3)] border border-[var(--border-1)] rounded hover:border-[var(--border-2)] hover:text-[var(--text-2)] transition-colors duration-200";
+    "inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] rounded-lg transition-colors duration-200";
 
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5 fade-in-action-chips">
+    <div className="mt-2.5 flex flex-wrap gap-1 fade-in-action-chips">
       <button onClick={handleCopy} className={btn}>
-        {copiedId === message.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+        {copiedId === message.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
         {copiedId === message.id ? "Copié" : "Copier"}
       </button>
       {showMail && (
         <a href={`mailto:?body=${encodeURIComponent(content)}`} className={btn}>
-          <Mail className="w-3 h-3" />
+          <Mail className="w-3.5 h-3.5" />
           Voir le mail
         </a>
       )}
       {showCalendar && (
-        <button onClick={() => void handleAddCalendar()} className={`${btn} hover:border-[var(--accent-warm)]/40 hover:text-[var(--accent-warm)]`}>
-          <CalendarPlus className="w-3 h-3" />
+        <button onClick={() => void handleAddCalendar()} className={cn(btn, "hover:text-[var(--accent-warm)]")}>
+          <CalendarPlus className="w-3.5 h-3.5" />
           Ajouter au calendrier
         </button>
       )}
       {showReminder && (
-        <button onClick={() => void handleAddReminder()} className={btn}>
-          <Bell className="w-3 h-3" />
+        <button onClick={() => void handleAddReminder()} className={cn(btn, "hover:text-[var(--warm)]")}>
+          <Bell className="w-3.5 h-3.5" />
           Créer un rappel
         </button>
       )}
@@ -122,52 +143,26 @@ function ActionChips({ message }: { message: Message }) {
 // le markdown de la conversation à chaque keypress.
 export const MessageBlock = memo(function MessageBlock({ message }: { message: Message }) {
   const isUser = message.role === "user";
-  const isWelcome = message.id === "welcome";
 
-  if (isWelcome) {
+  if (isUser) {
     return (
-      <div className="flex gap-3">
-        <div className="shrink-0 w-6 h-6 rounded-full border border-[var(--border-2)] bg-[var(--surface-1)] flex items-center justify-center mt-0.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)]" />
-        </div>
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)]">ASSISTANT</span>
-          </div>
-          <div className="text-[14px] text-[var(--text-2)] leading-relaxed">
-            <Markdown>{message.content}</Markdown>
-          </div>
+      <div className="flex justify-end">
+        <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-br-md bg-[var(--surface-2)] px-4 py-2.5 text-[15px] leading-[1.6] text-[var(--text-1)] whitespace-pre-wrap break-words">
+          {message.content}
         </div>
       </div>
     );
   }
 
   return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
-      <div
-        className={cn(
-          "relative max-w-[85%] rounded-lg p-3.5",
-          isUser
-            ? "bg-[var(--surface-2)] border-r-2 border-[var(--accent-warm)]"
-            : "bg-[var(--surface-1)] border-l-2 border-[var(--accent-cool)]"
-        )}
-      >
-        <div className="flex items-center gap-2 mb-1.5">
-          {!isUser && (
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)] shrink-0" />
-          )}
-          <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)]">
-            {isUser ? "TOI" : "ASSISTANT"}
-          </span>
-          <span className="text-[10px] font-mono text-[var(--text-3)]">
-            · {formatTime(message.timestamp)}
-          </span>
-        </div>
-        <div className="text-[14px] leading-relaxed text-[var(--text-1)]">
+    <div className="flex gap-3">
+      <AssistantAvatar />
+      <div className="min-w-0 flex-1 pt-0.5">
+        <div className="text-[15px] leading-[1.75] text-[var(--text-1)]">
           <Markdown>{message.content}</Markdown>
         </div>
-        {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="mt-2 space-y-1.5 fade-in-up">
+        {message.toolCalls && message.toolCalls.length > 0 && (
+          <div className="mt-2.5 space-y-1.5 fade-in-up">
             {message.toolCalls.map((tc) => (
               <ToolCallResult key={tc.id} tool={tc} />
             ))}
@@ -183,72 +178,46 @@ function ToolCallResult({ tool }: { tool: ToolCall }) {
   const [expanded, setExpanded] = useState(false);
   const isError = tool.status === "error";
   const isRunning = tool.status === "running";
+  const Icon = toolMeta[tool.name]?.icon ?? Sparkles;
 
   return (
     <div
       className={cn(
-        "text-[11px] font-mono rounded border px-2.5 py-1.5",
+        "inline-flex max-w-full flex-col items-stretch rounded-lg border px-2.5 py-1.5 text-[11px] font-mono",
         isRunning && "tool-scan",
         isRunning
-          ? "border-[var(--ai-tool-call)]/40 bg-[var(--ai-tool-call)]/5"
+          ? "border-[var(--ai-tool-call)]/40 bg-[var(--ai-tool-call)]/8 text-[var(--ai-tool-call)]"
           : isError
-            ? "border-[var(--danger)]/30 bg-[var(--danger)]/5"
-            : "border-[var(--accent-success)]/30 bg-[var(--accent-success)]/5"
+            ? "border-[var(--danger)]/30 bg-[var(--danger)]/8 text-[var(--danger)]"
+            : "border-[var(--border-1)] bg-[var(--surface-2)] text-[var(--text-2)]"
       )}
     >
-      {isRunning ? (
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-tool-call)] animate-pulse" />
-            <span className="text-[var(--ai-tool-call)]">
-              ◈ {toolMeta[tool.name]?.label || tool.name}
-            </span>
-            <span className="text-[var(--text-4)]">running...</span>
-          </div>
-          <div className="mt-1.5 h-0.5 bg-[var(--border-1)] rounded-full overflow-hidden">
-            <div className="h-full bg-[var(--ai-tool-call)]/50 rounded-full tool-progress-bar" />
-          </div>
-          {expanded && tool.arguments && (
-            <div className="mt-2 text-[var(--text-3)] whitespace-pre-wrap break-all">
-              {tool.arguments}
-            </div>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 min-w-0 text-left"
+      >
+        {isRunning ? (
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-tool-call)] animate-pulse shrink-0" />
+        ) : (
+          <Icon className="w-3 h-3 shrink-0" />
+        )}
+        <span className="truncate">{toolMeta[tool.name]?.label || tool.name}</span>
+        {tool.duration != null && !isRunning && (
+          <span className="text-[var(--text-4)]">· {tool.duration.toFixed(1)}s</span>
+        )}
+        {tool.resultCount != null && !isRunning && (
+          <span className="text-[var(--text-4)]">· {tool.resultCount} résultats</span>
+        )}
+        {expanded ? <ChevronUp className="w-3 h-3 shrink-0 text-[var(--text-4)]" /> : <ChevronDown className="w-3 h-3 shrink-0 text-[var(--text-4)]" />}
+      </button>
+      {expanded && (
+        <div
+          className={cn(
+            "mt-1.5 pt-1.5 border-t border-[var(--border-1)] whitespace-pre-wrap break-all text-[var(--text-3)]",
+            isError && "text-[var(--danger)]"
           )}
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="mt-1 text-[var(--text-4)] hover:text-[var(--text-2)] transition-colors inline-flex items-center gap-0.5"
-          >
-            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            {expanded ? "Masquer" : "Détails"}
-          </button>
-        </div>
-      ) : (
-        <div>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="w-full flex items-center gap-1.5 text-left"
-          >
-            <span className={isError ? "text-[var(--danger)]" : "text-[var(--accent-success)]"}>
-              {isError ? "✗" : "✓"}
-            </span>
-            <span className="text-[var(--text-2)]">{toolMeta[tool.name]?.label || tool.name}</span>
-            {tool.duration != null && (
-              <span className="text-[var(--text-4)]">· {tool.duration.toFixed(1)}s</span>
-            )}
-            {tool.resultCount != null && (
-              <span className="text-[var(--text-4)]">· {tool.resultCount} résultats</span>
-            )}
-            <span className="text-[var(--text-4)] ml-auto">
-              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </span>
-          </button>
-          {expanded && tool.result && (
-            <div className={cn(
-              "mt-2 pt-2 border-t border-[var(--border-1)] whitespace-pre-wrap break-all",
-              isError ? "text-[var(--danger)]" : "text-[var(--text-3)]"
-            )}>
-              {tool.result}
-            </div>
-          )}
+        >
+          {isRunning && tool.arguments ? tool.arguments : tool.result || tool.arguments || ""}
         </div>
       )}
     </div>
@@ -257,7 +226,7 @@ function ToolCallResult({ tool }: { tool: ToolCall }) {
 
 export function ToolCallTray({ tools }: { tools: ToolCall[] }) {
   return (
-    <div className="flex gap-2 flex-wrap py-1">
+    <div className="flex gap-2 flex-wrap py-0.5">
       {tools.map((t) => (
         <ToolCallResult key={t.id} tool={t} />
       ))}
@@ -267,13 +236,13 @@ export function ToolCallTray({ tools }: { tools: ToolCall[] }) {
 
 export function ThinkingIndicator({ index }: { index: number }) {
   return (
-    <div className="flex items-center gap-2.5 pl-9">
+    <div className="flex items-center gap-3">
       <div className="flex items-center gap-1">
         <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)] thinking-dot" />
         <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)] thinking-dot" style={{ animationDelay: "0.15s" }} />
         <span className="w-1.5 h-1.5 rounded-full bg-[var(--ai-thinking)] thinking-dot" style={{ animationDelay: "0.3s" }} />
       </div>
-      <span className="text-[11px] font-mono text-[var(--text-4)] italic">
+      <span className="text-[11px] font-mono text-[var(--text-4)]">
         {FUNNY_THOUGHTS[index % FUNNY_THOUGHTS.length]}
       </span>
     </div>
