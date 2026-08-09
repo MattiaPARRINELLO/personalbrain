@@ -22,6 +22,7 @@ export type ActivityAction =
   | "calendar_event_created"
   | "leetcode_solved"
   | "chat_message_sent"
+  | "daily_brief_sent"
   | "login"
   | "logout";
 
