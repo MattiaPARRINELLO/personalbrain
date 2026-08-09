@@ -168,10 +168,12 @@ export async function checkIntentions() {
   }
 }
 
-export async function triggerDailyBrief(): Promise<{ sent: boolean; devices: number } | null> {
+export async function triggerDailyBrief(): Promise<
+  { sent: boolean; devices: number } | { skipped: string }
+> {
   try {
     const config = await getConfig();
-    if (!config.features.dailyBrief) return null;
+    if (!config.features.dailyBrief) return { skipped: "dailyBrief desactive" };
 
     const { readJsonSafe } = await import("./storage");
     const data = await readJsonSafe<{ briefs: { date: string; summary: string }[] }>("daily-briefs.json", { briefs: [] });
@@ -184,13 +186,13 @@ export async function triggerDailyBrief(): Promise<{ sent: boolean; devices: num
       const summary = await generateDailyBrief();
       if (!summary) {
         console.log("[scheduler] Échec génération brief");
-        return null;
+        return { skipped: "generation impossible" };
       }
       const updated = await readJsonSafe<{ briefs: { date: string; summary: string }[] }>("daily-briefs.json", { briefs: [] });
       todayBrief = updated.briefs.find((b) => b.date === today);
       if (!todayBrief) {
         console.log("[scheduler] Brief généré mais introuvable après sauvegarde");
-        return null;
+        return { skipped: "brief introuvable apres sauvegarde" };
       }
     }
 
@@ -208,7 +210,7 @@ export async function triggerDailyBrief(): Promise<{ sent: boolean; devices: num
     return sendPushToAll(payload, "daily-brief");
   } catch (err) {
     console.error("[scheduler] triggerDailyBrief failed:", err);
-    return null;
+    return { skipped: "erreur interne" };
   }
 }
 

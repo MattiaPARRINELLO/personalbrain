@@ -24,6 +24,9 @@ export function DailyBriefTester() {
     }
   };
 
+  const skipped = result && "skipped" in result ? result.skipped : null;
+  const sentResult = result && "sent" in result ? result : null;
+
   return (
     <div className="space-y-6">
       <Button variant="primary" size="lg" loading={pending} leftIcon={<Send className="w-4 h-4" />} onClick={handleLaunch}>
@@ -37,21 +40,30 @@ export function DailyBriefTester() {
         </p>
       )}
 
-      {result && (
+      {skipped && (
+        <div className="flex items-start gap-2 text-[13px] text-[var(--warm)]">
+          <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>
+            Brief non envoyé : <span className="font-medium">{skipped}</span>.
+          </span>
+        </div>
+      )}
+
+      {sentResult && (
         <div
           className={`flex items-start gap-2 text-[13px] ${
-            result.sent ? "text-[var(--success)]" : "text-[var(--warm)]"
+            sentResult.sent ? "text-[var(--success)]" : "text-[var(--warm)]"
           }`}
         >
-          {result.sent ? (
+          {sentResult.sent ? (
             <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
           ) : (
             <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
           )}
           <span>
-            {result.sent
-              ? `Brief généré et push envoyé à ${result.devices} appareil(s).`
-              : `Brief généré mais aucun push envoyé (${result.devices} appareil(s) ciblé(s)).`}
+            {sentResult.sent
+              ? `Brief généré et push envoyé à ${sentResult.devices} appareil(s).`
+              : `Brief généré mais aucun push envoyé (${sentResult.devices} appareil(s) ciblé(s)).`}
           </span>
         </div>
       )}
