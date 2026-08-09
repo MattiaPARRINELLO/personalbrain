@@ -168,7 +168,10 @@ export async function checkIntentions() {
   }
 }
 
-export async function triggerDailyBrief(): Promise<
+export async function triggerDailyBrief(
+  source: "cron" | "page-test" | "interne" = "interne",
+  ip?: string
+): Promise<
   { sent: boolean; devices: number } | { skipped: string }
 > {
   try {
@@ -212,7 +215,7 @@ export async function triggerDailyBrief(): Promise<
     await logActivity(
       "daily_brief_sent",
       result.sent ? "Brief du jour envoyé" : "Brief du jour : envoi échoué",
-      `${result.devices} appareil(s) ciblé(s)`
+      `${result.devices} appareil(s) ciblé(s) [${source}]${ip ? ` depuis ${ip}` : ""}`
     );
     return result;
   } catch (err) {

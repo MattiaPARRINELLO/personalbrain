@@ -10,5 +10,5 @@ export async function launchDailyBrief(): Promise<DailyBriefLaunchResult> {
   await requireSession();
 
   const { triggerDailyBrief } = await import("@/lib/notification-scheduler");
-  return triggerDailyBrief();
+  return triggerDailyBrief("page-test");
 }
