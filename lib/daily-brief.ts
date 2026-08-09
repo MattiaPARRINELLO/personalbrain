@@ -1,4 +1,5 @@
 import { getReminders, getConcerts, getEmails, getLeetcode, getCalendar, writeJsonAtomic, readJsonSafe, prepareConcert } from "./storage";
+import { fetchGoogleCalendarEvents } from "./google-actions";
 import { chatCompletion } from "./ai-providers";
 import { getConfig } from "./config";
 import { toISODate, toHHMM } from "./utils";
@@ -33,10 +34,18 @@ export async function generateDailyBrief(): Promise<string | null> {
     // Concerts du jour
     const todayConcerts = concertsData.events.filter((c) => c.date === today);
 
-    // Agenda du jour depuis le calendrier
-    const todayAgenda = calendarEvents.filter(
-      (e) => toISODate(e.date) === today
-    );
+    // Agenda du jour : calendrier local + événements Google (récupérés à la volée)
+    const dayStart = new Date(`${today}T00:00:00`).toISOString();
+    const dayEnd = new Date(`${today}T23:59:59`).toISOString();
+    const googleEvents = await fetchGoogleCalendarEvents(dayStart, dayEnd).catch(() => []);
+    const todayAgenda = [
+      ...calendarEvents
+        .filter((e) => toISODate(e.date) === today)
+        .map((e) => ({ title: e.title, date: e.date })),
+      ...googleEvents
+        .filter((e) => toISODate(e.start) === today)
+        .map((e) => ({ title: e.summary, date: e.start })),
+    ];
 
     // Emails non lus + urgents
     const unreadEmails = emailsData.emails.filter((e) => e.unread);
