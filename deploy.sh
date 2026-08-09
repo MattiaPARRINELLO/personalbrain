@@ -106,6 +106,7 @@ rsync -avz --delete \
   -e "ssh -p ${SSH_PORT}" \
   --exclude 'node_modules' \
   --include 'data/firebase-service-account.json' \
+  --include 'data/config.json' \
   --exclude 'data/*.json' \
   --exclude 'data/backups' \
   --exclude '.htaccess' \
