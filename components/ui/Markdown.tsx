@@ -13,11 +13,11 @@ interface MarkdownProps {
 // conversation à chaque frappe pendant la saisie).
 export const Markdown = memo(function Markdown({ children, className }: MarkdownProps) {
   return (
-    <div className={cn("text-[13px] leading-relaxed text-[var(--text-1)]", className)}>
+    <div className={cn("text-[15px] leading-[1.75] text-[var(--text-1)]", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-        p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+        p: ({ children }) => <p className="mb-3.5 last:mb-0">{children}</p>,
         strong: ({ children }) => <strong className="font-semibold text-[var(--text-1)]">{children}</strong>,
         em: ({ children }) => <em className="italic text-[var(--text-2)]">{children}</em>,
         a: ({ href, children }) => (
@@ -25,7 +25,7 @@ export const Markdown = memo(function Markdown({ children, className }: Markdown
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[var(--accent)] hover:underline"
+            className="text-[var(--accent)] underline decoration-[var(--accent)]/40 underline-offset-2 hover:decoration-[var(--accent)]"
           >
             {children}
           </a>
@@ -34,15 +34,15 @@ export const Markdown = memo(function Markdown({ children, className }: Markdown
           const isInline = !className;
           return isInline ? (
             <code
-              className="px-1 py-0.5 rounded bg-[var(--surface-3)] text-[var(--accent)] font-mono text-[11px]"
+              className="px-1.5 py-0.5 rounded-md bg-[var(--surface-3)] text-[var(--accent-soft)] font-mono text-[13px]"
               {...props}
             >
               {children}
             </code>
           ) : (
-            <pre className="my-3 p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border-1)] overflow-x-auto">
+            <pre className="my-4 p-4 rounded-xl bg-[#0b0b0d] border border-[var(--border-1)] overflow-x-auto">
               <code
-                className="font-mono text-[11px] leading-relaxed text-[var(--text-1)]"
+                className="font-mono text-[12.5px] leading-relaxed text-[var(--text-1)]"
                 {...props}
               >
                 {children}
@@ -50,18 +50,23 @@ export const Markdown = memo(function Markdown({ children, className }: Markdown
             </pre>
           );
         },
-        ul: ({ children }) => <ul className="mb-3 pl-4 list-disc marker:text-[var(--text-3)]">{children}</ul>,
-        ol: ({ children }) => <ol className="mb-3 pl-4 list-decimal marker:text-[var(--text-3)]">{children}</ol>,
-        li: ({ children }) => <li className="mb-1">{children}</li>,
-        h1: ({ children }) => <h1 className="text-[15px] font-semibold mb-2 mt-4 first:mt-0">{children}</h1>,
-        h2: ({ children }) => <h2 className="text-[14px] font-semibold mb-2 mt-4 first:mt-0">{children}</h2>,
-        h3: ({ children }) => <h3 className="text-[13px] font-semibold mb-2 mt-3 first:mt-0">{children}</h3>,
+        ul: ({ children }) => <ul className="mb-3.5 pl-5 list-disc marker:text-[var(--text-3)]">{children}</ul>,
+        ol: ({ children }) => <ol className="mb-3.5 pl-5 list-decimal marker:text-[var(--text-3)]">{children}</ol>,
+        li: ({ children }) => <li className="mb-1.5">{children}</li>,
+        h1: ({ children }) => <h1 className="text-[18px] font-bold mb-3 mt-6 first:mt-0 tracking-tight">{children}</h1>,
+        h2: ({ children }) => <h2 className="text-[16px] font-bold mb-3 mt-6 first:mt-0 tracking-tight">{children}</h2>,
+        h3: ({ children }) => <h3 className="text-[15px] font-semibold mb-2 mt-5 first:mt-0">{children}</h3>,
         blockquote: ({ children }) => (
-          <blockquote className="border-l-2 border-[var(--accent)] pl-3 my-3 text-[var(--text-2)] italic">
+          <blockquote className="border-l-2 border-[var(--accent)]/50 pl-4 my-4 text-[var(--text-2)] italic">
             {children}
           </blockquote>
         ),
-        hr: () => <hr className="my-4 border-[var(--border-1)]" />,
+        hr: () => <hr className="my-5 border-[var(--border-1)]" />,
+        table: ({ children }) => (
+          <div className="my-4 overflow-x-auto rounded-lg border border-[var(--border-1)]">
+            <table className="w-full text-[13px]">{children}</table>
+          </div>
+        ),
       }}
     >
       {children}

@@ -19,62 +19,40 @@ import {
   activeToolsList,
   toolMeta,
 } from "@/components/chat/chat-data";
-import { MessageBlock, ToolCallTray, ThinkingIndicator } from "@/components/chat/MessageBlocks";
+import { MessageBlock, ToolCallTray, ThinkingIndicator, AssistantAvatar } from "@/components/chat/MessageBlocks";
 
 function Hero({ onPrompt, disabled }: { onPrompt: (p: string) => void; disabled: boolean }) {
   return (
-    <div className="flex flex-col items-center text-center">
-      <div className="-mx-6 sm:-mx-8 -mt-6 sm:-mt-16 relative flex items-center justify-center">
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-[200px] h-[200px] sm:w-[500px] sm:h-[500px] rounded-full bg-[var(--accent)]/8 blur-[60px] sm:blur-[100px] animate-breathe" />
-        </div>
-
-        {/* Outer ring — hidden on mobile */}
-        <div className="hidden sm:block absolute w-[420px] h-[420px] animate-orbit-ring pointer-events-none">
-          <div className="absolute inset-0 rounded-full border border-[var(--accent)]/15" />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[var(--accent)] shadow-[0_0_8px_rgba(165,180,252,0.6)]" />
-          <div className="absolute bottom-[15%] right-[10%] w-1.5 h-1.5 rounded-full bg-[var(--accent)]/40" />
-        </div>
-
-        {/* Middle ring — hidden on mobile */}
-        <div className="hidden sm:block absolute w-[320px] h-[320px] animate-orbit-ring-reverse pointer-events-none">
-          <div className="absolute inset-0 rounded-full border border-[var(--accent-cool)]/15" />
-          <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)] shadow-[0_0_6px_rgba(122,162,247,0.5)]" />
-        </div>
-
-        {/* Inner ring — hidden on mobile */}
-        <div className="hidden sm:block absolute w-[220px] h-[220px] animate-orbit-ring-slow pointer-events-none">
-          <div className="absolute inset-0 rounded-full border border-[var(--accent-warm)]/15" />
-          <div className="absolute top-[10%] left-[20%] w-1 h-1 rounded-full bg-[var(--accent-warm)] shadow-[0_0_6px_rgba(212,163,115,0.5)]" />
-        </div>
-
-        <div className="relative">
+    <div className="flex flex-col items-center text-center pt-6">
+      <div className="relative flex items-center justify-center">
+        <div className="absolute w-44 h-44 rounded-full bg-[var(--accent)]/8 blur-[60px]" aria-hidden />
+        <div className="relative w-14 h-14 rounded-2xl border border-[var(--border-2)] bg-[var(--surface-1)] flex items-center justify-center overflow-hidden">
           <Image
-            src="/backstage-logo.png"
+            src="/backstage-logo-simple.png"
             alt="BACKSTAGE"
-            width={500}
-            height={500}
-            priority
-            className="w-full max-w-[140px] sm:max-w-[500px] h-auto object-contain drop-shadow-[0_0_20px_rgba(165,180,252,0.25)] sm:drop-shadow-[0_0_40px_rgba(165,180,252,0.35)]"
+            width={36}
+            height={36}
+            className="w-9 h-9 object-contain"
           />
         </div>
       </div>
-      <h1 className="text-xl sm:text-6xl font-black tracking-[0.12em] uppercase text-[var(--text-1)] mb-1 sm:mb-2 font-mono">
-        BACKSTAGE
+      <h1 className="mt-6 text-[24px] sm:text-[32px] font-display font-bold tracking-tight text-[var(--text-1)] text-balance">
+        Que puis-je faire pour toi ?
       </h1>
-      <p className="text-[11px] sm:text-[14px] text-[var(--text-2)] max-w-md leading-relaxed mb-4 sm:mb-8 font-mono tracking-wide">
-        Ton espace de contrôle personnel.
+      <p className="mt-2.5 text-[13px] sm:text-[14px] text-[var(--text-3)] max-w-md leading-relaxed">
+        Gmail, agenda, rappels, mémoire, recherche : pose ta question ou donne
+        une consigne, je m&apos;occupe du reste.
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full">
+      <div className="mt-9 grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-lg">
         {SUGGESTIONS.map((s) => (
           <button
             key={s.label}
             onClick={() => void onPrompt(s.label)}
             disabled={disabled}
-            className="flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-[var(--text-2)] bg-[var(--surface-1)] border border-[var(--border-1)] rounded-lg hover:border-[var(--border-2)] hover:text-[var(--text-1)] transition-colors duration-200 text-left disabled:opacity-40"
+            className="group flex items-start gap-3 px-4 py-3.5 text-left text-[13px] text-[var(--text-2)] bg-[var(--surface-1)] border border-[var(--border-1)] rounded-xl hover:border-[var(--border-3)] hover:text-[var(--text-1)] transition-all duration-200 disabled:opacity-40"
           >
-            <s.icon className="w-3.5 h-3.5 shrink-0 text-[var(--text-3)]" />
-            <span className="line-clamp-2">{s.label}</span>
+            <s.icon className="w-4 h-4 shrink-0 mt-0.5 text-[var(--text-3)] group-hover:text-[var(--accent)] transition-colors duration-200" />
+            <span className="leading-relaxed">{s.label}</span>
           </button>
         ))}
       </div>
@@ -550,8 +528,8 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
           </div>
         </div>
       )}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
           {messages.length <= 1 && messages[0]?.id === "welcome" ? (
             <Hero onPrompt={(p) => void send(p)} disabled={loading} />
           ) : (
@@ -583,13 +561,10 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
                 </div>
               )}
               {streamingActive && streamingContent && (
-                <div key="streaming" className="flex justify-start scale-in">
-                  <div className="relative max-w-[85%] rounded-lg p-3.5 bg-[var(--surface-1)] border-l-2 border-[var(--accent-cool)]">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cool)] shrink-0" />
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)]">ASSISTANT</span>
-                    </div>
-                    <div className="text-[14px] leading-relaxed text-[var(--text-1)]">
+                <div key="streaming" className="flex gap-3 scale-in">
+                  <AssistantAvatar />
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="text-[15px] leading-[1.75] text-[var(--text-1)]">
                       <Markdown>{streamingContent}</Markdown>
                       <span className="blink-cursor">█</span>
                     </div>
@@ -598,12 +573,12 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
               )}
               {loading && !streamingActive && (activeToolsList(chatCtx.activeTools).length > 0 ? (
                 <div key="loading-tools" className="fade-in-up">
-                  <div className="pl-9">
+                  <div className="pl-10">
                     <ToolCallTray tools={activeToolsList(chatCtx.activeTools)} />
                   </div>
                 </div>
               ) : (
-                <div key="loading-thinking" className="fade-in-up">
+                <div key="loading-thinking" className="fade-in-up pl-10">
                   <ThinkingIndicator index={thinkingIndex} />
                 </div>
               ))}
@@ -619,8 +594,8 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-[var(--border-1)] bg-gradient-to-t from-[var(--background)] via-[var(--background)]/95 to-transparent backdrop-blur">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
+      <div className="shrink-0 px-4 sm:px-6 pt-1 pb-3">
+        <div className="max-w-3xl mx-auto">
           <ChatComposer
             value={input}
             onChange={setInput}
@@ -631,7 +606,7 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
             onKey={handleKey}
           />
           <p className="hidden sm:block text-[10px] text-[var(--text-4)] mt-2.5 text-center font-mono tracking-wide">
-            Ctrl+Enter envoi · Shift+Enter nouvelle ligne · ↑ éditer · Ctrl+L effacer · Esc arrêter
+            Entrée envoie · Shift+Entrée nouvelle ligne · Ctrl+L effacer · Esc arrêter
           </p>
         </div>
       </div>
