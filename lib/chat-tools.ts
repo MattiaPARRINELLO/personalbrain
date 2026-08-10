@@ -16,6 +16,7 @@ import {
   addPhotoShoot,
   updatePhotoShoot,
   addIntention,
+  isSafeFetchUrl,
 } from "@/lib/storage";
 import type { PhotoShootStatus, Accreditation } from "@/lib/types";
 import {
@@ -26,8 +27,31 @@ import {
   updateGoogleCalendarEvent,
 } from "@/lib/google-actions";
 
-export const tools: UnifiedTool[] = [
-  {
+// Outils à effet externe (envoi, modification de calendrier, notification)
+// ou à écriture sensible déclenchée par du contenu non fiable : leur
+// exécution exige une confirmation explicite de l'utilisateur via
+// /api/chat/confirm. Le modèle ne peut jamais les exécuter seul.
+export const REQUIRE_CONFIRMATION = new Set<string>([
+  "send_email_response",
+  "create_calendar_event",
+  "update_calendar_event",
+  "schedule_followup",
+  "scan_accreditations",
+]);
+
+// Résultat renvoyé au modèle quand une action est bloquée en attente de
+// confirmation. Le préfixe permet au client de détecter l'état.
+export const ACTION_BLOCKED_PREFIX = "ACTION_BLOCKED:";
+
+export function confirmationMessage(name: string): string {
+  return (
+    `${ACTION_BLOCKED_PREFIX}${name}. Cette action a un effet externe et exige ` +
+    `la confirmation de l'utilisateur. Explique-lui ce que tu veux faire et ` +
+    `demande-lui de confirmer. N'exécute PAS l'action toi-meme.`
+  );
+}
+
+export const tools: UnifiedTool[] = [  {
     name: "web_search",
     description: "Effectue une recherche web pour recuperer des informations d'actualite ou des faits generaux.",
     parameters: {
@@ -282,7 +306,16 @@ export const tools: UnifiedTool[] = [
   },
 ];
 
-export async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
+export async function executeTool(
+  name: string,
+  args: Record<string, unknown>,
+  confirmed = false
+): Promise<string> {
+  // Défense en profondeur : même si un appelant oublie le contrôle en amont,
+  // une action à effet externe n'est jamais exécutée sans confirmation.
+  if (REQUIRE_CONFIRMATION.has(name) && !confirmed) {
+    return confirmationMessage(name);
+  }
   switch (name) {
     case "web_search": {
       return await webSearch(String(args.query ?? ""));
@@ -417,6 +450,9 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       const thumbnail = args.thumbnail ? String(args.thumbnail) : undefined;
       const category = args.category as "video" | "article" | "photo" | "music" | "other" | undefined;
       if (!url || !title) return "Erreur : url et title requis.";
+      if (!(await isSafeFetchUrl(url))) {
+        return "Erreur : URL non autorisee (adresse privee ou invalide).";
+      }
       const item = await addWatchLaterItem({ url, title, description, thumbnail, category });
       return `Ajoute a 'A voir plus tard' : ${item.title} (${item.source}).`;
     }

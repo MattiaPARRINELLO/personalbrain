@@ -179,7 +179,6 @@ function ToolCallResult({ tool }: { tool: ToolCall }) {
   const isError = tool.status === "error";
   const isRunning = tool.status === "running";
   const Icon = toolMeta[tool.name]?.icon ?? Sparkles;
-
   return (
     <div
       className={cn(
@@ -230,6 +229,55 @@ export function ToolCallTray({ tools }: { tools: ToolCall[] }) {
       {tools.map((t) => (
         <ToolCallResult key={t.id} tool={t} />
       ))}
+    </div>
+  );
+}
+
+export function PendingActionCard({
+  toolName,
+  argsLabel,
+  onConfirm,
+  onCancel,
+  busy,
+}: {
+  toolName: string;
+  argsLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  busy?: boolean;
+}) {
+  const meta = toolMeta[toolName];
+  const Icon = meta?.icon ?? Sparkles;
+  return (
+    <div className="rounded-lg border border-[var(--warm)]/40 bg-[var(--warm)]/8 px-3 py-2.5 text-[12px] fade-in-up">
+      <div className="flex items-center gap-2 text-[var(--text-1)]">
+        <Icon className="w-3.5 h-3.5 shrink-0 text-[var(--warm)]" />
+        <span className="font-medium">{meta?.label || toolName}</span>
+        <span className="text-[var(--text-4)] font-mono text-[10px] uppercase tracking-wider">
+          action externe — confirmation requise
+        </span>
+      </div>
+      {argsLabel && (
+        <p className="mt-1.5 text-[11px] text-[var(--text-3)] whitespace-pre-wrap break-words leading-relaxed">
+          {argsLabel}
+        </p>
+      )}
+      <div className="mt-2.5 flex items-center gap-2">
+        <button
+          onClick={onConfirm}
+          disabled={busy}
+          className="px-3 py-1.5 rounded-md bg-[var(--warm)] text-[#0a0a0b] font-medium text-[11px] uppercase tracking-wider hover:brightness-110 active:brightness-95 disabled:opacity-50 transition-all duration-200"
+        >
+          {busy ? "Exécution…" : "Confirmer"}
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={busy}
+          className="px-3 py-1.5 rounded-md border border-[var(--border-2)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] text-[11px] uppercase tracking-wider disabled:opacity-50 transition-colors duration-200"
+        >
+          Annuler
+        </button>
+      </div>
     </div>
   );
 }
