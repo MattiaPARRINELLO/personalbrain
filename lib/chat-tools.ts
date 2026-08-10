@@ -25,6 +25,7 @@ import {
   createGoogleCalendarEvent,
   fetchGoogleCalendarEvents,
   updateGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
 } from "@/lib/google-actions";
 
 // Outils à effet externe (envoi, modification de calendrier, notification)
@@ -35,6 +36,7 @@ export const REQUIRE_CONFIRMATION = new Set<string>([
   "send_email_response",
   "create_calendar_event",
   "update_calendar_event",
+  "delete_calendar_event",
   "schedule_followup",
   "scan_accreditations",
 ]);
@@ -111,6 +113,17 @@ export const tools: UnifiedTool[] = [  {
         description: { type: "string", description: "Nouvelle description (optionnel)" },
         location: { type: "string", description: "Nouveau lieu (optionnel)" },
         color_id: { type: "string", description: "Nouvelle couleur Google Calendar (optionnel). Valeurs : 1=Lavande, 2=Sauge, 3=Raisin, 4=Flamant, 5=Banane, 6=Mandarine, 7=Paon, 8=Graphite, 9=Myrtille, 10=Basilic, 11=Tomate." },
+      },
+      required: ["event_id"],
+    },
+  },
+  {
+    name: "delete_calendar_event",
+    description: "Supprime un evenement existant dans Google Calendar. Utilise d'abord search_calendar_events pour trouver l'ID de l'evenement.",
+    parameters: {
+      type: "object",
+      properties: {
+        event_id: { type: "string", description: "ID Google Calendar de l'evenement a supprimer" },
       },
       required: ["event_id"],
     },
@@ -360,6 +373,12 @@ export async function executeTool(
       if (args.color_id) updates.colorId = String(args.color_id);
       await updateGoogleCalendarEvent(eventId, updates);
       return `Evenement mis a jour (id: ${eventId}).`;
+    }
+    case "delete_calendar_event": {
+      const eventId = String(args.event_id ?? "");
+      if (!eventId) return "Erreur : event_id requis.";
+      await deleteGoogleCalendarEvent(eventId);
+      return `Evenement supprime du Google Calendar (id: ${eventId}).`;
     }
     case "search_calendar_events": {
       const days = typeof args.days === "number" ? args.days : 30;

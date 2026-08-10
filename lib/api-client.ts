@@ -84,6 +84,11 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ eventId, ...data }),
       }),
+    remove: (eventId: string) =>
+      jsonFetch<{ success: boolean }>("/api/calendar", {
+        method: "DELETE",
+        body: JSON.stringify({ eventId }),
+      }),
   },
 
   chat: {
