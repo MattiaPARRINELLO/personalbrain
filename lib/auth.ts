@@ -5,6 +5,24 @@ import { writeJsonAtomic, readJsonSafe } from "./storage";
 const USERS_FILE = path.join(process.cwd(), "data", "users.json");
 const USERS_FILENAME = "users.json";
 
+// Marqueur "bootstrap consommé" : le SETUP_TOKEN ne doit servir qu'une fois.
+// Une fois le premier passkey enregistré, le token est inutilisable, même s'il
+// fuit. Seul `bun run reset:passkey` réouvre le bootstrap.
+export const SETUP_CONSUMED_FILE = path.join(process.cwd(), "data", ".setup-consumed");
+
+export async function markSetupConsumed(): Promise<void> {
+  await fs.writeFile(SETUP_CONSUMED_FILE, new Date().toISOString(), "utf-8");
+}
+
+export async function isSetupConsumed(): Promise<boolean> {
+  try {
+    await fs.access(SETUP_CONSUMED_FILE);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export type PasskeyCredential = {
   id: string;
   publicKey: string;

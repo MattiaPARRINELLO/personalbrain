@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyRegistrationResponse } from "@simplewebauthn/server";
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
-import { getRpID, getOrigin, saveCredential, hasCredentials } from "@/lib/auth";
+import { getRpID, getOrigin, saveCredential, hasCredentials, markSetupConsumed } from "@/lib/auth";
 import { consumeChallenge, createSession, getSession } from "@/lib/session";
 
 export async function POST(request: NextRequest) {
@@ -61,6 +61,13 @@ export async function POST(request: NextRequest) {
       counter: credential.counter,
       transports: credential.transports,
     });
+
+    // Consomme le SETUP_TOKEN : le bootstrap est clos dès le premier passkey.
+    if (!alreadyRegistered) {
+      await markSetupConsumed().catch((err) => {
+        console.error("[passkey] Échec marquage setup consommé:", err);
+      });
+    }
 
     await createSession("owner");
 

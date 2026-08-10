@@ -3,10 +3,15 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const mockFs = {
   mkdir: vi.fn(),
   access: vi.fn(),
+  writeFile: vi.fn(),
 };
 
 vi.mock("fs", () => ({
-  promises: { mkdir: (...args: unknown[]) => mockFs.mkdir(...args), access: (...args: unknown[]) => mockFs.access(...args) },
+  promises: {
+    mkdir: (...args: unknown[]) => mockFs.mkdir(...args),
+    access: (...args: unknown[]) => mockFs.access(...args),
+    writeFile: (...args: unknown[]) => mockFs.writeFile(...args),
+  },
 }));
 
 const mockStorage = {
@@ -16,7 +21,7 @@ const mockStorage = {
 
 vi.mock("@/lib/storage", () => mockStorage);
 
-const { getUserStore, saveUserStore, hasCredentials, saveCredential, getCredentialById, getRpID, getOrigin } = await import("@/lib/auth");
+const { getUserStore, saveUserStore, hasCredentials, saveCredential, getCredentialById, getRpID, getOrigin, markSetupConsumed, isSetupConsumed } = await import("@/lib/auth");
 
 describe("auth", () => {
   beforeEach(() => {
@@ -96,6 +101,24 @@ describe("auth", () => {
     it("retourne null pour un id inconnu", async () => {
       mockStorage.readJsonSafe.mockResolvedValue({ credentials: [] });
       expect(await getCredentialById("nope")).toBeNull();
+    });
+  });
+
+  describe("markSetupConsumed / isSetupConsumed", () => {
+    it("isSetupConsumed retourne false sans marqueur", async () => {
+      mockFs.access.mockRejectedValue(new Error("ENOENT"));
+      expect(await isSetupConsumed()).toBe(false);
+    });
+
+    it("isSetupConsumed retourne true quand le marqueur existe", async () => {
+      mockFs.access.mockResolvedValue(undefined);
+      expect(await isSetupConsumed()).toBe(true);
+    });
+
+    it("markSetupConsumed écrit le marqueur", async () => {
+      mockFs.writeFile.mockResolvedValue(undefined);
+      await markSetupConsumed();
+      expect(mockFs.writeFile).toHaveBeenCalled();
     });
   });
 
