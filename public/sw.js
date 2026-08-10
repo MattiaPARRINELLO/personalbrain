@@ -72,6 +72,11 @@ self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") {
     self.skipWaiting();
   }
+  if (event.data?.type === "CLEAR_CACHE") {
+    // Déconnexion : purge le cache (réponses GET, pages pré-rendues contenant
+    // des données personnelles) pour qu'il ne reste pas accessible.
+    event.waitUntil(caches.delete(CACHE));
+  }
 });
 
 self.addEventListener("push", (event) => {
