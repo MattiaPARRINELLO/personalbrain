@@ -1,6 +1,6 @@
 import type { WatchLaterCategory, WatchLaterData, WatchLaterItem } from "../types";
 import { maybeBackup, mutateJson, readOrCreate, writeJsonAtomic } from "../storage-core";
-import { isSafeFetchUrl } from "../web";
+import { isSafeFetchUrl, safeFetchText } from "../web";
 
 const defaultWatchLater: WatchLaterData = { items: [] };
 
@@ -107,12 +107,9 @@ export async function autoSummarize(url: string, title: string): Promise<{ summa
     return { summary: "", tags: [] };
   }
   try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(8000),
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; BACKSTAGE/1.0)" },
-    });
-    if (!res.ok) return { summary: "", tags: [] };
-    const html = await res.text();
+    // safeFetchText : redirections re-vérifiées (anti-SSRF) et corps limité.
+    const html = await safeFetchText(url, 8000);
+    if (!html) return { summary: "", tags: [] };
 
     // Extraction de texte minimal : enlever scripts, styles, balises
     const text = html
