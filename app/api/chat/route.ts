@@ -14,7 +14,7 @@ import type { ChatMessage, MemoryCategory } from "@/lib/types";
 import { autoExtractMemoryFacts } from "@/app/actions/brain";
 import { getSession } from "@/lib/session";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { executeTool, tools } from "@/lib/chat-tools";
+import { executeTool, tools, REQUIRE_CONFIRMATION, confirmationMessage } from "@/lib/chat-tools";
 import { buildSystemPrompt } from "@/lib/chat-prompts";
 
 
@@ -298,7 +298,21 @@ export async function POST(request: NextRequest) {
           try {
             let args: Record<string, unknown> = {};
             try { args = JSON.parse(tc.arguments); } catch { args = {}; }
-            result = await executeTool(tc.name, args);
+            if (REQUIRE_CONFIRMATION.has(tc.name)) {
+              // Action à effet externe : bloquée en attente de confirmation
+              // utilisateur. Le client affiche une carte Confirmer/Annuler ;
+              // l'exécution réelle passe par POST /api/chat/confirm. Le modèle
+              // reçoit un résultat de blocage et peut expliquer la situation.
+              send({
+                type: "tool_confirm",
+                toolCallId: tc.toolCallId,
+                name: tc.name,
+                arguments: tc.arguments,
+              });
+              result = confirmationMessage(tc.name);
+            } else {
+              result = await executeTool(tc.name, args);
+            }
           } catch (err) {
             result = `Erreur: ${err instanceof Error ? err.message : String(err)}`;
           }

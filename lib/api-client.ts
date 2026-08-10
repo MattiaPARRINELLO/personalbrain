@@ -130,6 +130,13 @@ export const api = {
         }
       }
     },
+
+    // Exécute une action IA bloquée en attente de confirmation utilisateur.
+    confirmAction: (name: string, args: Record<string, unknown>) =>
+      jsonFetch<{ ok: boolean; result?: string; error?: string }>("/api/chat/confirm", {
+        method: "POST",
+        body: JSON.stringify({ name, arguments: args }),
+      }),
   },
 };
 
@@ -138,6 +145,7 @@ export type ChatStreamEvent =
   | { type: "delta"; content: string }
   | { type: "tool_start"; toolCallId: string; name: string; arguments: string }
   | { type: "tool_result"; name: string; result: string }
+  | { type: "tool_confirm"; toolCallId: string; name: string; arguments: string }
   | { type: "memory_facts"; facts: { content: string; category: string; confidence: number }[] }
   | { type: "done"; content: string }
   | { type: "error"; message: string };

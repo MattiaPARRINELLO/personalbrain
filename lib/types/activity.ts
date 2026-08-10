@@ -24,7 +24,8 @@ export type ActivityAction =
   | "chat_message_sent"
   | "daily_brief_sent"
   | "login"
-  | "logout";
+  | "logout"
+  | "ai_action";
 
 export interface ActivityEntry {
   id: string;
