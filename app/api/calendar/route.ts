@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, updateGoogleCalendarEvent } from "@/lib/google-actions";
+import { fetchGoogleCalendarEvents, createGoogleCalendarEvent, updateGoogleCalendarEvent, deleteGoogleCalendarEvent } from "@/lib/google-actions";
 import { getServerCached, setServerCached, invalidateServerCache } from "@/lib/server-cache";
 import { safeErrorMessage } from "@/lib/utils";
 import type { GoogleCalendarEvent as CalendarEventItem } from "@/lib/types";
@@ -92,6 +92,24 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Calendar PATCH error:", err);
+    return NextResponse.json({ error: safeErrorMessage(err) }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = (await request.json()) as { eventId?: string };
+
+    if (!body.eventId) {
+      return NextResponse.json({ error: "eventId requis" }, { status: 400 });
+    }
+
+    await deleteGoogleCalendarEvent(body.eventId);
+
+    invalidateServerCache(CALENDAR_LIST_CACHE_KEY);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Calendar DELETE error:", err);
     return NextResponse.json({ error: safeErrorMessage(err) }, { status: 500 });
   }
 }

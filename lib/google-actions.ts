@@ -259,6 +259,18 @@ export async function updateGoogleCalendarEvent(
   );
 }
 
+export async function deleteGoogleCalendarEvent(eventId: string): Promise<void> {
+  const auth = await getCalendarClient();
+
+  await googleFetch<unknown>(
+    auth,
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+    {
+      method: "DELETE",
+    }
+  );
+}
+
 export async function fetchGoogleCalendarEvents(
   timeMin: string,
   timeMax: string
