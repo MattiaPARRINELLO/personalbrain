@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateRegistrationOptions } from "@simplewebauthn/server";
-import { getRpID, getOrigin, hasCredentials } from "@/lib/auth";
+import { getRpID, getOrigin, hasCredentials, isSetupConsumed } from "@/lib/auth";
 import { createChallenge, getSession } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
@@ -16,6 +16,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
   } else if (process.env.SETUP_TOKEN) {
+    // Le token est one-time : une fois le bootstrap consommé, il ne peut plus
+    // être réutilisé (même si credentials a été vidé manuellement). Seul
+    // `bun run reset:passkey` purge le marqueur et réouvre le setup.
+    if (await isSetupConsumed()) {
+      return NextResponse.json(
+        { error: "Bootstrap déjà utilisé. Exécutez bun run reset:passkey pour recommencer." },
+        { status: 403 }
+      );
+    }
     // Premier setup exposé à l'internet : exiger un token de bootstrap
     // one-time (défini via SETUP_TOKEN) pour empêcher qu'un attaquant
     // s'enregistre comme propriétaire avant l'installation.
