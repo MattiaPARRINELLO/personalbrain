@@ -120,6 +120,15 @@ ssh -p "$SSH_PORT" "${SSH_USER}@${SSH_HOST}" \
   && echo -e "${GREEN}  ✓ Dépendances installées${NC}" \
   || echo -e "${YELLOW}  ⚠  Impossible d'installer les dépendances — à faire manuellement :${NC}"
 
+# ─── 3.6 Durcissement des permissions ─────────────────
+# Les tokens OAuth et le secret de session ne doivent pas être lisibles par
+# d'autres comptes du serveur partagé (cPanel) : data/ en 700, fichiers 600.
+echo -e "${CYAN}→ Durcissement des permissions data/…${NC}"
+ssh -p "$SSH_PORT" "${SSH_USER}@${SSH_HOST}" \
+  "cd ${SSH_TARGET_DIR} && chmod 700 data 2>/dev/null; find data -type f -exec chmod 600 {} + 2>/dev/null; chmod 600 .env 2>/dev/null; echo 'ok'" \
+  && echo -e "${GREEN}  ✓ Permissions durcies (data/ 700, fichiers 600)${NC}" \
+  || echo -e "${YELLOW}  ⚠  chmod data/ échoué — à exécuter manuellement sur le serveur${NC}"
+
 # ─── 4. Restart ────────────────────────────────────────
 echo -e "\n${CYAN}→ Redémarrage de l'App Node.js…${NC}"
 
