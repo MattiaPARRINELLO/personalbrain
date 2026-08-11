@@ -13,6 +13,8 @@ import {
   Download,
   ShieldAlert,
   Loader2,
+  BellRing,
+  Cpu,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { setLeetcodeUsername, loadLeetcode } from "@/app/actions/leetcode";
@@ -51,6 +53,19 @@ export default function SettingsPage() {
   const [leetUsername, setLeetUsername] = useState("");
   const [leetSaving, setLeetSaving] = useState(false);
   const [leetMsg, setLeetMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const [runtime, setRuntime] = useState<{
+    models: { general: string; code: string };
+    features: { dailyBrief: boolean; webSearch: boolean };
+    pushCount: number;
+  } | null>(null);
+
+  useEffect(() => {
+    import("@/app/actions/settings")
+      .then(({ loadRuntimeInfo }) => loadRuntimeInfo())
+      .then(setRuntime)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     loadLeetcode().then((d) => {
@@ -297,6 +312,69 @@ export default function SettingsPage() {
                   >
                     {msStatus?.linked ? "Reconnecter" : "Connecter"}
                   </a>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Notifications & IA"
+                subtitle="État du push et des modèles d'IA configurés."
+                action={<BellRing className="w-4 h-4 text-[var(--text-3)]" />}
+              />
+              <CardBody>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)]/40">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center border border-[var(--border-2)] text-[var(--text-3)]">
+                        <BellRing className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-medium text-[var(--text-1)]">Notifications push</p>
+                        <p className="text-[11px] text-[var(--text-3)]">
+                          {runtime === null
+                            ? "Vérification…"
+                            : runtime.pushCount > 0
+                              ? `${runtime.pushCount} appareil(s) enregistré(s)`
+                              : "Aucun appareil enregistré"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)]/40">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center border border-[var(--border-2)] text-[var(--text-3)]">
+                        <Cpu className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-medium text-[var(--text-1)]">Modèles d'IA</p>
+                        <p className="text-[11px] text-[var(--text-3)] font-mono">
+                          {runtime === null
+                            ? "Vérification…"
+                            : `général : ${runtime.models.general} · code : ${runtime.models.code}`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)]/40">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center border border-[var(--border-2)] text-[var(--text-3)]">
+                        <Globe className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-medium text-[var(--text-1)]">Brief quotidien</p>
+                        <p className="text-[11px] text-[var(--text-3)]">
+                          {runtime === null
+                            ? "Vérification…"
+                            : runtime.features.dailyBrief
+                              ? "Activé (envoi à 7h)"
+                              : "Désactivé"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </CardBody>
             </Card>
