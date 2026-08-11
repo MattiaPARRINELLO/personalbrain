@@ -1,11 +1,30 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const mockStorage = {
-  readJsonSafe: vi.fn(),
-  writeJsonAtomic: vi.fn(),
-};
+// Simule le stockage JSON par fichier : readJsonSafe lit le store partagé,
+// mutateJson applique le mutator sous "lock" et persiste le résultat.
+const store = new Map<string, unknown>();
 
-vi.mock("@/lib/storage", () => mockStorage);
+const mockReadJsonSafe = vi.fn(async (_file: string, fallback: unknown) => {
+  return structuredClone(store.get("push-subscriptions.json") ?? fallback);
+});
+
+const mockMutateJson = vi.fn(
+  async (file: string, fallback: SubsData, mutator: (data: SubsData) => SubsData | null | void) => {
+    const current = structuredClone(store.get(file) ?? fallback) as SubsData;
+    const res = mutator(current);
+    const next = res ?? current;
+    store.set(file, next);
+    return next;
+  }
+);
+
+vi.mock("@/lib/storage", () => ({
+  readJsonSafe: mockReadJsonSafe,
+  writeJsonAtomic: vi.fn(),
+}));
+vi.mock("@/lib/storage-core", () => ({ mutateJson: mockMutateJson }));
+
+type SubsData = { subscriptions: unknown[] };
 
 const { getSubscriptions, addSubscription, removeSubscription } = await import("@/lib/push-subscriptions");
 
@@ -24,48 +43,42 @@ const sub2 = {
 describe("push-subscriptions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    store.clear();
   });
 
   it("getSubscriptions retourne un tableau vide par défaut", async () => {
-    mockStorage.readJsonSafe.mockResolvedValue({ subscriptions: [] });
     const subs = await getSubscriptions();
     expect(subs).toEqual([]);
   });
 
   it("getSubscriptions retourne les abonnements existants", async () => {
-    mockStorage.readJsonSafe.mockResolvedValue({ subscriptions: [sub1, sub2] });
+    store.set("push-subscriptions.json", { subscriptions: [sub1, sub2] });
     const subs = await getSubscriptions();
     expect(subs).toHaveLength(2);
     expect(subs[0].endpoint).toBe("https://push.example.com/1");
   });
 
   it("addSubscription ajoute un nouvel abonnement", async () => {
-    mockStorage.readJsonSafe.mockResolvedValue({ subscriptions: [] });
     await addSubscription(sub1);
-    expect(mockStorage.writeJsonAtomic).toHaveBeenCalledWith("push-subscriptions.json", {
-      subscriptions: [sub1],
-    });
+    expect(store.get("push-subscriptions.json")).toEqual({ subscriptions: [sub1] });
   });
 
   it("addSubscription ne duplique pas un abonnement existant (même endpoint)", async () => {
-    mockStorage.readJsonSafe.mockResolvedValue({ subscriptions: [sub1] });
+    store.set("push-subscriptions.json", { subscriptions: [sub1] });
     await addSubscription(sub1);
-    expect(mockStorage.writeJsonAtomic).not.toHaveBeenCalled();
+    const stored = store.get("push-subscriptions.json") as { subscriptions: typeof sub1[] };
+    expect(stored.subscriptions).toHaveLength(1);
   });
 
   it("removeSubscription supprime un abonnement par endpoint", async () => {
-    mockStorage.readJsonSafe.mockResolvedValue({ subscriptions: [sub1, sub2] });
+    store.set("push-subscriptions.json", { subscriptions: [sub1, sub2] });
     await removeSubscription(sub1.endpoint);
-    expect(mockStorage.writeJsonAtomic).toHaveBeenCalledWith("push-subscriptions.json", {
-      subscriptions: [sub2],
-    });
+    expect(store.get("push-subscriptions.json")).toEqual({ subscriptions: [sub2] });
   });
 
-  it("removeSubscription ne fait rien pour un endpoint inexistant", async () => {
-    mockStorage.readJsonSafe.mockResolvedValue({ subscriptions: [sub1] });
+  it("removeSubscription ne change rien pour un endpoint inexistant", async () => {
+    store.set("push-subscriptions.json", { subscriptions: [sub1] });
     await removeSubscription("https://push.example.com/unknown");
-    expect(mockStorage.writeJsonAtomic).toHaveBeenCalledWith("push-subscriptions.json", {
-      subscriptions: [sub1],
-    });
+    expect(store.get("push-subscriptions.json")).toEqual({ subscriptions: [sub1] });
   });
 });
