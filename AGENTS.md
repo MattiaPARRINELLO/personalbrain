@@ -17,7 +17,7 @@ Mono-utilisateur, auth par passkey, données en JSON local.
 
 ## ⚠️ À lire avant toute modification
 
-1. **`middleware.ts` protège TOUT par défaut.** Toute nouvelle route est privée
+1. **`proxy.ts` protège TOUT par défaut.** Toute nouvelle route est privée
    sauf ajout explicite dans `PUBLIC_PATHS` / `PUBLIC_API_PREFIXES`.
 2. **Server Actions : retour brut + `throw`.** Pas de wrapper `{ ok, error }`.
 3. **`requireSession()` en première ligne** de chaque Server Action. Sans exception.
@@ -127,7 +127,7 @@ composants sont dans `app/reminders/` et `app/watch-later/`. Ne pas s'y fier.
 
 ## Auth & sécurité
 
-### middleware.ts — deny-by-default
+### proxy.ts — deny-by-default
 
 Matcher : tout sauf `_next/static`, `_next/image`, `assets`, `icons`, `images`,
 `android-chrome-*`, `apple-touch-*`.
@@ -143,13 +143,13 @@ Matcher : tout sauf `_next/static`, `_next/image`, `assets`, `icons`, `images`,
 - `/api/*` → `401 JSON`
 - autre → `redirect("/login")`
 
-Le middleware tourne sur le **runtime edge** → utilise `lib/session-edge.ts`
-(`verifyJwt`, `SESSION_COOKIE`). Ne jamais y importer de code Node (`fs`, `path`).
+Le proxy tourne sur le **runtime Node par défaut** (Next 16 ; edge possible) →
+utilise `lib/session-edge.ts` (`verifyJwt`, `SESSION_COOKIE`). Ne pas y importer
+de code lourd (`fs`, `path`) si un jour déployé en edge.
 
-⚠️ **Dépréciation Next 16.2** : le boot serveur affiche « The "middleware" file
-convention is deprecated. Please use "proxy" instead ». La migration
-`middleware.ts` → `proxy.ts` est à prévoir (renommage + revalidation) mais
-l'app fonctionne telle quelle.
+✅ **Migration `middleware.ts` → `proxy.ts` réalisée** (Next 16.2 déprécie
+l'ancien nom) : fichier renommé, fonction exportée `proxy`, runtime Node par
+défaut. Testé par `proxy.test.ts` et les E2E (deny-by-default).
 
 ### Routes notables hors `/api/auth`
 
@@ -166,7 +166,7 @@ l'app fonctionne telle quelle.
 
 | Fichier               | Runtime | Usage                                                                              |
 | --------------------- | ------- | ---------------------------------------------------------------------------------- |
-| `lib/session-edge.ts` | edge    | middleware uniquement                                                              |
+| `lib/session-edge.ts` | edge/node | proxy (`proxy.ts`) uniquement                                                    |
 | `lib/session-core.ts` | node    | logique JWT + `fs`                                                                 |
 | `lib/session.ts`      | node    | **à importer dans les Server Actions** — expose `requireSession()`, `getSession()` |
 
@@ -327,7 +327,7 @@ export async function register() {
 
 ⚠️ Les imports sont **dynamiques et gardés par `NEXT_RUNTIME`** volontairement.
 Un import statique de `dotenv` embarque `fs`/`path`/`os`/`crypto` dans le bundle
-edge et **crashe le middleware** (`__import_unsupported is not defined`).
+edge et **crashe le proxy** (`__import_unsupported is not defined`).
 **Ne pas convertir en imports statiques.**
 
 ---
@@ -340,7 +340,7 @@ edge et **crashe le middleware** (`__import_unsupported is not defined`).
 
 Emplacements : `lib/__tests__/`, `app/actions/__tests__/`,
 `app/calendar/__tests__/`, `app/api/chat/__tests__/` + 2 fichiers **à la
-racine** : `middleware.test.ts` (deny-by-default) et `cron-auth.test.ts`
+racine** : `proxy.test.ts` (deny-by-default) et `cron-auth.test.ts`
 (secret partagé).
 
 **Tests dépendant du FS** : mocker `process.cwd()` **puis** faire un
@@ -436,9 +436,7 @@ Modèle complet : `.deploy.env.example`.
 6. Route Handlers ↔ Server Actions : recouvrement à maintenir manuellement
 7. `.gitignore` : entrée résiduelle `android/app/google-services.json`
 8. Fichier `tree` non suivi à la racine — à supprimer
-9. **Next 16.2 déprécie `middleware.ts` → `proxy.ts`** (warning au boot) :
-   migration à prévoir (renommage + revalidation)
-10. `data/.setup-consumed` : marqueur « bootstrap SETUP_TOKEN consommé » —
+9. `data/.setup-consumed` : marqueur « bootstrap SETUP_TOKEN consommé » —
     purge via `bun run reset:passkey` uniquement
 
 ---
@@ -446,7 +444,7 @@ Modèle complet : `.deploy.env.example`.
 ## Si tu bloques
 
 1. **API Next.js incertaine** → `node_modules/next/dist/docs/`
-2. **Auth / routing** → `middleware.ts` puis `lib/session.ts`
+2. **Auth / routing** → `proxy.ts` puis `lib/session.ts`
 3. **Pattern d'action** → `app/actions/reminders.ts` (référence canonique)
 4. **Question produit** → `PRODUCT.md` (si présent, sinon demander)
 5. **Question UI** → `DESIGN.md` (si présent, sinon demander)
@@ -460,7 +458,7 @@ Modèle complet : `.deploy.env.example`.
 ## Maintenance de ce fichier
 
 Toute modification structurelle — nouveau dossier racine, changement de
-`middleware.ts`, nouveau script `package.json`, nouveau provider OAuth, nouvelle
+`proxy.ts`, nouveau script `package.json`, nouveau provider OAuth, nouvelle
 variable d'env, nouvel outil — doit être répercutée ici **dans le même commit**.
 
 Un `AGENTS.md` périmé est plus dangereux qu'un `AGENTS.md` absent : l'agent
