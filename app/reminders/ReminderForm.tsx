@@ -47,19 +47,25 @@ export function ReminderForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Titre du rappel"
+          aria-label="Titre du rappel"
           autoFocus
         />
         <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Notes (optionnel)"
+          aria-label="Notes"
           rows={2}
         />
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-[var(--text-3)] font-mono uppercase tracking-wider shrink-0">
+          <label
+            htmlFor="reminder-due"
+            className="text-[11px] text-[var(--text-3)] font-mono uppercase tracking-wider shrink-0"
+          >
             Échéance
           </label>
           <Input
+            id="reminder-due"
             type="datetime-local"
             value={dueAt}
             onChange={(e) => setDueAt(e.target.value)}
@@ -70,7 +76,7 @@ export function ReminderForm({
           <label className="text-[11px] text-[var(--text-3)] font-mono uppercase tracking-wider shrink-0">
             Récurrence
           </label>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Récurrence">
             <button
               type="button"
               onClick={() => setRecurrence(undefined)}

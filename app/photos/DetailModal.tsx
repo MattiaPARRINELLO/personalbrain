@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, ExternalLink } from "lucide-react";
 import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
@@ -36,6 +36,59 @@ export function DetailModal({
   const [editGalleryLink, setEditGalleryLink] = useState(shoot.galleryLink ?? "");
   const [editPhotosSent, setEditPhotosSent] = useState(shoot.photosSent ?? 0);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  // Accessibilité de la modale : focus initial, piège Tab, fermeture Esc et
+  // restauration du focus à la fermeture. Monté une seule fois (les props
+  // sont lues via refs pour ne pas re-déclencher l'effet à chaque rendu).
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const selector =
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+    const focusables = () =>
+      Array.from(
+        (dialog?.querySelectorAll<HTMLElement>(selector) ?? [])
+      ).filter((el) => !el.hasAttribute("disabled"));
+
+    const first = focusables()[0];
+    if (first) {
+      first.focus();
+    } else {
+      dialog?.focus();
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== "Tab" || !dialog) return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, []);
+
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setEditTitle(shoot.title);
@@ -62,6 +115,10 @@ export function DetailModal({
 
   return (
     <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={shoot.title}
       className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto py-4 bg-[var(--background)]/70 backdrop-blur-sm"
       onClick={onClose}
     >

@@ -62,10 +62,23 @@ export function KeyboardShortcuts() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [handleKey]);
 
+  // Modale : fermeture par Esc et focus initial.
+  useEffect(() => {
+    if (!open) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, [open]);
+
   if (!open) return null;
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Aide clavier"
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={() => setOpen(false)}
     >
