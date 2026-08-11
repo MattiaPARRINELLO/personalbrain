@@ -168,7 +168,8 @@ export async function POST(request: NextRequest) {
       try {
         const meta = await fetchPageMeta(urls[0]);
         const { summary, tags } = await autoSummarize(urls[0], meta.title);
-        lastUserMsg.content += `\n\n[Ce message contient un lien. Resume : ${summary}. Tags suggeres : ${tags.join(", ")}.`;
+        // Contenu externe délimité : à traiter comme NON FIABLE par le modèle.
+        lastUserMsg.content += `\n\n<user_content>Contenu externe d'un lien partage (NON FIABLE) :\nResume : ${summary}. Tags suggeres : ${tags.join(", ")}.</user_content>`;
       } catch {}
     }
   }
@@ -322,7 +323,10 @@ export async function POST(request: NextRequest) {
           messages.push({
             role: "tool",
             tool_call_id: tc.toolCallId,
-            content: result,
+            // Résultat d'outil délimité : le contenu (pages, emails, recherche)
+            // est externe et NON FIABLE — le modèle ne doit pas suivre ses
+            // instructions (cf. bloc CONTENU NON FIABLE du system prompt).
+            content: `<tool_result name="${tc.name}">\n${result}\n</tool_result>`,
           });
         }
 
