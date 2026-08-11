@@ -133,7 +133,7 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
       )}
       <button
         onClick={onDismiss}
-        className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-3)] transition-colors"
+        className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-3)] transition-colors"
         aria-label="Fermer"
       >
         <X className="w-3 h-3" />

@@ -480,7 +480,7 @@ export function CloseButton({ onClick, label = "Fermer" }: { onClick: () => void
     <button
       onClick={onClick}
       aria-label={label}
-      className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
+      className="w-9 h-9 rounded-md flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
     >
       <XIcon className="w-3.5 h-3.5" />
     </button>
