@@ -22,6 +22,14 @@ import {
 import { MessageBlock, ToolCallTray, ThinkingIndicator, AssistantAvatar, PendingActionCard } from "@/components/chat/MessageBlocks";
 import { KeyboardSafe } from "@/components/ui/KeyboardSafe";
 
+// Scroll doux désactivé quand l'utilisateur demande un mouvement réduit.
+function scrollBehavior(): ScrollBehavior {
+  return typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? "auto"
+    : "smooth";
+}
+
 // Résumé lisible d'une action IA en attente de confirmation, pour la carte
 // Confirmer/Annuler. Aucun argument n'est affiché intégralement (confidentialité).
 function describeAction(name: string, args: Record<string, unknown>): string {
@@ -41,8 +49,7 @@ function describeAction(name: string, args: Record<string, unknown>): string {
   }
 }
 
-function Hero({ onPrompt, disabled }: { onPrompt: (p: string) => void; disabled: boolean }) {
-  return (
+function Hero({ onPrompt, disabled }: { onPrompt: (p: string) => void; disabled: boolean }) {  return (
     <div className="flex flex-col items-center text-center pt-6">
       <div className="relative flex items-center justify-center">
         <div className="absolute w-44 h-44 rounded-full bg-[var(--accent)]/8 blur-[60px]" aria-hidden />
@@ -278,12 +285,12 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
     const isNewMessage = len > prevMessagesLenRef.current;
     prevMessagesLenRef.current = len;
     if (isNewMessage) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      el.scrollTo({ top: el.scrollHeight, behavior: scrollBehavior() });
     } else {
       const threshold = 60;
       const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
       if (isNearBottom) {
-        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+        el.scrollTo({ top: el.scrollHeight, behavior: scrollBehavior() });
       }
     }
   }, [messages, streamingContent]);
