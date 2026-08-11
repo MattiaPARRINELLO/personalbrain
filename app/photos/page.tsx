@@ -16,12 +16,14 @@ import { STATUS_FLOW } from "./constants";
 import { ShootCard } from "./ShootCard";
 import { DetailModal } from "./DetailModal";
 import { AddShootForm } from "./AddShootForm";
+import { GalleryKanban } from "./GalleryKanban";
 
 export default function PhotoShootsPage() {
   const [data, setData] = useState<PhotoShootsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [, startTransition] = useTransition();
   const [showAdd, setShowAdd] = useState(false);
+  const [view, setView] = useState<"shoots" | "delivery">("shoots");
   const [detailShootId, setDetailShootId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<PhotoShootStatus | null>(null);
@@ -144,12 +146,40 @@ export default function PhotoShootsPage() {
           <PageHeader
             eyebrow="Photographie"
             title="Photos"
-            description="Suivi des shootings"
+            description="Shootings et livraisons photo au même endroit."
             actions={
               !showAdd && (
-                <Button variant="primary" size="sm" onClick={() => setShowAdd(true)} leftIcon={<Plus className="w-3 h-3" />}>
-                  Nouveau shooting
-                </Button>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center rounded-md border border-[var(--border-2)] overflow-hidden">
+                    <button
+                      onClick={() => setView("shoots")}
+                      className={cn(
+                        "px-3 h-8 text-[12px] font-medium transition-colors",
+                        view === "shoots"
+                          ? "bg-[var(--surface-2)] text-[var(--text-1)]"
+                          : "text-[var(--text-3)] hover:text-[var(--text-1)]"
+                      )}
+                    >
+                      Shootings
+                    </button>
+                    <button
+                      onClick={() => setView("delivery")}
+                      className={cn(
+                        "px-3 h-8 text-[12px] font-medium transition-colors",
+                        view === "delivery"
+                          ? "bg-[var(--surface-2)] text-[var(--text-1)]"
+                          : "text-[var(--text-3)] hover:text-[var(--text-1)]"
+                      )}
+                    >
+                      Livraison
+                    </button>
+                  </div>
+                  {view === "shoots" && (
+                    <Button variant="primary" size="sm" onClick={() => setShowAdd(true)} leftIcon={<Plus className="w-3 h-3" />}>
+                      Nouveau shooting
+                    </Button>
+                  )}
+                </div>
               )
             }
           />
@@ -164,7 +194,11 @@ export default function PhotoShootsPage() {
           </div>
         )}
 
-        {loading ? (
+        {view === "delivery" ? (
+          <div className="flex-1 min-h-0 overflow-y-auto pt-2">
+            <GalleryKanban />
+          </div>
+        ) : loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-6 pb-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="flex flex-col gap-3">
