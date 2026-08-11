@@ -48,8 +48,8 @@
 
   --text-1: #f5f5f4;
   --text-2: #a1a1aa;
-  --text-3: #71717a;
-  --text-4: #52525b;
+  --text-3: #8b8b94;
+  --text-4: #787880;
 
   --accent: #a5b4fc;
   --accent-soft: #c7d2fe;
@@ -816,5 +816,17 @@ textarea::placeholder {
   .login-ring[data-phase="verified"] .login-burst-ring,
   .login-ring[data-phase="error"] {
     animation: none !important;
+  }
+
+  /* Toutes les autres animations (shimmer, pulse-dot, breathe,
+     thinking-dot, tool-scan, chat-stagger, toast, context-pulse,
+     fade-in, slide-up…) sont réduites à un état terminal immédiat. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
