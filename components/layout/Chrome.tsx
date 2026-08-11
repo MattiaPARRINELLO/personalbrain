@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import {
   Brain,
   MessageSquareText,
@@ -51,8 +51,21 @@ const navItems: NavItem[] = [
   { href: "/gallery", label: "Galerie", icon: Images },
 ];
 
-const mobileNavItems: NavItem[] = navItems.slice(0, 5);
-const mobileMoreItems: NavItem[] = navItems.slice(5);
+// Navigation principale : les 4 destinations cœur du produit. Le reste est
+// accessible via le menu « Plus » (rail desktop et bottom nav mobile).
+const primaryNavItems: NavItem[] = [
+  { href: "/chat", label: "Console IA", icon: MessageSquareText, exact: true },
+  { href: "/today", label: "Aujourd'hui", icon: CalendarDays, exact: true },
+  { href: "/brain", label: "Cerveau", icon: Brain },
+  { href: "/watch-later", label: "À voir", icon: Bookmark },
+];
+
+const secondaryNavItems: NavItem[] = navItems.filter(
+  (item) => !primaryNavItems.some((p) => p.href === item.href)
+);
+
+const mobileNavItems: NavItem[] = primaryNavItems;
+const mobileMoreItems: NavItem[] = secondaryNavItems;
 
 const GOOGLE_STATUS_KEY = "google:status";
 
@@ -97,7 +110,7 @@ export function LeftNav() {
       </div>
 
       <nav className="flex-1 flex flex-col items-center gap-1 py-4 overflow-y-auto min-h-0">
-        {navItems.map((item) => {
+        {primaryNavItems.map((item) => {
           const active = item.exact
             ? pathname === item.href
             : pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -107,6 +120,7 @@ export function LeftNav() {
               key={item.href}
               href={item.href}
               title={item.label}
+              aria-label={item.label}
               className={cn(
                 "group relative w-11 h-11 rounded-lg flex items-center justify-center transition-all duration-200",
                 active
@@ -124,6 +138,22 @@ export function LeftNav() {
             </Link>
           );
         })}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("backstage:open-more"))}
+          title="Toutes les pages"
+          aria-label="Toutes les pages"
+          className={cn(
+            "group relative w-11 h-11 rounded-lg flex items-center justify-center transition-all duration-200",
+            !primaryNavItems.some((p) => p.exact ? pathname === p.href : pathname === p.href || pathname.startsWith(`${p.href}/`))
+              ? "bg-[var(--surface-2)] text-[var(--accent)] border border-[var(--border-2)]"
+              : "text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] border border-transparent"
+          )}
+        >
+          <MoreHorizontal className="w-[18px] h-[18px]" strokeWidth={1.75} />
+          <span className="pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md bg-[var(--surface-3)] border border-[var(--border-2)] text-[11px] text-[var(--text-1)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50">
+            Toutes les pages
+          </span>
+        </button>
       </nav>
 
       <div className="flex flex-col items-center gap-2 py-4 border-t border-[var(--border-1)]">
@@ -248,6 +278,14 @@ export function MobileBottomNav() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
 
+  // Le rail desktop et la bottom nav mobile ouvrent le même sheet via cet
+  // événement : les pages secondaires restent accessibles partout.
+  useEffect(() => {
+    const openMore = () => setMoreOpen(true);
+    window.addEventListener("backstage:open-more", openMore);
+    return () => window.removeEventListener("backstage:open-more", openMore);
+  }, []);
+
   const coreActive = mobileNavItems.some(
     (item) =>
       item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`)
@@ -308,7 +346,7 @@ function MobileMoreSheet({ open, onClose }: { open: boolean; onClose: () => void
   };
 
   return (
-    <div className="lg:hidden fixed inset-0 z-[95]" role="dialog" aria-modal="true" aria-label="Menu">
+    <div className="fixed inset-0 z-[95]" role="dialog" aria-modal="true" aria-label="Menu">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="absolute inset-x-0 bottom-0 max-h-[82vh] rounded-t-2xl border-t border-[var(--border-1)] bg-[var(--surface-1)] flex flex-col pb-[env(safe-area-inset-bottom)] fade-in-up">
         <div className="flex items-center justify-between h-12 px-4 border-b border-[var(--border-1)] shrink-0">
