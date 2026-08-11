@@ -1,10 +1,11 @@
 "use client";
 
-import { Bell, Brain, Music, Code2, Mail } from "lucide-react";
+import { Bell, Brain, Music, Mail } from "lucide-react";
 import { createReminder } from "@/app/actions/reminders";
 import { rememberFact } from "@/app/actions/brain";
 import { loadConcerts, saveConcertEvents } from "@/app/actions/concerts";
 import { findEmails } from "@/app/actions/ai-tools";
+import { api } from "@/lib/api-client";
 import type { MemoryCategory, ConcertEvent } from "@/lib/types";
 
 export type ParsedArgs = Record<string, string>;
@@ -212,23 +213,6 @@ export const COMMANDS: CommandDef[] = [
     },
   },
   {
-    id: "leetcode",
-    prefix: "/leetcode",
-    label: "Synchroniser LeetCode",
-    description: "Déclenche une synchronisation des exercices LeetCode",
-    usage: "/leetcode sync",
-    icon: Code2,
-    parse(raw) {
-      const rest = raw.slice("/leetcode".length).trim().toLowerCase();
-      if (rest !== "sync") return null;
-      return {};
-    },
-    async execute() {
-      // Placeholder — la vraie sync viendra plus tard
-      return "✓ Sync LeetCode lancée";
-    },
-  },
-  {
     id: "search",
     prefix: "/search",
     label: "Chercher dans les emails",
@@ -241,6 +225,12 @@ export const COMMANDS: CommandDef[] = [
       return { query: rest };
     },
     async execute(args) {
+      // La palette reflète l'état réel : sans compte Gmail lié, la recherche
+      // ne peut pas aboutir — on le dit au lieu d'échouer silencieusement.
+      const status = await api.googleStatus();
+      if (!status.gmail) {
+        throw new Error("Gmail non connecté — lie ton compte dans les Paramètres.");
+      }
       const emails = await findEmails(args.query);
       if (emails.length === 0) return `Aucun email trouvé pour "${args.query}"`;
       return `${emails.length} email(s) trouvé(s) pour "${args.query}"`;

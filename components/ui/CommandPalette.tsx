@@ -409,7 +409,6 @@ export function CommandPalette() {
               Essayez <kbd className="px-1 py-0.5 rounded bg-[var(--surface-2)] border border-[var(--border-1)] text-[10px] font-mono">/todo</kbd>,{" "}
               <kbd className="px-1 py-0.5 rounded bg-[var(--surface-2)] border border-[var(--border-1)] text-[10px] font-mono">/remember</kbd>,{" "}
               <kbd className="px-1 py-0.5 rounded bg-[var(--surface-2)] border border-[var(--border-1)] text-[10px] font-mono">/concert</kbd>,{" "}
-              <kbd className="px-1 py-0.5 rounded bg-[var(--surface-2)] border border-[var(--border-1)] text-[10px] font-mono">/leetcode</kbd>,{" "}
               <kbd className="px-1 py-0.5 rounded bg-[var(--surface-2)] border border-[var(--border-1)] text-[10px] font-mono">/search</kbd>
             </p>
           </div>
