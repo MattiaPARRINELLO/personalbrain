@@ -9,6 +9,7 @@ import { loadActivity } from "@/app/actions/activity";
 import type { ActivityEntry, ActivityAction } from "@/lib/types";
 
 const ACTION_LABELS: Partial<Record<ActivityAction, string>> = {
+  ai_action: "Action IA",
   accreditation_created: "Accréditation créée",
   accreditation_updated: "Accréditation mise à jour",
   accreditation_deleted: "Accréditation supprimée",
@@ -25,6 +26,7 @@ const ACTION_LABELS: Partial<Record<ActivityAction, string>> = {
 };
 
 const ACTION_COLORS: Partial<Record<ActivityAction, string>> = {
+  ai_action: "text-[var(--accent-cool)]",
   accreditation_created: "text-[var(--accent)]",
   accreditation_updated: "text-[var(--warm)]",
   accreditation_deleted: "text-[var(--danger)]",
