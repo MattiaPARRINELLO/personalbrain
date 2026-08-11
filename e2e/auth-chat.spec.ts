@@ -1,39 +1,39 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Auth + Chat flow", () => {
-  test("affiche la page de login et tente une authentification passkey", async ({ page }) => {
-    await page.goto("/login");
+// Specs avec session (storageState) : uniquement des pages en lecture pure
+// (/brain charge la mémoire sans mutation, /chat affiche le composer sans
+// envoyer). Aucun backend IA réel, aucune écriture, aucune notification.
 
-    // La page doit afficher le bouton de connexion
-    await expect(page.locator("h1, h2, button")).toContainText(/connexion|authentification|passkey|Se connecter|Créer/i);
+test.describe("Navigation authentifiée", () => {
+  test("le rail affiche les 4 destinations principales", async ({ page }) => {
+    await page.goto("/brain");
+    await expect(page.getByRole("link", { name: "Console IA" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Aujourd'hui" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Cerveau" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "À voir" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Toutes les pages" })).toBeVisible();
   });
 
-  test("la page d'accueil affiche le layout chat", async ({ page }) => {
-    await page.goto("/");
+  test("le menu Toutes les pages liste les pages secondaires", async ({ page }) => {
+    await page.goto("/brain");
+    await page.getByRole("button", { name: "Toutes les pages" }).click();
+    await expect(page.getByRole("dialog", { name: "Menu" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Rappels" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Calendrier" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Paramètres" })).toBeVisible();
+  });
 
-    // Vérifie que des éléments du chat sont présents
-    await expect(page).toHaveURL("/");
-    // Le body ne doit pas être vide
+  test("la page Cerveau se charge avec une session", async ({ page }) => {
+    await page.goto("/brain");
+    await expect(page.getByRole("heading", { name: "Cerveau" })).toBeVisible();
     await expect(page.locator("body")).not.toBeEmpty();
   });
+});
 
-  test("le champ de message est présent sur la page d'accueil", async ({ page }) => {
-    await page.goto("/");
-
-    // Recherche un champ de saisie (textarea ou input) dans le chat
-    const input = page.locator('textarea, input[type="text"], [contenteditable="true"]').first();
-    await expect(input).toBeVisible({ timeout: 10_000 });
-  });
-
-  test("navigation vers /reminders depuis l'accueil", async ({ page }) => {
-    await page.goto("/");
-
-    // Cherche le lien ou le bouton "Rappels" dans la navigation
-    const remindersLink = page.locator('a[href="/reminders"], button:has-text("Rappels"), a:has-text("Rappels")').first();
-
-    if (await remindersLink.isVisible()) {
-      await remindersLink.click();
-      await expect(page).toHaveURL(/\/reminders/);
-    }
+test.describe("Chat", () => {
+  test("le composer est visible avec une session (sans envoi de message)", async ({ page }) => {
+    await page.goto("/chat");
+    const composer = page.locator("textarea").first();
+    await expect(composer).toBeVisible({ timeout: 10_000 });
   });
 });
