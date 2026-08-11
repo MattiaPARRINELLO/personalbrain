@@ -1,5 +1,6 @@
 import path from "path";
-import { writeJsonAtomic, readJsonSafe } from "./storage";
+import { readJsonSafe } from "./storage";
+import { mutateJson } from "./storage-core";
 
 export interface AppConfig {
   models: {
@@ -71,9 +72,18 @@ export async function getConfig(): Promise<AppConfig> {
 }
 
 export async function updateConfig(partial: Partial<AppConfig>): Promise<AppConfig> {
-  const current = await getConfig();
-  const next: AppConfig = { ...current, ...partial };
-  await writeJsonAtomic(CONFIG_FILENAME, next);
+  // mutateJson : lecture et écriture sous un seul lock (deux mises à jour
+  // simultanées ne se perdent plus mutuellement).
+  const next = (await mutateJson<AppConfig>(CONFIG_FILENAME, defaultConfig, (current) => {
+    return {
+      ...current,
+      ...partial,
+      models: { ...defaultConfig.models, ...current.models, ...partial.models },
+      llm: { ...defaultConfig.llm, ...current.llm, ...partial.llm },
+      features: { ...defaultConfig.features, ...current.features, ...partial.features },
+      theme: { ...defaultConfig.theme, ...current.theme, ...partial.theme },
+    };
+  })) ?? defaultConfig;
   cachedConfig = { data: next, ts: Date.now() };
   return next;
 }

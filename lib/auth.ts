@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { writeJsonAtomic, readJsonSafe } from "./storage";
+import { mutateJson } from "./storage-core";
 
 const USERS_FILE = path.join(process.cwd(), "data", "users.json");
 const USERS_FILENAME = "users.json";
@@ -66,14 +67,16 @@ export async function hasCredentials(): Promise<boolean> {
 }
 
 export async function saveCredential(credential: PasskeyCredential): Promise<void> {
-  const store = await getUserStore();
-  const existingIndex = store.credentials.findIndex((c) => c.id === credential.id);
-  if (existingIndex >= 0) {
-    store.credentials[existingIndex] = credential;
-  } else {
-    store.credentials.push(credential);
-  }
-  await saveUserStore(store);
+  // read→mutate→write sous un seul lock : deux enregistrements simultanés ne
+  // se perdent pas mutuellement.
+  await mutateJson<UserStore>(USERS_FILENAME, defaultStore, (store) => {
+    const existingIndex = store.credentials.findIndex((c) => c.id === credential.id);
+    if (existingIndex >= 0) {
+      store.credentials[existingIndex] = credential;
+    } else {
+      store.credentials.push(credential);
+    }
+  });
 }
 
 export async function getCredentialById(id: string): Promise<PasskeyCredential | null> {

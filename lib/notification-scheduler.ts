@@ -37,12 +37,11 @@ async function getNotifiedReminders(): Promise<Set<string>> {
 
 async function markReminderNotified(id: string): Promise<void> {
   try {
-    const { readJsonSafe, writeJsonAtomic } = await import("./storage");
-    const data = await readJsonSafe<{ ids: string[] }>(NOTIFIED_FILE, { ids: [] });
-    if (!data.ids.includes(id)) {
+    const { mutateJson } = await import("./storage-core");
+    await mutateJson<{ ids: string[] }>(NOTIFIED_FILE, { ids: [] }, (data) => {
+      if (data.ids.includes(id)) return null; // déjà notifié → pas d'écriture
       data.ids.push(id);
-      await writeJsonAtomic(NOTIFIED_FILE, data);
-    }
+    });
   } catch (err) {
     console.error("[scheduler] Erreur persistance notification:", err);
   }

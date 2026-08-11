@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { readJsonSafe, writeJsonAtomic } from "@/lib/storage";
+import { readJsonSafe } from "@/lib/storage";
 
 vi.mock("@/lib/storage", () => ({
   readJsonSafe: vi.fn(),
   writeJsonAtomic: vi.fn(),
 }));
+
+const mockMutateJson = vi.fn();
+vi.mock("@/lib/storage-core", () => ({ mutateJson: mockMutateJson }));
 
 const { getConfig, updateConfig, getConfigCachePath, clearConfigCache, getModel } = await import("@/lib/config");
 
@@ -51,14 +54,17 @@ describe("config", () => {
 
   it("updateConfig écrit et met à jour le cache", async () => {
     vi.mocked(readJsonSafe).mockResolvedValue({});
+    mockMutateJson.mockImplementation(async (_file, fallback, mutator) => {
+      const data = structuredClone(fallback);
+      const res = mutator(data);
+      return (res ?? data) as unknown;
+    });
     const updated = await updateConfig({
       llm: { temperature: 1.0, maxTokens: 8192 },
     });
     expect(updated.llm.temperature).toBe(1.0);
     expect(updated.llm.maxTokens).toBe(8192);
-    expect(writeJsonAtomic).toHaveBeenCalledWith("config.json", expect.objectContaining({
-      llm: { temperature: 1.0, maxTokens: 8192 },
-    }));
+    expect(mockMutateJson).toHaveBeenCalledWith("config.json", expect.anything(), expect.any(Function));
   });
 
   it("getConfigCachePath retourne le chemin attendu", () => {

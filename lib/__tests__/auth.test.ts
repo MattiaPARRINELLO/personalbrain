@@ -21,6 +21,21 @@ const mockStorage = {
 
 vi.mock("@/lib/storage", () => mockStorage);
 
+// Simule le read→mutate→write de storage-core pour saveCredential.
+type Cred = { id: string; publicKey: string; counter: number };
+type CredStore = { credentials: Cred[] };
+
+const credentialStore: { current: CredStore } = { current: { credentials: [] } };
+const mockMutateJson = vi.fn(
+  async (_file: string, fallback: CredStore, mutator: (data: CredStore) => CredStore | null | void) => {
+    const data = structuredClone(credentialStore.current ?? fallback);
+    const res = mutator(data);
+    credentialStore.current = (res ?? data) as CredStore;
+    return credentialStore.current;
+  }
+);
+vi.mock("@/lib/storage-core", () => ({ mutateJson: mockMutateJson }));
+
 const { getUserStore, saveUserStore, hasCredentials, saveCredential, getCredentialById, getRpID, getOrigin, markSetupConsumed, isSetupConsumed } = await import("@/lib/auth");
 
 describe("auth", () => {
@@ -28,6 +43,7 @@ describe("auth", () => {
     vi.clearAllMocks();
     mockFs.access.mockRejectedValue(new Error("ENOENT"));
     mockFs.mkdir.mockResolvedValue(undefined);
+    credentialStore.current = { credentials: [] };
   });
 
   describe("getUserStore", () => {
@@ -70,21 +86,20 @@ describe("auth", () => {
 
   describe("saveCredential", () => {
     it("ajoute un nouveau credential", async () => {
-      mockStorage.readJsonSafe.mockResolvedValue({ credentials: [] });
       await saveCredential({ id: "cred1", publicKey: "abc", counter: 0 });
-      expect(mockStorage.writeJsonAtomic).toHaveBeenCalledWith("users.json", {
-        credentials: [{ id: "cred1", publicKey: "abc", counter: 0 }],
-      });
+      expect(credentialStore.current.credentials).toEqual([
+        { id: "cred1", publicKey: "abc", counter: 0 },
+      ]);
     });
 
     it("remplace un credential existant par son id", async () => {
-      mockStorage.readJsonSafe.mockResolvedValue({
+      credentialStore.current = {
         credentials: [{ id: "cred1", publicKey: "abc", counter: 0 }],
-      });
+      };
       await saveCredential({ id: "cred1", publicKey: "def", counter: 1 });
-      expect(mockStorage.writeJsonAtomic).toHaveBeenCalledWith("users.json", {
-        credentials: [{ id: "cred1", publicKey: "def", counter: 1 }],
-      });
+      expect(credentialStore.current.credentials).toEqual([
+        { id: "cred1", publicKey: "def", counter: 1 },
+      ]);
     });
   });
 
