@@ -102,6 +102,22 @@ fi
 # Déploiement via rsync
 echo -e "${CYAN}→ Déploiement vers ${SSH_USER}@${SSH_HOST}:${SSH_TARGET_DIR}${NC}"
 
+# ─── 3.1 Backup du déploiement courant (rollback) ──────
+# Avant le rsync destructif (--delete), on archive l'application en place
+# (hors node_modules et data/) dans backstage-releases/, à côté de l'app.
+# Les 5 dernières versions sont conservées ; le data/ (données réelles) n'est
+# jamais inclus (ni touché par le rsync).
+BACKUP_ROOT="$(dirname ${SSH_TARGET_DIR})/backstage-releases"
+BACKUP_TS=$(date +%Y%m%d-%H%M%S)
+echo -e "${CYAN}→ Backup du déploiement courant (rollback)…${NC}"
+if ssh -p "$SSH_PORT" "${SSH_USER}@${SSH_HOST}" \
+  "mkdir -p ${BACKUP_ROOT} && tar -czf ${BACKUP_ROOT}/backstage-${BACKUP_TS}.tar.gz -C ${SSH_TARGET_DIR} --exclude=node_modules --exclude=data . 2>/dev/null && ls -1t ${BACKUP_ROOT}/backstage-*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f && echo ok"; then
+  echo -e "${GREEN}  ✓ Backup créé : backstage-${BACKUP_TS}.tar.gz (5 versions conservées)${NC}"
+  echo -e "    Rollback : tar -xzf ${BACKUP_ROOT}/backstage-${BACKUP_TS}.tar.gz -C ${SSH_TARGET_DIR}"
+else
+  echo -e "${YELLOW}  ⚠  Backup impossible — poursuite SANS sauvegarde (risqué)${NC}"
+fi
+
 rsync -avz --delete \
   -e "ssh -p ${SSH_PORT}" \
   --exclude 'node_modules' \
