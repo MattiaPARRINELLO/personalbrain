@@ -204,6 +204,17 @@ export async function POST(request: NextRequest) {
 
   const systemPrompt = await buildSystemPrompt(context, body.messages);
 
+  // Fenêtrage du contexte : ne renvoyer que les 40 derniers messages,
+  // tronqués à la frontière d'un message utilisateur (couper au milieu d'un
+  // échange d'outils casserait l'appel). L'historique complet reste
+  // consultable dans la sidebar de sessions.
+  const MAX_CONTEXT_MESSAGES = 40;
+  if (body.messages.length > MAX_CONTEXT_MESSAGES) {
+    const windowed = body.messages.slice(-MAX_CONTEXT_MESSAGES);
+    const firstUserIdx = windowed.findIndex((m) => m.role === "user");
+    body.messages = firstUserIdx > 0 ? windowed.slice(firstUserIdx) : windowed;
+  }
+
   const messages: UnifiedMessage[] = [
     { role: "system", content: systemPrompt },
     ...body.messages.map((m): UnifiedMessage => {
