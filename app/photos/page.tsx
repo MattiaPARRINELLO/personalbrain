@@ -17,6 +17,7 @@ import { ShootCard } from "./ShootCard";
 import { DetailModal } from "./DetailModal";
 import { AddShootForm } from "./AddShootForm";
 import { GalleryKanban } from "./GalleryKanban";
+import { useToast } from "@/components/ui/Toast";
 
 export default function PhotoShootsPage() {
   const [data, setData] = useState<PhotoShootsData | null>(null);
@@ -28,6 +29,7 @@ export default function PhotoShootsPage() {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<PhotoShootStatus | null>(null);
   const [mobileStatus, setMobileStatus] = useState<PhotoShootStatus | "all">("all");
+  const toast = useToast();
 
   useEffect(() => {
     loadPhotoShoots()
@@ -106,6 +108,26 @@ export default function PhotoShootsPage() {
     const ok = await removePhotoShoot(id);
     if (!ok && old) {
       setData((prev) => prev ? { shoots: [...prev.shoots, old] } : prev);
+    } else if (ok && old) {
+      // Undo : recrée le shooting (nouvel id) si l'utilisateur clique Annuler.
+      toast.show({
+        message: "Shooting supprimé",
+        tone: "info",
+        duration: 6000,
+        action: {
+          label: "Annuler",
+          onClick: () => {
+            void createPhotoShoot({
+              title: old.title,
+              date: old.date,
+              client: old.client,
+              notes: old.notes,
+            })
+              .then((shoot) => setData((prev) => prev ? { shoots: [...prev.shoots, shoot] } : prev))
+              .catch(() => {});
+          },
+        },
+      });
     }
     setDetailShootId(null);
   };
