@@ -65,6 +65,12 @@ export default function RootLayout({
       <body className="min-h-full relative font-sans">
         <PwaLoader />
         <ThemeApplier />
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[200] focus:px-3 focus:py-2 focus:rounded-lg focus:bg-[var(--surface-1)] focus:border focus:border-[var(--border-2)] focus:text-[var(--text-1)] focus:text-[12px]"
+        >
+          Aller au contenu
+        </a>
         <ViewTransitionProvider>
           {children}
         </ViewTransitionProvider>

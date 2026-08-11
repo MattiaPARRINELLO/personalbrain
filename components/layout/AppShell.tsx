@@ -14,7 +14,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <LeftNav />
         <div className="flex-1 flex flex-col min-w-0 h-full">
           <MobileTopBar />
-          <main className="flex-1 min-h-0 flex">
+          <main id="main" className="flex-1 min-h-0 flex">
             <div className="flex-1 min-w-0 flex">{children}</div>
           </main>
           <MobileBottomNav />
