@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Trash2, Pencil, RotateCcw, Clock } from "lucide-react";
+import { Check, Trash2, Pencil, RotateCcw, Clock, CloudOff } from "lucide-react";
 import { Pill } from "@/components/ui/Pill";
 import type { Reminder } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -9,11 +9,13 @@ import { RECURRENCE_META } from "./timeline";
 
 export function ReminderRow({
   reminder,
+  msLinked,
   onToggle,
   onEdit,
   onDelete,
 }: {
   reminder: Reminder;
+  msLinked?: boolean;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -66,6 +68,15 @@ export function ReminderRow({
             <span className="text-[10px] text-[var(--text-3)] font-mono uppercase tracking-wider inline-flex items-center gap-1">
               <RotateCcw className="w-2.5 h-2.5" />
               {RECURRENCE_META[reminder.recurrence].label}
+            </span>
+          )}
+          {msLinked && reminder.status === "pending" && !reminder.microsoftTaskId && (
+            <span
+              className="text-[10px] text-[var(--text-3)] font-mono uppercase tracking-wider inline-flex items-center gap-1"
+              title="Non synchronisé avec Microsoft To Do (sync échouée ou rappel créé avant la liaison)"
+            >
+              <CloudOff className="w-2.5 h-2.5" />
+              Non synchronisé
             </span>
           )}
         </div>

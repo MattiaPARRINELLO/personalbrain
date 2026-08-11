@@ -16,6 +16,8 @@ import {
 } from "@/app/actions/reminders";
 import type { Reminder, ReminderRecurrence, ReminderStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api-client";
+import { useCachedFetch } from "@/lib/cache";
 import { MicrosoftTodoPanel } from "@/components/MicrosoftTodoPanel";
 import {
   fireBrowserNotification,
@@ -38,6 +40,15 @@ export default function RemindersPage() {
   const [, startTransition] = useTransition();
   const notifiedRef = useRef<Set<string>>(new Set());
   const toast = useToast();
+
+  // État du lien Microsoft To Do : permet d'afficher les rappels non
+  // synchronisés (sync échouée ou rappel créé avant la liaison).
+  const { data: msStatus } = useCachedFetch<{ linked: boolean }>(
+    "microsoft:status",
+    () => api.microsoftStatus(),
+    { ttl: 60 * 1000 }
+  );
+  const msLinked = msStatus?.linked === true;
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -225,6 +236,7 @@ export default function RemindersPage() {
                           <ReminderRow
                             key={r.id}
                             reminder={r}
+                            msLinked={msLinked}
                             onToggle={() => handleToggle(r)}
                             onEdit={() => setEditing(r.id)}
                             onDelete={() => handleDelete(r.id)}
@@ -250,6 +262,7 @@ export default function RemindersPage() {
                       <ReminderRow
                         key={r.id}
                         reminder={r}
+                        msLinked={msLinked}
                         onToggle={() => handleToggle(r)}
                         onEdit={() => setEditing(r.id)}
                         onDelete={() => handleDelete(r.id)}
