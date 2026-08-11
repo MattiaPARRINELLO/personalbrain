@@ -87,7 +87,7 @@ pas l'app Next.
 
 ```
 app/
-  actions/          15 Server Actions ("use server") + __tests__/
+  actions/          17 Server Actions ("use server") + __tests__/
   api/              Route Handlers
   <page>/           page.tsx + composants LOCAUX à cette page
 components/
@@ -102,9 +102,15 @@ lib/
   types/            définitions par domaine (15 fichiers)
   ai-providers/     openai, anthropic, config, types
   __tests__/        tests unitaires
-e2e/                specs Playwright
+e2e/                specs Playwright (helpers, global-setup, projets no-auth/chromium)
 scripts/            cron-scheduler, reset-passkey, scripts de QA/screenshots
 ```
+
+### Pages particulières
+
+- `/today` — page d'agrégat « Aujourd'hui » (rappels du jour, agenda, relances), 2e destination du rail.
+- `/gallery` — redirige vers `/photos` (la galerie de livraison est la vue « Livraison » de Photos, `app/photos/GalleryKanban.tsx`).
+- `/photos` — kanban shootings + toggle de vue « Shootings / Livraison ».
 
 ### Où placer un composant
 
@@ -139,6 +145,22 @@ Matcher : tout sauf `_next/static`, `_next/image`, `assets`, `icons`, `images`,
 
 Le middleware tourne sur le **runtime edge** → utilise `lib/session-edge.ts`
 (`verifyJwt`, `SESSION_COOKIE`). Ne jamais y importer de code Node (`fs`, `path`).
+
+⚠️ **Dépréciation Next 16.2** : le boot serveur affiche « The "middleware" file
+convention is deprecated. Please use "proxy" instead ». La migration
+`middleware.ts` → `proxy.ts` est à prévoir (renommage + revalidation) mais
+l'app fonctionne telle quelle.
+
+### Routes notables hors `/api/auth`
+
+- `/api/chat/confirm` — **exécute les outils IA à effet externe après
+  confirmation utilisateur** (bouton Confirmer/Annuler dans le chat). Session
+  requise ; seuls les outils listés dans `REQUIRE_CONFIRMATION`
+  (`lib/chat-tools.ts`) sont exécutables ; journalise dans `activity.json`
+  (`ai_action`). Le modèle ne peut jamais s'auto-confirmer.
+- `/api/auth/set-session` — **supprimé** (reliquat Capacitor, 0 appelant).
+- `/api/reminders/[id]/done` — reproduit `markReminderStatus` (push MS +
+  revalidation) ; appelé par le service worker.
 
 ### Trois implémentations de session — ne pas confondre
 
@@ -317,7 +339,9 @@ edge et **crashe le middleware** (`__import_unsupported is not defined`).
 `exclude: ["node_modules", ".mimocode", "e2e", "**/e2e/**"]`, alias `@` → racine.
 
 Emplacements : `lib/__tests__/`, `app/actions/__tests__/`,
-`app/calendar/__tests__/`.
+`app/calendar/__tests__/`, `app/api/chat/__tests__/` + 2 fichiers **à la
+racine** : `middleware.test.ts` (deny-by-default) et `cron-auth.test.ts`
+(secret partagé).
 
 **Tests dépendant du FS** : mocker `process.cwd()` **puis** faire un
 `await import()` dynamique du module storage. `lib/__tests__/__fs-mock-helper.ts`
@@ -326,14 +350,22 @@ doit **jamais** importer du code projet (deps circulaires).
 
 ### Playwright
 
-`testDir: "./e2e"`, chromium seul, `workers: 1`, `fullyParallel: false`.
+`testDir: "./e2e"`, `workers: 1`, `fullyParallel: false`.
 `webServer` lance `bun run dev` sur `:3000` (réutilise un serveur existant hors CI).
 
-⚠️ Les specs actuelles ne testent **que des pages publiques** (`/`, `/login`).
-Il n'existe **aucun pattern d'authentification E2E**. Pour tester une page
-protégée, il faudra construire un `storageState` avec un cookie de session valide.
-`e2e/auth-chat.spec.ts` contient un test conditionnel (`if (await
-link.isVisible())`) — non déterministe, ne pas copier ce pattern.
+**Deux projets** :
+
+- `chromium` — pages protégées, avec `storageState: e2e/.auth/state.json`
+  (cookie `pb_session` valide signé avec `AUTH_SECRET` de l'environnement,
+  généré par `e2e/global-setup.ts` via `e2e/helpers.ts`).
+- `no-auth` (`e2e/public.spec.ts`) — pages publiques et redirections.
+
+Règles : les specs **ne doivent déclencher aucune mutation** (lectures pures
+uniquement — le serveur dev utilise `data/` réel) ni appeler le backend IA.
+Lancer avec le scheduler neutralisé :
+`AUTH_SECRET="$(openssl rand -hex 32)" VAPID_PRIVATE_KEY="" NEXT_PUBLIC_VAPID_PUBLIC_KEY="" bun run test:e2e`
+(pas de VAPID → pas de notification push réelle pendant les tests).
+`e2e/.auth/` est gitignoré (JWT de session, ne jamais committer).
 
 ---
 
@@ -373,7 +405,7 @@ Modèle complet : `.deploy.env.example`.
   renommer.
 - **Logging** : `console.error` / `console.warn` avec préfixe module
   (`[watch-later]`, `[storage]`). Pas de lib dédiée.
-- **Directives** : `"use server"` en tête des 15 fichiers `app/actions/*`,
+- **Directives** : `"use server"` en tête des 17 fichiers `app/actions/*`,
   `"use client"` sur les composants interactifs. Systématique.
 - **Langue** : messages utilisateur et commits en français, code et
   identifiants en anglais.
@@ -404,6 +436,10 @@ Modèle complet : `.deploy.env.example`.
 6. Route Handlers ↔ Server Actions : recouvrement à maintenir manuellement
 7. `.gitignore` : entrée résiduelle `android/app/google-services.json`
 8. Fichier `tree` non suivi à la racine — à supprimer
+9. **Next 16.2 déprécie `middleware.ts` → `proxy.ts`** (warning au boot) :
+   migration à prévoir (renommage + revalidation)
+10. `data/.setup-consumed` : marqueur « bootstrap SETUP_TOKEN consommé » —
+    purge via `bun run reset:passkey` uniquement
 
 ---
 
