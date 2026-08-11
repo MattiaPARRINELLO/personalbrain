@@ -52,8 +52,9 @@ export function ItemCard({
         <div className="flex items-center gap-0.5">
           <button
             onClick={onDelete}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-4)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors opacity-0 group-hover:opacity-100"
+            className="w-9 h-9 rounded-md flex items-center justify-center text-[var(--text-4)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors opacity-0 group-hover:opacity-100"
             title="Supprimer"
+            aria-label="Supprimer"
           >
             <Trash2 className="w-3 h-3" />
           </button>
