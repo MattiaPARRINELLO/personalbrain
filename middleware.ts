@@ -2,6 +2,22 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifyJwt, SESSION_COOKIE } from "./lib/session-edge";
 
+// Identifiant de corrélation court, posé sur chaque requête edge et relu
+// côté node par lib/logger (getRequestId) : permet de relier un log serveur
+// à une requête précise dans les logs cPanel.
+function withRequestId(request: NextRequest, response: NextResponse): NextResponse {
+  const incoming = request.headers.get("x-request-id");
+  if (incoming) {
+    response.headers.set("x-request-id", incoming);
+    return response;
+  }
+  const generated = Array.from({ length: 8 }, () =>
+    "abcdef0123456789"[Math.floor(Math.random() * 16)]
+  ).join("");
+  response.headers.set("x-request-id", generated);
+  return response;
+}
+
 const PUBLIC_PATHS = [
   "/login",
   "/notif",
@@ -67,28 +83,34 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isPublicPath(pathname)) {
-    return NextResponse.next();
+    return withRequestId(request, NextResponse.next());
   }
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
 
   if (!token) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return withRequestId(
+        request,
+        NextResponse.json({ error: "Non authentifié" }, { status: 401 })
+      );
     }
-    return NextResponse.redirect(new URL("/login", request.url));
+    return withRequestId(request, NextResponse.redirect(new URL("/login", request.url)));
   }
 
   const payload = await verifyJwt<{ sub: string }>(token);
 
   if (!payload) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Session invalide" }, { status: 401 });
+      return withRequestId(
+        request,
+        NextResponse.json({ error: "Session invalide" }, { status: 401 })
+      );
     }
-    return NextResponse.redirect(new URL("/login", request.url));
+    return withRequestId(request, NextResponse.redirect(new URL("/login", request.url)));
   }
 
-  return NextResponse.next();
+  return withRequestId(request, NextResponse.next());
 }
 
 export const config = {

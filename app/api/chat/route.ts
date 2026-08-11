@@ -16,6 +16,7 @@ import { getSession } from "@/lib/session";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { executeTool, tools, REQUIRE_CONFIRMATION, confirmationMessage } from "@/lib/chat-tools";
 import { buildSystemPrompt } from "@/lib/chat-prompts";
+import { serverLog } from "@/lib/logger";
 
 
 
@@ -92,7 +93,7 @@ Faits a extraire :`;
     }
     return facts;
   } catch (err) {
-    console.error("Memory extraction failed:", err);
+    void serverLog("chat", "error", "Memory extraction failed", err, true);
     return [];
   }
 }
@@ -123,7 +124,7 @@ async function runMemoryExtraction(
       send?.({ type: "memory_facts", facts });
     }
   } catch (err) {
-    console.error("Memory extraction error:", err);
+    void serverLog("chat", "error", "Memory extraction error", err, true);
   }
 }
 
@@ -194,7 +195,7 @@ export async function POST(request: NextRequest) {
           m.content = summary;
         }
       } catch (err) {
-        console.error("[chat] Auto-summary failed, keeping original:", err);
+        void serverLog("chat", "error", "Auto-summary failed, keeping original", err, true);
       }
     }
   }
@@ -363,7 +364,7 @@ export async function POST(request: NextRequest) {
             }
           } catch (err) {
             if (streamClosed) throw err; // client parti : pas de fallback inutile
-            console.error(`[chat] runModel(${currentModel}) failed:`, err instanceof Error ? err.message : String(err));
+            void serverLog("chat", "error", `runModel(${currentModel}) failed`, err);
             if (useFallback || currentModel === altModel) throw new Error(`Le modèle ${currentModel} a échoué après fallback`);
             useFallback = true;
             continue;
@@ -376,7 +377,7 @@ export async function POST(request: NextRequest) {
         controller.close();
       } catch (error) {
         if (streamClosed) return;
-        console.error("Chat stream error:", error);
+        void serverLog("chat", "error", "Chat stream error", error);
         const message = error instanceof Error ? error.message : "Erreur inconnue";
         send({ type: "error", message });
         send({ type: "done", content: "" });
