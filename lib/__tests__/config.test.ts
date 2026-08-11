@@ -19,7 +19,7 @@ const defaultConfig = {
     titleModel: "deepseek-v4-flash",
   },
   llm: { temperature: 0.7, maxTokens: 4096 },
-  features: { dailyBrief: false, webSearch: true },
+  features: { dailyBrief: true, webSearch: true },
   theme: { accentColor: "#a5b4fc" },
 };
 
