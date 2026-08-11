@@ -2,6 +2,7 @@ import { OAuth2Client, type Credentials } from "google-auth-library";
 import { promises as fs } from "fs";
 import path from "path";
 import { writeJsonAtomic } from "./storage";
+import { serverLog } from "./logger";
 
 export type GoogleAccountType = "gmail" | "calendar";
 export type GoogleTokens = Credentials;
@@ -75,14 +76,14 @@ async function doRefreshTokens(type: GoogleAccountType): Promise<Credentials> {
       return credentials;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      console.warn(`[google-client] Refresh token attempt ${attempt + 1}/${MAX_RETRIES} failed for ${type}:`, lastError.message);
+      void serverLog("google-client", "warn", `Refresh token attempt ${attempt + 1}/${MAX_RETRIES} failed for ${type}`, lastError, true);
       if (attempt < MAX_RETRIES - 1) {
         await sleep(RETRY_DELAY_MS * Math.pow(2, attempt));
       }
     }
   }
 
-  console.error(`[google-client] All ${MAX_RETRIES} refresh attempts failed for ${type}. User must re-authenticate.`);
+  void serverLog("google-client", "error", `All ${MAX_RETRIES} refresh attempts failed for ${type}. User must re-authenticate`, undefined, true);
   throw new Error(
     `La session ${type} a expire et le rafraichissement a echoue apres ${MAX_RETRIES} tentatives. ` +
     `Va sur /api/auth/google?type=${type} pour reconnecter.`

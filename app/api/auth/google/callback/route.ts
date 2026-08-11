@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createOAuth2Client, saveTokens, type GoogleAccountType } from "@/lib/google-client";
 import { requireSession } from "@/lib/session";
+import { serverLog } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
     await saveTokens(type, tokens);
     return NextResponse.redirect(new URL(`/?${type}=linked`, request.url));
   } catch (err) {
-    console.error("Google callback error:", err);
+    void serverLog("google-callback", "error", "Google callback error", err, true);
     const message = err instanceof Error ? err.message : "Erreur inconnue";
     return NextResponse.json({ error: message }, { status: 500 });
   }

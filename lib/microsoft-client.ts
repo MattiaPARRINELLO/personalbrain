@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { writeJsonAtomic } from "./storage";
+import { serverLog } from "./logger";
 import type { MicrosoftTodoList, MicrosoftTodoTask } from "./types";
 
 export type { MicrosoftTodoList, MicrosoftTodoTask };
@@ -149,14 +150,14 @@ async function doRefreshTokens(): Promise<MicrosoftTokens> {
       return refreshed;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      console.warn(`[microsoft-client] Refresh attempt ${attempt + 1}/${MAX_REFRESH_RETRIES} failed:`, lastError.message);
+      void serverLog("microsoft-client", "warn", `Refresh attempt ${attempt + 1}/${MAX_REFRESH_RETRIES} failed`, lastError, true);
       if (attempt < MAX_REFRESH_RETRIES - 1) {
         await sleep(RETRY_DELAY_MS * Math.pow(2, attempt));
       }
     }
   }
 
-  console.error("[microsoft-client] All refresh attempts failed. User must re-authenticate.");
+  void serverLog("microsoft-client", "error", "All refresh attempts failed. User must re-authenticate", undefined, true);
   throw new Error(
     `La session Microsoft To Do a expire et le rafraichissement a echoue apres ${MAX_REFRESH_RETRIES} tentatives. ` +
     "Va sur /api/auth/microsoft pour reconnecter."

@@ -2,6 +2,7 @@ import { getReminders } from "./storage";
 import { getSubscriptions, type StoredPushSubscription } from "./push-subscriptions";
 import { getConfig } from "./config";
 import { configureVapid, getVapidDetails, sendPushNotification } from "./send-push";
+import { serverLog } from "./logger";
 
 let schedulerStarted = false;
 let reminderInterval: ReturnType<typeof setInterval> | null = null;
@@ -43,7 +44,7 @@ async function markReminderNotified(id: string): Promise<void> {
       data.ids.push(id);
     });
   } catch (err) {
-    console.error("[scheduler] Erreur persistance notification:", err);
+    void serverLog("scheduler", "error", "Erreur persistance notification", err);
   }
 }
 
@@ -56,7 +57,7 @@ export async function sendPushToAll(
   if (subs.length > 0) {
     const vapidDetails = configureVapid();
     if (!vapidDetails.publicKey || !vapidDetails.privateKey) {
-      console.error("[scheduler] VAPID keys missing");
+      void serverLog("scheduler", "error", "VAPID keys missing");
     } else {
       console.log(`[scheduler] Envoi push à ${subs.length} appareil(s)...`);
 
@@ -68,7 +69,7 @@ export async function sendPushToAll(
             return true;
           } catch (err: unknown) {
             const e = err as { statusCode?: number; body?: string };
-            console.error(`[scheduler] Push ÉCHEC ${e.statusCode || ""} → ${sub.endpoint.slice(0, 50)}...`, e.body || "");
+            void serverLog("scheduler", "error", `Push ÉCHEC ${e.statusCode || ""} → ${sub.endpoint.slice(0, 50)}...`, undefined, true);
             if (e.statusCode === 410 || e.statusCode === 404 || e.statusCode === 401) {
               const { removeSubscription } = await import("./push-subscriptions");
               await removeSubscription(sub.endpoint);
@@ -131,7 +132,7 @@ export async function checkReminders() {
       }
     }
   } catch (err) {
-    console.error("[scheduler] checkReminders failed:", err);
+    void serverLog("scheduler", "error", "checkReminders failed", err);
   }
 }
 
@@ -163,7 +164,7 @@ export async function checkIntentions() {
       }
     }
   } catch (err) {
-    console.error("[scheduler] checkIntentions failed:", err);
+    void serverLog("scheduler", "error", "checkIntentions failed", err);
   }
 }
 
@@ -218,7 +219,7 @@ export async function triggerDailyBrief(
     );
     return result;
   } catch (err) {
-    console.error("[scheduler] triggerDailyBrief failed:", err);
+    void serverLog("scheduler", "error", "triggerDailyBrief failed", err);
     return { skipped: "erreur interne" };
   }
 }

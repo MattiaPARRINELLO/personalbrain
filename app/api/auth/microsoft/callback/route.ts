@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMicrosoftTokensFromCode, saveMicrosoftTokens } from "@/lib/microsoft-client";
 import { requireSession } from "@/lib/session";
+import { serverLog } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     const detail = errorDescription ? ` (${errorDescription})` : "";
-    console.error(`[api/auth/microsoft/callback] OAuth error: ${error}${detail}`);
+    void serverLog("microsoft-callback", "error", `OAuth error: ${error}${detail}`);
     return NextResponse.json({ error: `Microsoft OAuth error: ${error}${detail}` }, { status: 400 });
   }
 
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     await saveMicrosoftTokens(tokens);
     return NextResponse.redirect(new URL("/reminders?todo=linked", request.url));
   } catch (err) {
-    console.error("Microsoft callback error:", err);
+    void serverLog("microsoft-callback", "error", "Microsoft callback error", err, true);
     const message = err instanceof Error ? err.message : "Erreur inconnue";
     return NextResponse.json({ error: message }, { status: 500 });
   }

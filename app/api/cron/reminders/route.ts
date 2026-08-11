@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthorizedCron } from "@/lib/cron-auth";
+import { serverLog } from "@/lib/logger";
 
 export async function POST(request: Request) {
   if (!isAuthorizedCron(request)) {
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
     await checkIntentions();
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[cron/reminders]", err);
+    void serverLog("cron/reminders", "error", "Echec du run", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

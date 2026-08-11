@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthorizedCron } from "@/lib/cron-auth";
+import { serverLog } from "@/lib/logger";
 
 function clientIp(request: Request): string | undefined {
   const fwd = request.headers.get("x-forwarded-for");
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
     await triggerDailyBrief("cron", clientIp(request));
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[cron/daily-brief]", err);
+    void serverLog("cron/daily-brief", "error", "Echec du brief", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
