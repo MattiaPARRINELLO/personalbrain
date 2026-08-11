@@ -37,7 +37,7 @@ const defaultConfig: AppConfig = {
     maxTokens: 4096,
   },
   features: {
-    dailyBrief: false,
+    dailyBrief: true,
     webSearch: true,
   },
   theme: {
