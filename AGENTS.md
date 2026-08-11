@@ -367,6 +367,10 @@ Lancer avec le scheduler neutralisé :
 (pas de VAPID → pas de notification push réelle pendant les tests).
 `e2e/.auth/` est gitignoré (JWT de session, ne jamais committer).
 
+**CI** : `.github/workflows/ci.yml` — lint, typecheck, tests unitaires et
+build à chaque push/PR (job `quality`) + suite E2E Playwright (job `e2e`,
+avec AUTH_SECRET aléatoire et VAPID vides).
+
 ---
 
 ## Variables d'environnement

@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    name: Lint · Typecheck · Tests · Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Installer les dépendances
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bunx tsc --noEmit
+
+      - name: Tests unitaires
+        run: bun run test
+
+      - name: Build de production
+        # VAPID vides : neutralise le scheduler (aucun push réel possible).
+        run: VAPID_PRIVATE_KEY="" NEXT_PUBLIC_VAPID_PUBLIC_KEY="" bun run build
+
+  e2e:
+    name: Tests E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Installer les dépendances
+        run: bun install --frozen-lockfile
+
+      - name: Installer Chromium (Playwright)
+        run: bunx playwright install --with-deps chromium
+
+      - name: Suite E2E
+        # AUTH_SECRET forcé : cohérent entre le storageState et le serveur dev.
+        # VAPID vides : pas de notification push réelle pendant les tests.
+        run: AUTH_SECRET="$(openssl rand -hex 32)" VAPID_PRIVATE_KEY="" NEXT_PUBLIC_VAPID_PUBLIC_KEY="" bun run test:e2e
