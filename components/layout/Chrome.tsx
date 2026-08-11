@@ -60,9 +60,10 @@ const primaryNavItems: NavItem[] = [
   { href: "/watch-later", label: "À voir", icon: Bookmark },
 ];
 
-const secondaryNavItems: NavItem[] = navItems.filter(
-  (item) => !primaryNavItems.some((p) => p.href === item.href)
-);
+const secondaryNavItems: NavItem[] = navItems
+  .filter((item) => !primaryNavItems.some((p) => p.href === item.href))
+  // La galerie est intégrée à la page Photos (vue « Livraison »).
+  .filter((item) => item.href !== "/gallery");
 
 const mobileNavItems: NavItem[] = primaryNavItems;
 const mobileMoreItems: NavItem[] = secondaryNavItems;
