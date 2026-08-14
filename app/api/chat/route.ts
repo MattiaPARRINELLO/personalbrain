@@ -45,6 +45,44 @@ const chatBodySchema = z.object({
   model: z.enum(["general", "code"]).optional(),
 });
 
+// Consigne injectée après un résultat d'outil en échec ou bloqué : force le
+// modèle à rendre compte fidèlement au lieu d'annoncer une action non faite.
+const RESULT_HONESTY_RULE =
+  "Ne pretend JAMAIS qu'une action a ete realisee (rappel cree, email envoye, " +
+  "evenement cree...) si le resultat de l'outil commence par \"Erreur\" ou " +
+  "\"ACTION_BLOCKED\" : dans ce cas l'action n'a PAS eu lieu. Explique a " +
+  "l'utilisateur que l'action n'a pas ete realisee et pourquoi. Si l'action est " +
+  "en attente de sa confirmation (resultat \"ACTION_BLOCKED\"), dis que tu " +
+  "attends sa confirmation, jamais que c'est fait.";
+
+function parseToolArguments(argumentsRaw: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(argumentsRaw);
+  } catch {
+    throw new Error("arguments d'outil invalides (JSON)");
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("arguments d'outil invalides (JSON)");
+  }
+  return parsed as Record<string, unknown>;
+}
+
+// Le dernier résultat d'outil est-il un échec ou un blocage ? Si oui, la
+// réponse finale du modèle risque d'annoncer une action non réalisée.
+function lastToolResultIsProblematic(messages: UnifiedMessage[]): boolean {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== "tool") continue;
+    const inner = (m.content ?? "")
+      .replace(/^<tool_result[^>]*>\s*/, "")
+      .replace(/<\/tool_result>\s*$/, "")
+      .trim();
+    return inner.startsWith("Erreur") || inner.startsWith("ACTION_BLOCKED");
+  }
+  return false;
+}
+
 
 
 async function extractMemoryFacts(
@@ -309,8 +347,10 @@ export async function POST(request: NextRequest) {
         for (const tc of toolCallsToExecute) {
           let result: string;
           try {
-            let args: Record<string, unknown> = {};
-            try { args = JSON.parse(tc.arguments); } catch { args = {}; }
+            // Validation stricte : des arguments invalides ne doivent jamais
+            // devenir un appel silencieux avec `{}` ni une carte de
+            // confirmation cassée.
+            const args = parseToolArguments(tc.arguments);
             if (REQUIRE_CONFIRMATION.has(tc.name)) {
               // Action à effet externe : bloquée en attente de confirmation
               // utilisateur. Le client affiche une carte Confirmer/Annuler ;
@@ -361,6 +401,12 @@ export async function POST(request: NextRequest) {
             const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
             if (lastAssistantMsg && typeof lastAssistantMsg.content === "string") {
               lastAssistantContent = lastAssistantMsg.content;
+            }
+            // Garde-fou : si le dernier résultat d'outil est un échec ou un
+            // blocage, rappeler au modèle avant sa réponse finale de ne pas
+            // annoncer une action non réalisée.
+            if (lastToolResultIsProblematic(messages)) {
+              messages.push({ role: "system", content: RESULT_HONESTY_RULE });
             }
           } catch (err) {
             if (streamClosed) throw err; // client parti : pas de fallback inutile
