@@ -71,7 +71,14 @@ export async function getConfig(): Promise<AppConfig> {
   return merged;
 }
 
-export async function updateConfig(partial: Partial<AppConfig>): Promise<AppConfig> {
+export type ConfigUpdate = {
+  models?: Partial<AppConfig["models"]>;
+  llm?: Partial<AppConfig["llm"]>;
+  features?: Partial<AppConfig["features"]>;
+  theme?: Partial<AppConfig["theme"]>;
+};
+
+export async function updateConfig(partial: ConfigUpdate): Promise<AppConfig> {
   // mutateJson : lecture et écriture sous un seul lock (deux mises à jour
   // simultanées ne se perdent plus mutuellement).
   const next = (await mutateJson<AppConfig>(CONFIG_FILENAME, defaultConfig, (current) => {

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { setLeetcodeUsername, loadLeetcode } from "@/app/actions/leetcode";
+import { updateModels } from "@/app/actions/settings";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/Chrome";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
@@ -55,17 +56,55 @@ export default function SettingsPage() {
   const [leetMsg, setLeetMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [runtime, setRuntime] = useState<{
-    models: { general: string; code: string };
+    models: { general: string; generalAlt: string; code: string };
+    availableModels: string[];
     features: { dailyBrief: boolean; webSearch: boolean };
     pushCount: number;
   } | null>(null);
 
+  const [modelSel, setModelSel] = useState<{
+    general: string;
+    generalAlt: string;
+    code: string;
+  } | null>(null);
+  const [modelSaving, setModelSaving] = useState(false);
+  const [modelMsg, setModelMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   useEffect(() => {
     import("@/app/actions/settings")
       .then(({ loadRuntimeInfo }) => loadRuntimeInfo())
-      .then(setRuntime)
+      .then((info) => {
+        setRuntime(info);
+        setModelSel({
+          general: info.models.general,
+          generalAlt: info.models.generalAlt,
+          code: info.models.code,
+        });
+      })
       .catch(() => {});
   }, []);
+
+  const handleModelsSave = async () => {
+    if (!modelSel) return;
+    setModelSaving(true);
+    setModelMsg(null);
+    try {
+      await updateModels(modelSel);
+      setModelMsg({ ok: true, text: "Modèles mis à jour ✓" });
+    } catch (e) {
+      setModelMsg({ ok: false, text: e instanceof Error ? e.message : "Erreur" });
+    } finally {
+      setModelSaving(false);
+    }
+  };
+
+  // Le modèle actuellement sélectionné doit toujours être représenté dans le
+  // select, même s'il n'apparaît plus dans la liste de l'API.
+  const modelOptions = (m: string | undefined) => {
+    const opts = runtime?.availableModels ?? [];
+    if (m && !opts.includes(m)) return [...opts, m];
+    return opts;
+  };
 
   useEffect(() => {
     loadLeetcode().then((d) => {
@@ -173,6 +212,95 @@ export default function SettingsPage() {
               />
               <CardBody>
                 <AccentPicker />
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Modèles d'IA"
+                subtitle="Choisis le modèle principal du chat, son secours en cas d'échec et le modèle des sessions de code."
+                action={<Cpu className="w-4 h-4 text-[var(--text-3)]" />}
+              />
+              <CardBody>
+                {modelSel === null ? (
+                  <p className="text-[11px] text-[var(--text-3)]">Chargement des modèles…</p>
+                ) : (
+                  <div className="space-y-3">
+                    <label className="block">
+                      <span className="block mb-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-[var(--text-3)]">
+                        Modèle principal
+                      </span>
+                      <select
+                        value={modelSel.general}
+                        onChange={(e) => setModelSel({ ...modelSel, general: e.target.value })}
+                        className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none transition-colors duration-200 focus:border-[var(--accent)]/70"
+                      >
+                        {modelOptions(runtime?.models.general).map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                      <span className="block mt-1 text-[11px] text-[var(--text-4)]">
+                        Utilisé pour les conversations du chat.
+                      </span>
+                    </label>
+
+                    <label className="block">
+                      <span className="block mb-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-[var(--text-3)]">
+                        Modèle de secours
+                      </span>
+                      <select
+                        value={modelSel.generalAlt}
+                        onChange={(e) => setModelSel({ ...modelSel, generalAlt: e.target.value })}
+                        className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none transition-colors duration-200 focus:border-[var(--accent)]/70"
+                      >
+                        {modelOptions(runtime?.models.generalAlt).map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                      <span className="block mt-1 text-[11px] text-[var(--text-4)]">
+                        Pris automatiquement si le modèle principal échoue (fallback).
+                      </span>
+                    </label>
+
+                    <label className="block">
+                      <span className="block mb-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-[var(--text-3)]">
+                        Modèle code
+                      </span>
+                      <select
+                        value={modelSel.code}
+                        onChange={(e) => setModelSel({ ...modelSel, code: e.target.value })}
+                        className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-md px-3 py-2 text-[13px] text-[var(--text-1)] outline-none transition-colors duration-200 focus:border-[var(--accent)]/70"
+                      >
+                        {modelOptions(runtime?.models.code).map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                      <span className="block mt-1 text-[11px] text-[var(--text-4)]">
+                        Utilisé pour les sessions de code.
+                      </span>
+                    </label>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        onClick={() => void handleModelsSave()}
+                        disabled={modelSaving}
+                        leftIcon={modelSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Cpu className="w-3.5 h-3.5" />}
+                      >
+                        {modelSaving ? "Sauvegarde…" : "Sauvegarder"}
+                      </Button>
+                      {modelMsg && (
+                        <p
+                          className={`text-[11px] ${
+                            modelMsg.ok ? "text-[var(--success)]" : "text-[var(--danger)]"
+                          }`}
+                        >
+                          {modelMsg.text}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardBody>
             </Card>
 
@@ -337,22 +465,6 @@ export default function SettingsPage() {
                             : runtime.pushCount > 0
                               ? `${runtime.pushCount} appareil(s) enregistré(s)`
                               : "Aucun appareil enregistré"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)]/40">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center border border-[var(--border-2)] text-[var(--text-3)]">
-                        <Cpu className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-[13px] font-medium text-[var(--text-1)]">Modèles d'IA</p>
-                        <p className="text-[11px] text-[var(--text-3)] font-mono">
-                          {runtime === null
-                            ? "Vérification…"
-                            : `général : ${runtime.models.general} · code : ${runtime.models.code}`}
                         </p>
                       </div>
                     </div>
