@@ -120,4 +120,72 @@ describe("POST /api/chat", () => {
     expect(text).toContain("résultats web");
     expect(mockExecuteTool).toHaveBeenCalledWith("web_search", { query: "test" });
   });
+
+  it("ne crée pas de carte de confirmation ni d'exécution pour des arguments JSON invalides", async () => {
+    mockStream.mockImplementation(() =>
+      fakeStream([
+        {
+          type: "tool_start",
+          toolCallId: "tc-1",
+          name: "send_email_response",
+          arguments: '{"email_id":"a","response_text":invalide}',
+        },
+        { type: "done", content: "" },
+      ])
+    );
+    const res = await POST(makeRequest({ messages: [{ role: "user", content: "Envoie un mail" }] }));
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).not.toContain('"type":"tool_confirm"');
+    expect(text).toContain("Erreur: arguments d'outil invalides (JSON)");
+    expect(mockExecuteTool).not.toHaveBeenCalled();
+  });
+
+  it("injecte la règle d'honnêteté quand le dernier résultat d'outil est une erreur", async () => {
+    let callCount = 0;
+    mockStream.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return fakeStream([
+          { type: "tool_start", toolCallId: "tc-1", name: "web_search", arguments: '{"query":"test"}' },
+          { type: "done", content: "" },
+        ]);
+      }
+      return fakeStream([{ type: "done", content: "Voilà le résultat." }]);
+    });
+    mockExecuteTool.mockResolvedValue("Erreur: boom");
+    const res = await POST(makeRequest({ messages: [{ role: "user", content: "Cherche" }] }));
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain("Voilà le résultat.");
+    expect(callCount).toBe(2);
+    const secondCallMessages = mockStream.mock.calls[1][1] as { role: string; content?: string }[];
+    const lastMsg = secondCallMessages[secondCallMessages.length - 1];
+    expect(lastMsg?.role).toBe("system");
+    expect(lastMsg?.content).toContain("Ne pretend JAMAIS");
+  });
+
+  it("n'injecte pas la règle d'honnêteté quand le dernier résultat d'outil est un succès", async () => {
+    let callCount = 0;
+    mockStream.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return fakeStream([
+          { type: "tool_start", toolCallId: "tc-1", name: "web_search", arguments: '{"query":"test"}' },
+          { type: "done", content: "" },
+        ]);
+      }
+      return fakeStream([{ type: "done", content: "Voilà le résultat." }]);
+    });
+    mockExecuteTool.mockResolvedValue("résultats web");
+    const res = await POST(makeRequest({ messages: [{ role: "user", content: "Cherche" }] }));
+    expect(res.status).toBe(200);
+    // Consomme le stream : sans cela, l'itération 2 (appel n°2 de mockStream)
+    // peut ne pas encore avoir démarré quand on inspecte les appels.
+    await res.text();
+    expect(callCount).toBe(2);
+    const secondCallMessages = mockStream.mock.calls[1][1] as { role: string; content?: string }[];
+    const lastMsg = secondCallMessages[secondCallMessages.length - 1];
+    expect(lastMsg?.role).not.toBe("system");
+  });
 });

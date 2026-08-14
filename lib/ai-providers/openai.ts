@@ -122,6 +122,17 @@ export async function* streamOpenAI(
   const toolCalls = new Map<number, { id: string; name: string; args: string }>();
   let fullContent = "";
 
+  function* emitPendingToolCalls(): Generator<StreamEvent> {
+    for (const [, tc] of toolCalls) {
+      yield {
+        type: "tool_start",
+        toolCallId: tc.id || crypto.randomUUID(),
+        name: tc.name,
+        arguments: tc.args,
+      };
+    }
+  }
+
   for await (const chunk of stream) {
     const choice = chunk.choices?.[0];
     const delta = choice?.delta;
@@ -137,50 +148,65 @@ export async function* streamOpenAI(
     }
 
     if (delta?.tool_calls) {
-      // Some providers send all tool calls in one chunk with full data,
-      // some stream them incrementally. Handle both.
+      // Certains providers envoient chaque appel complet dans un seul chunk,
+      // d'autres le stream fragment par fragment. Certains répètent l'id à
+      // chaque chunk. On concatène les fragments tant que la valeur n'est pas
+      // un JSON complet ; si un JSON déjà complet est renvoyé à nouveau (appel
+      // dupliqué), on remplace pour éviter un doublon.
       for (const tc of delta.tool_calls) {
         const existing = toolCalls.get(tc.index);
-        if (tc.id) {
-          // New or full tool call
+        const argsFragment = tc.function?.arguments ?? "";
+        if (!existing) {
           toolCalls.set(tc.index, {
-            id: tc.id,
-            name: tc.function?.name ?? existing?.name ?? "",
-            args: tc.function?.arguments ?? existing?.args ?? "",
+            id: tc.id ?? "",
+            name: tc.function?.name ?? "",
+            args: argsFragment,
           });
-        } else if (existing && tc.function?.arguments) {
-          existing.args += tc.function.arguments;
-        } else if (!existing && tc.function?.name) {
-          toolCalls.set(tc.index, {
-            id: "",
-            name: tc.function.name,
-            args: tc.function?.arguments ?? "",
-          });
+          continue;
+        }
+        if (tc.id) existing.id = tc.id;
+        if (tc.function?.name) existing.name = tc.function.name;
+        if (!argsFragment) continue;
+        const existingComplete = isCompleteJson(existing.args);
+        if (existingComplete && isCompleteJson(argsFragment)) {
+          existing.args = argsFragment;
+        } else {
+          existing.args += argsFragment;
         }
       }
     }
 
     if (choice?.finish_reason === "tool_calls") {
-      for (const [, tc] of toolCalls) {
-        yield {
-          type: "tool_start",
-          toolCallId: tc.id || crypto.randomUUID(),
-          name: tc.name,
-          arguments: tc.args,
-        };
-      }
+      yield* emitPendingToolCalls();
       return;
     }
 
     if (choice?.finish_reason === "stop") {
+      if (toolCalls.size > 0) {
+        // Appels émis puis arrêt : on les transmet quand même pour que le
+        // serveur les exécute ou renvoie une erreur claire au modèle.
+        yield* emitPendingToolCalls();
+      }
       yield { type: "done", content: fullContent };
       return;
     }
   }
 
+  if (toolCalls.size > 0) {
+    yield* emitPendingToolCalls();
+  }
   if (fullContent) {
     yield { type: "done", content: fullContent };
   } else {
     yield { type: "done", content: "" };
+  }
+}
+
+function isCompleteJson(value: string): boolean {
+  try {
+    JSON.parse(value);
+    return true;
+  } catch {
+    return false;
   }
 }
