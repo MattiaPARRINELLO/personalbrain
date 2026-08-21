@@ -1,7 +1,32 @@
-import { describe, it, expect } from "vitest";
-import { extractBody } from "../google-actions";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("../google-client", () => ({
+  getCalendarClient: () => Promise.resolve({ credentials: { access_token: "tok" } }),
+  getGmailClient: () => Promise.resolve({ credentials: { access_token: "tok" } }),
+}));
+
+import { extractBody, createGoogleCalendarEvent } from "../google-actions";
 
 const b64 = (text: string) => Buffer.from(text, "utf-8").toString("base64");
+
+async function captureEventBody(start: string, end: string) {
+  let captured: {
+    start: { dateTime?: string; date?: string; timeZone?: string };
+    end: { dateTime?: string; date?: string; timeZone?: string };
+  } | undefined;
+  const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+    captured = JSON.parse(String(init?.body));
+    return new Response(JSON.stringify({ id: "evt-1" }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+  try {
+    await createGoogleCalendarEvent("Réunion", start, end);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+  if (!captured) throw new Error("fetch n'a pas été appelé");
+  return captured;
+}
 
 describe("extractBody", () => {
   it("renvoie le corps direct pour un email text/plain mono-part", () => {
@@ -46,5 +71,35 @@ describe("extractBody", () => {
   it("retourne une chaîne vide quand il n'y a aucun contenu", () => {
     expect(extractBody(undefined, "text/html", undefined)).toBe("");
     expect(extractBody([{ mimeType: "image/png", body: { data: b64("img") } }], "multipart/mixed", undefined)).toBe("");
+  });
+});
+
+describe("createGoogleCalendarEvent — fuseau horaire", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("ajoute le fuseau local pour une dateHeure naïve (sans décalage)", async () => {
+    const body = await captureEventBody("2026-08-22T17:00:00", "2026-08-22T18:00:00");
+    expect(body.start).toEqual({
+      dateTime: "2026-08-22T17:00:00",
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    });
+    expect(body.end.timeZone).toBeDefined();
+  });
+
+  it("laisse intacte une dateHeure avec décalage explicite (Z)", async () => {
+    const body = await captureEventBody("2026-08-22T17:00:00Z", "2026-08-22T18:00:00Z");
+    expect(body.start).toEqual({ dateTime: "2026-08-22T17:00:00Z" });
+    expect(body.end).toEqual({ dateTime: "2026-08-22T18:00:00Z" });
+  });
+
+  it("laisse intacte une dateHeure avec décalage +02:00", async () => {
+    const body = await captureEventBody("2026-08-22T17:00:00+02:00", "2026-08-22T18:00:00+02:00");
+    expect(body.start).toEqual({ dateTime: "2026-08-22T17:00:00+02:00" });
+  });
+
+  it("conserve le format jour-entier (all-day) sans timeZone", async () => {
+    const body = await captureEventBody("2026-08-22", "2026-08-23");
+    expect(body.start).toEqual({ date: "2026-08-22" });
+    expect(body.end).toEqual({ date: "2026-08-23" });
   });
 });
