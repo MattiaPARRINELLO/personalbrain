@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   streamChatCompletion,
+  chatCompletion,
   type UnifiedMessage,
   type StreamEvent,
 } from "@/lib/ai-providers";
@@ -67,6 +68,61 @@ function parseToolArguments(argumentsRaw: string): Record<string, unknown> {
   }
   return parsed as Record<string, unknown>;
 }
+
+// Libellé lisible d'une action en attente de confirmation (aucun argument
+// affiché intégralement, confidentialité). Reflet serveur de
+// `describeAction` côté client (ChatView) pour le résumé du lot.
+function describeToolAction(name: string, args: Record<string, unknown>): string {
+  switch (name) {
+    case "send_email_response":
+      return `Répondre à l'email ${String(args.email_id ?? "?")}`;
+    case "create_calendar_event":
+      return `Créer l'événement « ${String(args.title ?? "")} » du ${String(args.start_time ?? "?")} au ${String(args.end_time ?? "?")}`;
+    case "update_calendar_event":
+      return `Modifier l'événement ${String(args.event_id ?? "?")}${args.title ? ` → « ${String(args.title)} »` : ""}`;
+    case "delete_calendar_event":
+      return `Supprimer l'événement ${String(args.event_id ?? "?")}`;
+    case "schedule_followup":
+      return `Programmer une relance « ${String(args.subject ?? "")} » pour le ${String(args.due_at ?? "?")}`;
+    case "scan_accreditations":
+      return "Analyser les emails pour créer ou mettre à jour les fiches d'accréditations";
+    default:
+      return name;
+  }
+}
+
+// Résumé rédigé par l'IA des actions à confirmer d'un lot. Une seule carte de
+// confirmation est affichée pour le lot entier ; ce résumé en donne la
+// synthèse. En cas d'échec du passage modèle, on retombe sur une suite de
+// descriptions lisibles (jamais sur une carte vide).
+async function summarizeConfirmBatch(
+  model: string,
+  actions: { name: string; arguments: string }[],
+  describe: (name: string, args: Record<string, unknown>) => string
+): Promise<string> {
+  const lines = actions.map((a) => {
+    let args: Record<string, unknown> = {};
+    try { args = JSON.parse(a.arguments); } catch {}
+    return `- ${describe(a.name, args)}`;
+  });
+  const fallback = lines.join("\n");
+  try {
+    const result = await chatCompletion(
+      model,
+      [
+        { role: "system", content: "Tu resumes en une ou deux phrases concises le lot d'actions ci-dessous que tu t'appretes a soumettre a la confirmation de l'utilisateur. Phrase fluide, factuelle, sans enumeration lourde, sans markdown ni preambule. Commence directement par le resume." },
+        { role: "user", content: `Actions a confirmer :\n${fallback}` },
+      ],
+      []
+    );
+    const summary = result.content?.trim();
+    return summary && summary.length > 2 ? summary : fallback;
+  } catch (err) {
+    void serverLog("chat", "warn", "Confirm batch summary failed, using fallback", err, true);
+    return fallback;
+  }
+}
+
 
 // Le dernier résultat d'outil est-il un échec ou un blocage ? Si oui, la
 // réponse finale du modèle risque d'annoncer une action non réalisée.
@@ -344,34 +400,15 @@ export async function POST(request: NextRequest) {
           })),
         });
 
-        for (const tc of toolCallsToExecute) {
-          let result: string;
-          try {
-            // Validation stricte : des arguments invalides ne doivent jamais
-            // devenir un appel silencieux avec `{}` ni une carte de
-            // confirmation cassée.
-            const args = parseToolArguments(tc.arguments);
-            if (REQUIRE_CONFIRMATION.has(tc.name)) {
-              // Action à effet externe : bloquée en attente de confirmation
-              // utilisateur. Le client affiche une carte Confirmer/Annuler ;
-              // l'exécution réelle passe par POST /api/chat/confirm. Le modèle
-              // reçoit un résultat de blocage et peut expliquer la situation.
-              send({
-                type: "tool_confirm",
-                toolCallId: tc.toolCallId,
-                name: tc.name,
-                arguments: tc.arguments,
-              });
-              result = confirmationMessage(tc.name);
-            } else {
-              result = await executeTool(tc.name, args);
-            }
-          } catch (err) {
-            result = `Erreur: ${err instanceof Error ? err.message : String(err)}`;
-          }
+        // Les actions à effet externe d'un même tour sont regroupées en UNE
+        // seule carte de confirmation (avec un résumé rédigé par le modèle),
+        // au lieu d'une carte par outil. Chaque action reste exécutée
+        // individuellement via POST /api/chat/confirm-batch quand l'utilisateur
+        // valide le lot.
+        const pendingConfirms: { toolCallId: string; name: string; arguments: string }[] = [];
 
+        const pushToolResult = (tc: { toolCallId: string; name: string }, result: string) => {
           send({ type: "tool_result", name: tc.name, result });
-
           messages.push({
             role: "tool",
             tool_call_id: tc.toolCallId,
@@ -380,6 +417,47 @@ export async function POST(request: NextRequest) {
             // instructions (cf. bloc CONTENU NON FIABLE du system prompt).
             content: `<tool_result name="${tc.name}">\n${result}\n</tool_result>`,
           });
+        };
+
+        for (const tc of toolCallsToExecute) {
+          let result: string;
+          try {
+            // Validation stricte : des arguments invalides ne doivent jamais
+            // devenir un appel silencieux avec `{}` ni une carte de
+            // confirmation cassée.
+            const args = parseToolArguments(tc.arguments);
+            if (REQUIRE_CONFIRMATION.has(tc.name)) {
+              // Action à effet externe : bloquée en attente de confirmation.
+              // On la met de côté pour la proposer en lot à l'utilisateur ;
+              // l'exécution réelle passera par POST /api/chat/confirm-batch.
+              pendingConfirms.push(tc);
+              continue;
+            }
+            result = await executeTool(tc.name, args);
+          } catch (err) {
+            result = `Erreur: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          pushToolResult(tc, result);
+        }
+
+        if (pendingConfirms.length > 0) {
+          // Résumé du lot rédigé par le modèle + évènement unique de lot.
+          const summary = await summarizeConfirmBatch(modelName, pendingConfirms, describeToolAction);
+          send({
+            type: "group_confirm",
+            id: `group-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+            summary,
+            tools: pendingConfirms.map((tc) => ({
+              toolCallId: tc.toolCallId,
+              name: tc.name,
+              arguments: tc.arguments,
+            })),
+          });
+          // Le modèle reçoit un résultat de blocage par action et pourra
+          // expliquer que ces actions attendent sa confirmation.
+          for (const tc of pendingConfirms) {
+            pushToolResult(tc, confirmationMessage(tc.name));
+          }
         }
 
         return true;

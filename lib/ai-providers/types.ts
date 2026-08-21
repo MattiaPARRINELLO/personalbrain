@@ -27,7 +27,12 @@ export type StreamEvent =
   | { type: "delta"; content: string }
   | { type: "tool_start"; toolCallId: string; name: string; arguments: string }
   | { type: "tool_result"; name: string; result: string }
-  | { type: "tool_confirm"; toolCallId: string; name: string; arguments: string }
+  | {
+      type: "group_confirm";
+      id: string;
+      summary: string;
+      tools: { toolCallId: string; name: string; arguments: string }[];
+    }
   | { type: "memory_facts"; facts: { content: string; category: string; confidence: number }[] }
   | { type: "done"; content: string }
   | { type: "error"; message: string };

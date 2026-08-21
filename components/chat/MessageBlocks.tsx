@@ -233,42 +233,55 @@ export function ToolCallTray({ tools }: { tools: ToolCall[] }) {
   );
 }
 
-export function PendingActionCard({
-  toolName,
-  argsLabel,
+// Carte de confirmation GROUPÉE : un lot d'actions à effet externe est soumis
+// à l'utilisateur en une seule carte, avec un résumé rédigé par l'IA et la
+// liste des actions. « Confirmer tout » exécute le lot entier.
+export function GroupActionCard({
+  summary,
+  tools,
   onConfirm,
   onCancel,
   busy,
 }: {
-  toolName: string;
-  argsLabel: string;
+  summary: string;
+  tools: { name: string; argsLabel: string }[];
   onConfirm: () => void;
   onCancel: () => void;
   busy?: boolean;
 }) {
-  const meta = toolMeta[toolName];
-  const Icon = meta?.icon ?? Sparkles;
   return (
-    <div className="rounded-lg border border-[var(--warm)]/40 bg-[var(--warm)]/8 px-3 py-2.5 text-[12px] fade-in-up">
+    <div className="rounded-lg border border-[var(--warm)]/40 bg-[var(--warm)]/8 px-3.5 py-3 text-[12px] fade-in-up">
       <div className="flex items-center gap-2 text-[var(--text-1)]">
-        <Icon className="w-3.5 h-3.5 shrink-0 text-[var(--warm)]" />
-        <span className="font-medium">{meta?.label || toolName}</span>
+        {tools[0] ? (() => {
+          const meta = toolMeta[tools[0].name];
+          const Icon = meta?.icon ?? Sparkles;
+          return <Icon className="w-3.5 h-3.5 shrink-0 text-[var(--warm)]" />;
+        })() : null}
+        <span className="font-medium">Actions à confirmer</span>
         <span className="text-[var(--text-4)] font-mono text-[10px] uppercase tracking-wider">
-          action externe — confirmation requise
+          {tools.length > 1 ? `${tools.length} actions` : "1 action"}
         </span>
       </div>
-      {argsLabel && (
-        <p className="mt-1.5 text-[11px] text-[var(--text-3)] whitespace-pre-wrap break-words leading-relaxed">
-          {argsLabel}
+      {summary && (
+        <p className="mt-1.5 text-[11.5px] text-[var(--text-2)] font-medium leading-relaxed">
+          {summary}
         </p>
       )}
-      <div className="mt-2.5 flex items-center gap-2">
+      <ul className="mt-2 space-y-1.5">
+        {tools.map((t) => (
+          <li key={t.name + t.argsLabel} className="flex items-start gap-2 text-[11px] text-[var(--text-3)]">
+            <span className="mt-1.5 w-1 h-1 rounded-full bg-[var(--warm)] shrink-0" />
+            <span className="leading-snug whitespace-pre-wrap break-words">{t.argsLabel || t.name}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 flex items-center gap-2">
         <button
           onClick={onConfirm}
           disabled={busy}
           className="px-3 py-1.5 rounded-md bg-[var(--warm)] text-[#0a0a0b] font-medium text-[11px] uppercase tracking-wider hover:brightness-110 active:brightness-95 disabled:opacity-50 transition-all duration-200"
         >
-          {busy ? "Exécution…" : "Confirmer"}
+          {busy ? "Exécution…" : tools.length > 1 ? "Confirmer tout" : "Confirmer"}
         </button>
         <button
           onClick={onCancel}

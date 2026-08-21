@@ -19,7 +19,7 @@ import {
   activeToolsList,
   toolMeta,
 } from "@/components/chat/chat-data";
-import { MessageBlock, ToolCallTray, ThinkingIndicator, AssistantAvatar, PendingActionCard } from "@/components/chat/MessageBlocks";
+import { MessageBlock, ToolCallTray, ThinkingIndicator, AssistantAvatar, GroupActionCard } from "@/components/chat/MessageBlocks";
 import { KeyboardSafe } from "@/components/ui/KeyboardSafe";
 
 // Scroll doux désactivé quand l'utilisateur demande un mouvement réduit.
@@ -40,6 +40,8 @@ function describeAction(name: string, args: Record<string, unknown>): string {
       return `Créer l'événement « ${String(args.title ?? "")} » du ${String(args.start_time ?? "?")} au ${String(args.end_time ?? "?")}${args.location ? ` (${String(args.location)})` : ""}`;
     case "update_calendar_event":
       return `Modifier l'événement ${String(args.event_id ?? "?")}${args.title ? ` → « ${String(args.title)} »` : ""}`;
+    case "delete_calendar_event":
+      return `Supprimer l'événement ${String(args.event_id ?? "?")}`;
     case "schedule_followup":
       return `Programmer une relance « ${String(args.subject ?? "")} » pour le ${String(args.due_at ?? "?")}`;
     case "scan_accreditations":
@@ -103,8 +105,12 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionCards, setActionCards] = useState<{ id: string; toolName: string; result: string; timestamp: string }[]>([]);
-  const [pendingConfirmations, setPendingConfirmations] = useState<
-    { id: string; toolName: string; args: Record<string, unknown>; argsLabel: string }[]
+  const [pendingGroups, setPendingGroups] = useState<
+    {
+      id: string;
+      summary: string;
+      tools: { toolCallId: string; name: string; args: Record<string, unknown>; argsLabel: string }[];
+    }[]
   >([]);
   const [confirmBusy, setConfirmBusy] = useState<string | null>(null);
   const [thinkingIndex, setThinkingIndex] = useState(() => Math.floor(Math.random() * FUNNY_THOUGHTS.length));
@@ -333,7 +339,7 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
       chatCtx.clearActiveTools();
       setStreamingContent("");
       setActionCards([]);
-      setPendingConfirmations([]);
+      setPendingGroups([]);
       setLoading(true);
       setStreamingActive(false);
 
@@ -417,16 +423,22 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
                 ]);
               }
               forceRender((n) => n + 1);
-            } else if (event.type === "tool_confirm") {
-              let args: Record<string, unknown> = {};
-              try { args = JSON.parse(event.arguments); } catch { args = {}; }
-              setPendingConfirmations((prev) => [
+            } else if (event.type === "group_confirm") {
+              setPendingGroups((prev) => [
                 ...prev,
                 {
-                  id: `confirm-${event.toolCallId}`,
-                  toolName: event.name,
-                  args,
-                  argsLabel: describeAction(event.name, args),
+                  id: event.id,
+                  summary: event.summary,
+                  tools: event.tools.map((t) => {
+                    let args: Record<string, unknown> = {};
+                    try { args = JSON.parse(t.arguments); } catch { args = {}; }
+                    return {
+                      toolCallId: t.toolCallId,
+                      name: t.name,
+                      args,
+                      argsLabel: describeAction(t.name, args),
+                    };
+                  }),
                 },
               ]);
             } else if (event.type === "error") {
@@ -513,28 +525,35 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
     setStreamingActive(false);
   }, []);
 
-  const confirmAction = useCallback(
-    async (id: string, toolName: string, args: Record<string, unknown>) => {
+  const confirmGroup = useCallback(
+    async (group: { id: string; tools: { name: string; args: Record<string, unknown> }[] }) => {
       if (confirmBusy) return;
-      setConfirmBusy(id);
+      setConfirmBusy(group.id);
       try {
-        const res = await api.chat.confirmAction(toolName, args);
-        setPendingConfirmations((prev) => prev.filter((c) => c.id !== id));
-        if (res.ok && res.result) {
-          const result = res.result;
-          toast.show({ message: "Action exécutée", tone: "success", duration: 3000 });
+        const actions = group.tools.map((t) => ({ name: t.name, arguments: t.args }));
+        const res = await api.chat.confirmBatch(actions);
+        setPendingGroups((prev) => prev.filter((g) => g.id !== group.id));
+        if (!res.ok && res.error) {
+          throw new Error(res.error);
+        }
+        // Chaque résultat (succès ou échec) est reporté dans une carte d'action.
+        const results = res.results ?? [];
+        if (results.length > 0) {
           setActionCards((prev) => [
             ...prev,
-            {
+            ...results.map((r) => ({
               id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              toolName,
-              result,
+              toolName: r.name,
+              result: r.ok ? (r.result ?? "OK") : (r.error ?? "Échec"),
               timestamp: new Date().toISOString(),
-            },
+            })),
           ]);
-        } else {
-          throw new Error(res.error || "Échec de l'action");
         }
+        toast.show({
+          message: `${results.filter((r) => r.ok).length}/${results.length} action${results.length > 1 ? "s" : ""} exécutée${results.length > 1 ? "s" : ""}`,
+          tone: "success",
+          duration: 3000,
+        });
       } catch (err) {
         toast.show({
           message: err instanceof Error ? err.message : "L'action a échoué",
@@ -548,10 +567,10 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
     [confirmBusy, toast]
   );
 
-  const cancelAction = useCallback(
+  const cancelGroup = useCallback(
     (id: string) => {
-      setPendingConfirmations((prev) => prev.filter((c) => c.id !== id));
-      toast.show({ message: "Action annulée", tone: "info", duration: 2500 });
+      setPendingGroups((prev) => prev.filter((g) => g.id !== id));
+      toast.show({ message: "Lot d'actions annulé", tone: "info", duration: 2500 });
     },
     [toast]
   );
@@ -683,16 +702,16 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
 
       <div className="shrink-0 px-4 sm:px-6 pt-1 pb-3">
         <div className="max-w-3xl mx-auto">
-          {pendingConfirmations.length > 0 && (
+          {pendingGroups.length > 0 && (
             <div className="mb-3 space-y-2">
-              {pendingConfirmations.map((c) => (
-                <PendingActionCard
-                  key={c.id}
-                  toolName={c.toolName}
-                  argsLabel={c.argsLabel}
-                  busy={confirmBusy === c.id}
-                  onConfirm={() => void confirmAction(c.id, c.toolName, c.args)}
-                  onCancel={() => cancelAction(c.id)}
+              {pendingGroups.map((g) => (
+                <GroupActionCard
+                  key={g.id}
+                  summary={g.summary}
+                  tools={g.tools}
+                  busy={confirmBusy === g.id}
+                  onConfirm={() => void confirmGroup(g)}
+                  onCancel={() => cancelGroup(g.id)}
                 />
               ))}
             </div>
