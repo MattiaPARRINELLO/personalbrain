@@ -34,7 +34,11 @@ const mockAutoExtractMemoryFacts = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/app/actions/brain", () => ({ autoExtractMemoryFacts: mockAutoExtractMemoryFacts }));
 
 const mockStream = vi.fn();
-vi.mock("@/lib/ai-providers", () => ({ streamChatCompletion: mockStream }));
+const mockChatCompletion = vi.fn();
+vi.mock("@/lib/ai-providers", () => ({
+  streamChatCompletion: mockStream,
+  chatCompletion: mockChatCompletion,
+}));
 
 const { POST } = await import("@/app/api/chat/route");
 
@@ -58,6 +62,7 @@ describe("POST /api/chat", () => {
     mockGetModel.mockResolvedValue({ primary: "model-test", alt: "model-test" });
     mockBuildSystemPrompt.mockResolvedValue("system prompt");
     mockConfirmationMessage.mockReturnValue("ACTION_BLOCKED:send_email_response");
+    mockChatCompletion.mockResolvedValue({ content: "Résumé du lot d'actions", toolCalls: [] });
     // Retourne l'AsyncGenerator directement (pas de wrapper async : la route
     // itère dessus avec `for await`).
     mockStream.mockImplementation(() => fakeStream([{ type: "done", content: "Salut !" }]));
@@ -99,8 +104,10 @@ describe("POST /api/chat", () => {
     const res = await POST(makeRequest({ messages: [{ role: "user", content: "Envoie un mail" }] }));
     expect(res.status).toBe(200);
     const text = await res.text();
-    // La carte de confirmation est émise et le résultat renvoyé au modèle est bloqué.
-    expect(text).toContain('"type":"tool_confirm"');
+    // Une seule carte de confirmation groupée est émise (résumé IA) et le
+    // résultat renvoyé au modèle est bloqué.
+    expect(text).toContain('"type":"group_confirm"');
+    expect(text).toContain('"summary":"Résumé du lot d\'actions"');
     expect(text).toContain("ACTION_BLOCKED");
     expect(mockExecuteTool).not.toHaveBeenCalled();
     expect(mockConfirmationMessage).toHaveBeenCalled();
@@ -136,7 +143,7 @@ describe("POST /api/chat", () => {
     const res = await POST(makeRequest({ messages: [{ role: "user", content: "Envoie un mail" }] }));
     expect(res.status).toBe(200);
     const text = await res.text();
-    expect(text).not.toContain('"type":"tool_confirm"');
+    expect(text).not.toContain('"type":"group_confirm"');
     expect(text).toContain("Erreur: arguments d'outil invalides (JSON)");
     expect(mockExecuteTool).not.toHaveBeenCalled();
   });

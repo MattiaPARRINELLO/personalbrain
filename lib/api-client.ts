@@ -142,6 +142,17 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ name, arguments: args }),
       }),
+
+    // Exécute un lot d'actions IA bloquées (une seule carte de confirmation).
+    confirmBatch: (actions: { name: string; arguments: Record<string, unknown> }[]) =>
+      jsonFetch<{
+        ok: boolean;
+        results: { name: string; ok: boolean; result?: string; error?: string }[];
+        error?: string;
+      }>("/api/chat/confirm-batch", {
+        method: "POST",
+        body: JSON.stringify({ actions }),
+      }),
   },
 };
 
@@ -150,7 +161,12 @@ export type ChatStreamEvent =
   | { type: "delta"; content: string }
   | { type: "tool_start"; toolCallId: string; name: string; arguments: string }
   | { type: "tool_result"; name: string; result: string }
-  | { type: "tool_confirm"; toolCallId: string; name: string; arguments: string }
+  | {
+      type: "group_confirm";
+      id: string;
+      summary: string;
+      tools: { toolCallId: string; name: string; arguments: string }[];
+    }
   | { type: "memory_facts"; facts: { content: string; category: string; confidence: number }[] }
   | { type: "done"; content: string }
   | { type: "error"; message: string };
