@@ -526,7 +526,7 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
   }, []);
 
   const confirmGroup = useCallback(
-    async (group: { id: string; tools: { name: string; args: Record<string, unknown> }[] }) => {
+    async (group: { id: string; tools: { name: string; args: Record<string, unknown>; argsLabel: string }[] }) => {
       if (confirmBusy) return;
       setConfirmBusy(group.id);
       try {
@@ -549,10 +549,19 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
             })),
           ]);
         }
+        // Une seule toast groupée qui liste ce qui a été fait.
+        const lines = results
+          .map((r, i) => {
+            const label = group.tools[i]?.argsLabel || r.name;
+            return r.ok ? `✓ ${label}` : `✗ ${label} — ${r.error ?? "échec"}`;
+          })
+          .join("\n");
+        const okCount = results.filter((r) => r.ok).length;
+        const header = `${okCount}/${results.length} action${results.length > 1 ? "s" : ""} exécutée${results.length > 1 ? "s" : ""}`;
         toast.show({
-          message: `${results.filter((r) => r.ok).length}/${results.length} action${results.length > 1 ? "s" : ""} exécutée${results.length > 1 ? "s" : ""}`,
-          tone: "success",
-          duration: 3000,
+          message: lines ? `${header}\n${lines}` : header,
+          tone: okCount === results.length && results.length > 0 ? "success" : "warning",
+          duration: 4500,
         });
       } catch (err) {
         toast.show({
