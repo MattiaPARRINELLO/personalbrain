@@ -118,7 +118,7 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
           toast.tone === "default" && "text-[var(--text-2)]"
         )}
       />
-      <span className="text-[12.5px] leading-snug flex-1 min-w-0">{toast.message}</span>
+      <span className="text-[12.5px] leading-snug flex-1 min-w-0 whitespace-pre-line">{toast.message}</span>
       {toast.action && (
         <button
           onClick={() => {
