@@ -207,6 +207,23 @@ export async function sendGmailReply(emailId: string, responseText: string): Pro
   return sent.id ?? "";
 }
 
+// Date/heure ISO que Google peut interpréter. Une dateHeure naïve (sans
+// décalage ni Z) est rejetée par l'API Calendar (« Missing time zone
+// definition ») : on lui attache alors le fuseau local du serveur. Une valeur
+// déjà qualifiée (Z, ±hh:mm) ou une date seule (journée entière) est laissée
+// intacte.
+function calendarDateTime(value: string): { dateTime: string; timeZone?: string } {
+  const hasOffset = /(Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const timeZone = hasOffset ? undefined : localTimezone();
+  return { dateTime: value, ...(timeZone ? { timeZone } : {}) };
+}
+
+let cachedTimezone: string | undefined;
+function localTimezone(): string {
+  cachedTimezone ??= Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  return cachedTimezone;
+}
+
 export async function createGoogleCalendarEvent(
   summary: string,
   start: string,
@@ -226,8 +243,8 @@ export async function createGoogleCalendarEvent(
       method: "POST",
       body: JSON.stringify({
         summary,
-        start: isAllDay ? { date: start } : { dateTime: start },
-        end: isAllDay ? { date: end } : { dateTime: end },
+        start: isAllDay ? { date: start } : calendarDateTime(start),
+        end: isAllDay ? { date: end } : calendarDateTime(end),
         location,
         description,
         colorId,
