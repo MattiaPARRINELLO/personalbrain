@@ -23,6 +23,13 @@ export const HERO = {
   title: "Votre journée, enfin reliée.",
   description:
     "Vos conversations, votre mémoire et vos outils, reliés dans un même espace — sans repartir de zéro.",
+  // Extrait de contexte illustratif (fictif) — une seule carte cohérente.
+  contextLabel: "Contexte relié",
+  fragments: [
+    { kind: "Événement", text: "Shooting — jeudi 20:30" },
+    { kind: "Mémoire", text: "Claire V. — attachée de presse" },
+    { kind: "Information", text: "Accréditation à retirer sur place" },
+  ],
   primaryCta: "Essayer la démo",
   secondaryCta: "Découvrir Backstage",
   loginCta: "Se connecter",

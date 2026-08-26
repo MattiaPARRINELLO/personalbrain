@@ -5,13 +5,6 @@ import { useCallback, useEffect, useRef } from "react";
 import { HERO } from "@/app/landing-content";
 import { scrollToSection } from "./SmoothScroll";
 
-const LAYERS = [
-  { kind: "Conversation", text: "« Objectif lumineux pour la fosse »", x: -215, y: -78, delay: 0 },
-  { kind: "Événement", text: "Shooting — jeudi 20:30", x: 205, y: -64, delay: 120 },
-  { kind: "Mémoire", text: "Claire V. — attachée de presse", x: -195, y: 74, delay: 240 },
-  { kind: "Information", text: "Accréditation à retirer sur place", x: 200, y: 88, delay: 360 },
-] as const;
-
 /**
  * Hero — les éléments dispersés se rapprochent et se connectent
  * autour d'un même contexte (perspective CSS + parallaxe pointeur).
@@ -91,27 +84,33 @@ export function HeroSection() {
         {HERO.note}
       </p>
 
-      {/* Couches d'interface — fragments convergents */}
+      {/* Carte de contexte relié — un seul objet cohérent */}
       <div
         ref={stackRef}
         onPointerMove={handlePointer}
         onPointerLeave={resetPointer}
-        className="hero__stack"
+        className="hero__stage"
         aria-hidden="true"
       >
-        <div className="hero__stack-core">
-          <span className="hero__core-label font-mono">Contexte</span>
-          <span className="hero__core-dot" />
-          {LAYERS.map((layer) => (
-            <div
-              key={layer.kind}
-              className="hero__layer"
-              style={{ ["--layer-x" as string]: `${layer.x}px`, ["--layer-y" as string]: `${layer.y}px`, ["--layer-delay" as string]: `${layer.delay}ms` }}
-            >
-              <span className="hero__layer-kind font-mono">{layer.kind}</span>
-              <span className="hero__layer-text">{layer.text}</span>
-            </div>
-          ))}
+        <div className="hero__floaters">
+          <span className="hero__floater hero__floater--a" />
+          <span className="hero__floater hero__floater--b" />
+          <span className="hero__floater hero__floater--c" />
+        </div>
+
+        <div className="hero__context-card">
+          <div className="hero__context-head">
+            <span className="hero__context-dot" />
+            <span className="hero__context-label font-mono">{HERO.contextLabel}</span>
+          </div>
+          <ul className="hero__context-list">
+            {HERO.fragments.map((fragment) => (
+              <li key={fragment.text} className="hero__context-item">
+                <span className="hero__context-kind font-mono">{fragment.kind}</span>
+                <span className="hero__context-text">{fragment.text}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </section>

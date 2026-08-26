@@ -141,104 +141,114 @@
   line-height: 1.65;
 }
 
-/* --- Couches d'interface convergentes ----------------------- */
+/* --- Carte de contexte relié -------------------------------- */
 
-.hero__stack {
-  margin-top: 44px;
-  width: min(680px, 100%);
-  perspective: 1100px;
-}
-.hero__stack-core {
+.hero__stage {
   --tilt-x: 0deg;
   --tilt-y: 0deg;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 240px;
-  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
-  transform-style: preserve-3d;
-  transition: transform 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  margin-top: 52px;
+  width: min(440px, 92%);
+  perspective: 1100px;
+  transition: transform 450ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.hero__core-label {
-  padding: 10px 22px;
-  border: 1px solid rgba(196, 181, 253, 0.35);
-  border-radius: 999px;
+.hero__context-card {
+  position: relative;
+  z-index: 2;
+  padding: 20px 22px;
+  border: 1px solid rgba(245, 243, 240, 0.1);
+  border-radius: 18px;
   background:
-    radial-gradient(ellipse 90% 120% at 50% 0%, rgba(139, 92, 246, 0.22) 0%, rgba(17, 18, 26, 0.9) 70%),
-    rgba(17, 18, 26, 0.9);
-  backdrop-filter: blur(10px);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  color: #e9e4ff;
-  box-shadow: 0 0 50px rgba(139, 92, 246, 0.25);
+    radial-gradient(ellipse 100% 140% at 80% 0%, rgba(139, 92, 246, 0.12) 0%, transparent 60%),
+    rgba(13, 14, 21, 0.82);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45);
+  text-align: left;
+  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  animation: hero-card-in 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 350ms;
 }
-.hero__core-dot {
-  position: absolute;
-  width: 6px;
-  height: 6px;
+@keyframes hero-card-in {
+  from { opacity: 0; transform: translateY(22px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)); }
+  to { opacity: 1; transform: translateY(0) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)); }
+}
+.hero__context-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(245, 243, 240, 0.07);
+}
+.hero__context-dot {
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
   background: #a78bfa;
-  box-shadow: 0 0 14px rgba(167, 139, 250, 0.9);
+  box-shadow: 0 0 10px rgba(167, 139, 250, 0.9);
   animation: hero-core-breathe 3.2s ease-in-out infinite;
 }
 @keyframes hero-core-breathe {
   0%, 100% { opacity: 0.5; transform: scale(0.85); }
-  50% { opacity: 1; transform: scale(1.15); }
+  50% { opacity: 1; transform: scale(1.2); }
 }
-
-.hero__layer {
-  position: absolute;
+.hero__context-label {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: #c4b5fd;
+}
+.hero__context-list { margin-top: 6px; }
+.hero__context-item {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  max-width: 220px;
-  padding: 12px 16px;
-  border: 1px solid rgba(245, 243, 240, 0.09);
-  border-radius: 14px;
-  background: rgba(13, 14, 21, 0.82);
-  backdrop-filter: blur(8px);
-  transform: translate(var(--layer-x), var(--layer-y));
-  text-align: left;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
-  animation: hero-layer-in 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
-  animation-delay: calc(var(--layer-delay, 0ms) + 500ms);
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 4px;
 }
-@keyframes hero-layer-in {
-  from { opacity: 0; transform: translate(calc(var(--layer-x) * 3), calc(var(--layer-y) * 3)) scale(0.92); }
-  to { opacity: 1; transform: translate(var(--layer-x), var(--layer-y)) scale(1); }
+.hero__context-item + .hero__context-item {
+  border-top: 1px solid rgba(245, 243, 240, 0.05);
 }
-.hero__layer-kind {
+.hero__context-kind {
+  flex-shrink: 0;
+  width: 92px;
   font-size: 8.5px;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   color: #a78bfa;
 }
-.hero__layer-text {
-  font-size: 12px;
-  line-height: 1.45;
-  color: #c9cbd6;
+.hero__context-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #e4e2df;
 }
 
-/* Lignes de connexion (pseudo-éléments vers le centre) */
-.hero__layer::after {
-  content: "";
+/* Pastilles décoratives qui se relient à la carte */
+.hero__floaters {
   position: absolute;
-  inset: 50% auto auto 100%;
-  width: 60px;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(167, 139, 250, 0.35), transparent);
-  transform-origin: left;
+  inset: -26px -22px auto auto;
+  z-index: 1;
+  pointer-events: none;
+}
+.hero__floater {
+  position: absolute;
+  border-radius: 999px;
+  background: rgba(167, 139, 250, 0.16);
+  border: 1px solid rgba(196, 181, 253, 0.3);
+  box-shadow: 0 0 24px rgba(139, 92, 246, 0.18);
+  animation: hero-float 6s ease-in-out infinite;
+}
+.hero__floater--a { top: -14px; right: 36px; width: 12px; height: 12px; animation-delay: 0s; }
+.hero__floater--b { top: 38px; right: -14px; width: 8px; height: 8px; animation-delay: 1.4s; background: rgba(122, 162, 247, 0.18); border-color: rgba(122, 162, 247, 0.35); }
+.hero__floater--c { top: 96px; right: 30px; width: 6px; height: 6px; animation-delay: 2.6s; }
+@keyframes hero-float {
+  0%, 100% { transform: translateY(0); opacity: 0.7; }
+  50% { transform: translateY(-9px); opacity: 1; }
 }
 
 @media (max-width: 640px) {
-  .hero__stack-core { min-height: 300px; transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) scale(0.62); }
-  .hero__layer { max-width: 180px; padding: 10px 12px; }
-  .hero__layer-text { font-size: 10.5px; }
-  .hero__layer::after { display: none; }
+  .hero__stage { width: min(420px, 92%); }
+  .hero__context-kind { width: 78px; }
+  .hero__context-text { font-size: 12.5px; }
 }
 
 /* ============================================================
@@ -909,11 +919,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .hero__core-dot,
-  .hero__layer,
+  .hero__floater,
+  .hero__context-card,
   .pubdemo__spinner {
     animation: none !important;
   }
-  .hero__stack-core { transition: none; }
   .daystory__connection {
     opacity: 1;
     transform: none;
