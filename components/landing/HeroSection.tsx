@@ -22,8 +22,8 @@ export function HeroSection() {
     const rect = stackRef.current.getBoundingClientRect();
     const px = (e.clientX - rect.left) / rect.width - 0.5;
     const py = (e.clientY - rect.top) / rect.height - 0.5;
-    stackRef.current.style.setProperty("--tilt-x", `${(-py * 5).toFixed(2)}deg`);
-    stackRef.current.style.setProperty("--tilt-y", `${(px * 7).toFixed(2)}deg`);
+    stackRef.current.style.setProperty("--tilt-x", `${(-py * 9).toFixed(2)}deg`);
+    stackRef.current.style.setProperty("--tilt-y", `${(px * 11).toFixed(2)}deg`);
   }, []);
 
   const resetPointer = useCallback(() => {
@@ -94,8 +94,12 @@ export function HeroSection() {
       >
         <p className="hero__context-label font-mono">{HERO.contextLabel}</p>
         <ul className="hero__context-list">
-          {HERO.fragments.map((fragment) => (
-            <li key={fragment.text} className="hero__context-item">
+          {HERO.fragments.map((fragment, i) => (
+            <li
+              key={fragment.text}
+              className="hero__context-item"
+              style={{ ["--depth" as string]: `${24 + i * 22}px` }}
+            >
               <span className="hero__context-kind font-mono">{fragment.kind}</span>
               <span className="hero__context-text">{fragment.text}</span>
             </li>

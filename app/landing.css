@@ -140,15 +140,16 @@
   line-height: 1.65;
 }
 
-/* --- Contexte relié — pose légère, sans cadre ----------------- */
+/* --- Contexte relié — pose légère en profondeur 3D ------------ */
 
 .hero__stage {
   --tilt-x: 0deg;
   --tilt-y: 0deg;
   margin-top: 48px;
   width: min(360px, 84%);
-  perspective: 1100px;
-  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  perspective: 900px;
+  transform-style: preserve-3d;
+  transform: rotateX(calc(12deg + var(--tilt-x))) rotateY(var(--tilt-y));
   transition: transform 450ms cubic-bezier(0.16, 1, 0.3, 1);
   text-align: left;
 }
@@ -158,6 +159,7 @@
   text-transform: uppercase;
   letter-spacing: 0.24em;
   color: #8f91a0;
+  transform: translateZ(14px);
 }
 
 .hero__context-list { margin-top: 10px; }
@@ -167,8 +169,16 @@
   gap: 12px;
   padding: 9px 2px;
   border-bottom: 1px solid rgba(245, 243, 240, 0.05);
+  transform-style: preserve-3d;
+  transform: translateZ(var(--depth, 24px));
+  animation: hero-depth-float 8s ease-in-out infinite;
+  animation-delay: calc(var(--depth, 24px) * -0.04s);
 }
 .hero__context-item:last-child { border-bottom: none; }
+@keyframes hero-depth-float {
+  0%, 100% { transform: translateZ(var(--depth, 24px)) translateY(0); }
+  50% { transform: translateZ(calc(var(--depth, 24px) + 14px)) translateY(-3px); }
+}
 .hero__context-kind {
   flex-shrink: 0;
   width: 84px;
@@ -856,6 +866,7 @@
    ============================================================ */
 
 @media (prefers-reduced-motion: reduce) {
+  .hero__context-item,
   .pubdemo__spinner {
     animation: none !important;
   }
