@@ -38,7 +38,6 @@ export const REQUIRE_CONFIRMATION = new Set<string>([
   "update_calendar_event",
   "delete_calendar_event",
   "schedule_followup",
-  "scan_accreditations",
 ]);
 
 // Résultat renvoyé au modèle quand une action est bloquée en attente de

@@ -11,7 +11,6 @@ vi.mock("@/lib/chat-tools", () => ({
     "create_calendar_event",
     "update_calendar_event",
     "schedule_followup",
-    "scan_accreditations",
   ]),
 }));
 

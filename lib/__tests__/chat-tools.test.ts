@@ -50,7 +50,9 @@ describe("chat-tools — confirmation des actions IA", () => {
     expect(REQUIRE_CONFIRMATION.has("update_calendar_event")).toBe(true);
     expect(REQUIRE_CONFIRMATION.has("delete_calendar_event")).toBe(true);
     expect(REQUIRE_CONFIRMATION.has("schedule_followup")).toBe(true);
-    expect(REQUIRE_CONFIRMATION.has("scan_accreditations")).toBe(true);
+    // Le scan des accréditations (analyse d'emails) et les lectures seules ne
+    // demandent pas de confirmation.
+    expect(REQUIRE_CONFIRMATION.has("scan_accreditations")).toBe(false);
     // Les lectures seules ne demandent pas de confirmation.
     expect(REQUIRE_CONFIRMATION.has("web_search")).toBe(false);
     expect(REQUIRE_CONFIRMATION.has("list_reminders")).toBe(false);
@@ -111,9 +113,15 @@ describe("chat-tools — confirmation des actions IA", () => {
     expect(mockStorage.webSearch).toHaveBeenCalledWith("test");
   });
 
-  it("bloque le scan des accréditations (écriture en masse depuis des emails)", async () => {
+  it("exécute le scan des accréditations sans confirmation (analyse d'emails)", async () => {
+    // Un email sans artiste détecté : le scan aboutit quand même (déclenché
+    // immédiatement, jamais bloqué en attente de confirmation).
+    mockGoogleActions.fetchGmailMessages.mockResolvedValue([
+      { id: "m1", from: "a@b.fr", subject: "Re: accreditation", date: "2026-08-20", snippet: "confirme le pass presse" },
+    ]);
     const result = await executeTool("scan_accreditations", {});
-    expect(result.startsWith(ACTION_BLOCKED_PREFIX)).toBe(true);
-    expect(mockGoogleActions.fetchGmailMessages).not.toHaveBeenCalled();
+    expect(result.startsWith(ACTION_BLOCKED_PREFIX)).toBe(false);
+    expect(result).toContain("Scan termine");
+    expect(mockGoogleActions.fetchGmailMessages).toHaveBeenCalled();
   });
 });
