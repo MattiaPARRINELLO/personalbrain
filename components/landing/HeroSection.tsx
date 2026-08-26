@@ -48,7 +48,19 @@ export function HeroSection() {
         {HERO.eyebrow}
       </p>
 
-      <h1 className="hero__title mt-7 max-w-3xl text-balance">{HERO.title}</h1>
+      <h1 className="hero__title mt-7 max-w-3xl text-balance">
+        {(() => {
+          const words = HERO.title.split(" ");
+          const last = words.pop() ?? "";
+          return (
+            <>
+              {words.join(" ")}
+              {words.length > 0 ? " " : ""}
+              <span className="hero__title-grad">{last}</span>
+            </>
+          );
+        })()}
+      </h1>
 
       <p className="hero__desc mt-6 max-w-2xl text-balance">{HERO.description}</p>
 

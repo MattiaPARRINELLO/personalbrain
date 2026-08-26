@@ -20,7 +20,7 @@ export const NAV_LINKS = [
 
 export const HERO = {
   eyebrow: "Votre second cerveau personnel",
-  title: "Tout ce qui compte dans votre journée, enfin relié.",
+  title: "Votre journée, enfin reliée.",
   description:
     "Vos conversations, votre mémoire et vos outils, reliés dans un même espace — sans repartir de zéro.",
   primaryCta: "Essayer la démo",

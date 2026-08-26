@@ -128,6 +128,12 @@
   font-weight: 700;
   color: #f5f3f0;
 }
+.hero__title-grad {
+  background: linear-gradient(120deg, #f5f3f0 25%, #a78bfa 70%, #7aa2f7 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
 
 .hero__desc {
   color: #a5a7b3;
