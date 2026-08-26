@@ -21,26 +21,6 @@
 }
 
 /* ============================================================
-   SCÈNE DE CONTEXTE — canvas 2D fixe derrière le contenu
-   ============================================================ */
-
-.context-stage {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(ellipse 70% 50% at 50% 40%, rgba(30, 27, 75, 0.12) 0%, transparent 70%),
-    #050507;
-}
-.context-stage canvas { display: block; }
-.context-stage__vignette {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse 95% 85% at 50% 50%, transparent 66%, rgba(5, 5, 7, 0.3) 100%);
-  pointer-events: none;
-}
-
-/* ============================================================
    BOUTONS
    ============================================================ */
 
@@ -112,11 +92,10 @@
   color: #c4b5fd;
 }
 .hero__eyebrow-dot {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 999px;
   background: #a78bfa;
-  box-shadow: 0 0 6px rgba(167, 139, 250, 0.7);
 }
 
 .hero__title {
@@ -171,14 +150,8 @@
   border-bottom: 1px solid rgba(245, 243, 240, 0.05);
   transform-style: preserve-3d;
   transform: translateZ(var(--depth, 24px));
-  animation: hero-depth-float 8s ease-in-out infinite;
-  animation-delay: calc(var(--depth, 24px) * -0.04s);
 }
 .hero__context-item:last-child { border-bottom: none; }
-@keyframes hero-depth-float {
-  0%, 100% { transform: translateZ(var(--depth, 24px)) translateY(0); }
-  50% { transform: translateZ(calc(var(--depth, 24px) + 14px)) translateY(-3px); }
-}
 .hero__context-kind {
   flex-shrink: 0;
   width: 84px;
@@ -327,10 +300,7 @@
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1;
-  background: linear-gradient(120deg, #f5f3f0 30%, #a78bfa 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #f5f3f0;
 }
 .daystory__when {
   font-size: 10px;
@@ -786,10 +756,7 @@
     linear-gradient(180deg, rgba(5, 5, 7, 0.6) 0%, rgba(5, 5, 7, 0.92) 14%, rgba(5, 5, 7, 0.92) 86%, rgba(5, 5, 7, 0.7) 100%);
 }
 .control__title-b {
-  background: linear-gradient(120deg, #f5f3f0 40%, #a78bfa 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #c4b5fd;
 }
 .control__desc { color: #a5a7b3; font-size: 15px; line-height: 1.65; }
 
@@ -866,7 +833,6 @@
    ============================================================ */
 
 @media (prefers-reduced-motion: reduce) {
-  .hero__context-item,
   .pubdemo__spinner {
     animation: none !important;
   }
@@ -875,9 +841,4 @@
     transform: none;
     transition: none;
   }
-}
-
-/* Libellé éventuel masqué sur petit écran */
-@media (max-width: 767px) {
-  .context-stage__vignette { background: radial-gradient(ellipse 100% 90% at 50% 50%, transparent 45%, rgba(5, 5, 7, 0.85) 100%); }
 }

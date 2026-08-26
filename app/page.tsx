@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./landing.css";
 import { InstalledRedirect } from "@/components/landing/InstalledRedirect";
-import { ContextStage } from "@/components/landing/ContextStage";
 import { SmoothScroll } from "@/components/landing/SmoothScroll";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { HeroSection } from "@/components/landing/HeroSection";
@@ -46,9 +45,6 @@ export default function Home() {
   return (
     <>
       <InstalledRedirect />
-      {/* Scène de contexte — canvas 2D décoratif, aria-hidden.
-          Toute l'information utile est dans le HTML. */}
-      <ContextStage />
       <SmoothScroll>
         <LandingHeader />
         <main id="main" className="landing relative z-10">
