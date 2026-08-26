@@ -84,7 +84,7 @@ export function HeroSection() {
         {HERO.note}
       </p>
 
-      {/* Carte de contexte relié — un seul objet cohérent */}
+      {/* Contexte relié — pose légère, sans cadre */}
       <div
         ref={stackRef}
         onPointerMove={handlePointer}
@@ -92,26 +92,15 @@ export function HeroSection() {
         className="hero__stage"
         aria-hidden="true"
       >
-        <div className="hero__floaters">
-          <span className="hero__floater hero__floater--a" />
-          <span className="hero__floater hero__floater--b" />
-          <span className="hero__floater hero__floater--c" />
-        </div>
-
-        <div className="hero__context-card">
-          <div className="hero__context-head">
-            <span className="hero__context-dot" />
-            <span className="hero__context-label font-mono">{HERO.contextLabel}</span>
-          </div>
-          <ul className="hero__context-list">
-            {HERO.fragments.map((fragment) => (
-              <li key={fragment.text} className="hero__context-item">
-                <span className="hero__context-kind font-mono">{fragment.kind}</span>
-                <span className="hero__context-text">{fragment.text}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <p className="hero__context-label font-mono">{HERO.contextLabel}</p>
+        <ul className="hero__context-list">
+          {HERO.fragments.map((fragment) => (
+            <li key={fragment.text} className="hero__context-item">
+              <span className="hero__context-kind font-mono">{fragment.kind}</span>
+              <span className="hero__context-text">{fragment.text}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );
