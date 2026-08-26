@@ -6,12 +6,7 @@ vi.mock("@/lib/session", () => ({ getSession: mockGetSession }));
 const mockExecuteTool = vi.fn();
 vi.mock("@/lib/chat-tools", () => ({
   executeTool: mockExecuteTool,
-  REQUIRE_CONFIRMATION: new Set([
-    "send_email_response",
-    "create_calendar_event",
-    "update_calendar_event",
-    "schedule_followup",
-  ]),
+  REQUIRE_CONFIRMATION: new Set(["send_email_response"]),
 }));
 
 const mockLogActivity = vi.fn();
@@ -56,7 +51,7 @@ describe("POST /api/chat/confirm-batch", () => {
       makeRequest({
         actions: [
           { name: "send_email_response", arguments: { email_id: "a", response_text: "ok" } },
-          { name: "create_calendar_event", arguments: { title: "R", start_time: "x", end_time: "y" } },
+          { name: "send_email_response", arguments: { email_id: "b", response_text: "merci" } },
         ],
       })
     );
@@ -66,26 +61,26 @@ describe("POST /api/chat/confirm-batch", () => {
     expect(body.results.every((r: { ok: boolean }) => r.ok)).toBe(true);
     expect(mockExecuteTool).toHaveBeenCalledTimes(2);
     expect(mockExecuteTool).toHaveBeenCalledWith("send_email_response", { email_id: "a", response_text: "ok" }, true);
-    expect(mockExecuteTool).toHaveBeenCalledWith("create_calendar_event", { title: "R", start_time: "x", end_time: "y" }, true);
+    expect(mockExecuteTool).toHaveBeenCalledWith("send_email_response", { email_id: "b", response_text: "merci" }, true);
     expect(mockLogActivity).toHaveBeenCalledTimes(2);
   });
 
   it("continue le lot et marque en échec une action qui échoue", async () => {
-    mockExecuteTool.mockImplementation(async (name: string) => {
-      if (name === "schedule_followup") throw new Error("boom");
+    mockExecuteTool.mockImplementation(async (name: string, args: { email_id?: string }) => {
+      if (args?.email_id === "bad") throw new Error("boom");
       return "ok";
     });
     const res = await POST(
       makeRequest({
         actions: [
-          { name: "schedule_followup", arguments: { subject: "s" } },
+          { name: "send_email_response", arguments: { email_id: "bad", response_text: "x" } },
           { name: "send_email_response", arguments: { email_id: "a", response_text: "ok" } },
         ],
       })
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.results[0]).toEqual({ name: "schedule_followup", ok: false, error: "boom" });
+    expect(body.results[0]).toEqual({ name: "send_email_response", ok: false, error: "boom" });
     expect(body.results[1].ok).toBe(true);
     expect(mockExecuteTool).toHaveBeenCalledTimes(2);
     expect(mockLogActivity).toHaveBeenCalledTimes(2);

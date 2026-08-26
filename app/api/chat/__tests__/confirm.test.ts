@@ -6,12 +6,7 @@ vi.mock("@/lib/session", () => ({ getSession: mockGetSession }));
 const mockExecuteTool = vi.fn();
 vi.mock("@/lib/chat-tools", () => ({
   executeTool: mockExecuteTool,
-  REQUIRE_CONFIRMATION: new Set([
-    "send_email_response",
-    "create_calendar_event",
-    "update_calendar_event",
-    "schedule_followup",
-  ]),
+  REQUIRE_CONFIRMATION: new Set(["send_email_response"]),
 }));
 
 const mockLogActivity = vi.fn();

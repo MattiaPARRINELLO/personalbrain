@@ -44,12 +44,13 @@ describe("chat-tools — confirmation des actions IA", () => {
     mockStorage.getPhotoShoots.mockResolvedValue({ shoots: [] });
   });
 
-  it("liste les outils à effet externe exigeant une confirmation", () => {
+  it("liste les outils exigeant une confirmation (uniquement l'envoi d'emails)", () => {
     expect(REQUIRE_CONFIRMATION.has("send_email_response")).toBe(true);
-    expect(REQUIRE_CONFIRMATION.has("create_calendar_event")).toBe(true);
-    expect(REQUIRE_CONFIRMATION.has("update_calendar_event")).toBe(true);
-    expect(REQUIRE_CONFIRMATION.has("delete_calendar_event")).toBe(true);
-    expect(REQUIRE_CONFIRMATION.has("schedule_followup")).toBe(true);
+    // Calendrier, rappels, scan, lectures : exécution directe sans confirmation.
+    expect(REQUIRE_CONFIRMATION.has("create_calendar_event")).toBe(false);
+    expect(REQUIRE_CONFIRMATION.has("update_calendar_event")).toBe(false);
+    expect(REQUIRE_CONFIRMATION.has("delete_calendar_event")).toBe(false);
+    expect(REQUIRE_CONFIRMATION.has("schedule_followup")).toBe(false);
     // Le scan des accréditations (analyse d'emails) et les lectures seules ne
     // demandent pas de confirmation.
     expect(REQUIRE_CONFIRMATION.has("scan_accreditations")).toBe(false);
@@ -79,30 +80,28 @@ describe("chat-tools — confirmation des actions IA", () => {
     expect(mockGoogleActions.sendGmailReply).toHaveBeenCalledWith("abc", "Bonjour");
   });
 
-  it("bloque la création d'événement calendrier sans confirmation", async () => {
+  it("exécute la création d'événement calendrier sans confirmation", async () => {
+    mockGoogleActions.createGoogleCalendarEvent.mockResolvedValue("evt-1");
     const result = await executeTool("create_calendar_event", {
       title: "Réunion",
       start_time: "2026-08-10T10:00:00Z",
       end_time: "2026-08-10T11:00:00Z",
     });
-    expect(result.startsWith(ACTION_BLOCKED_PREFIX)).toBe(true);
-    expect(mockGoogleActions.createGoogleCalendarEvent).not.toHaveBeenCalled();
-  });
-
-  it("bloque la suppression d'événement calendrier sans confirmation", async () => {
-    const result = await executeTool("delete_calendar_event", { event_id: "evt-1" });
-    expect(result.startsWith(ACTION_BLOCKED_PREFIX)).toBe(true);
-    expect(mockGoogleActions.deleteGoogleCalendarEvent).not.toHaveBeenCalled();
-  });
-
-  it("exécute la suppression d'événement quand la confirmation est fournie", async () => {
-    mockGoogleActions.deleteGoogleCalendarEvent.mockResolvedValue(undefined);
-    const result = await executeTool(
-      "delete_calendar_event",
-      { event_id: "evt-1" },
-      true
+    expect(result.startsWith(ACTION_BLOCKED_PREFIX)).toBe(false);
+    expect(mockGoogleActions.createGoogleCalendarEvent).toHaveBeenCalledWith(
+      "Réunion",
+      "2026-08-10T10:00:00Z",
+      "2026-08-10T11:00:00Z",
+      undefined,
+      undefined,
+      undefined
     );
-    expect(result).toContain("evt-1");
+  });
+
+  it("exécute la suppression d'événement calendrier sans confirmation", async () => {
+    mockGoogleActions.deleteGoogleCalendarEvent.mockResolvedValue(undefined);
+    const result = await executeTool("delete_calendar_event", { event_id: "evt-1" });
+    expect(result.startsWith(ACTION_BLOCKED_PREFIX)).toBe(false);
     expect(mockGoogleActions.deleteGoogleCalendarEvent).toHaveBeenCalledWith("evt-1");
   });
 

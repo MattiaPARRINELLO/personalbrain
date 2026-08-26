@@ -28,17 +28,10 @@ import {
   deleteGoogleCalendarEvent,
 } from "@/lib/google-actions";
 
-// Outils à effet externe (envoi, modification de calendrier, notification)
-// ou à écriture sensible déclenchée par du contenu non fiable : leur
-// exécution exige une confirmation explicite de l'utilisateur via
-// /api/chat/confirm. Le modèle ne peut jamais les exécuter seul.
-export const REQUIRE_CONFIRMATION = new Set<string>([
-  "send_email_response",
-  "create_calendar_event",
-  "update_calendar_event",
-  "delete_calendar_event",
-  "schedule_followup",
-]);
+// Seule l'envoi d'emails exige une confirmation explicite de l'utilisateur
+// via /api/chat/confirm. Le modèle ne peut jamais l'exécuter seul. Les autres
+// outils (calendrier, rappels, scan, lecture) s'exécutent directement.
+export const REQUIRE_CONFIRMATION = new Set<string>(["send_email_response"]);
 
 // Résultat renvoyé au modèle quand une action est bloquée en attente de
 // confirmation. Le préfixe permet au client de détecter l'état.
