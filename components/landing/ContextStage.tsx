@@ -40,7 +40,7 @@ export function ContextStage() {
     let pointerX = 0.5;
     let pointerY = 0.5;
 
-    const NODE_COUNT = window.innerWidth < 768 ? 16 : 26;
+    const NODE_COUNT = window.innerWidth < 768 ? 10 : 14;
     const nodes: Node[] = [];
 
     const resize = () => {
@@ -113,14 +113,14 @@ export function ContextStage() {
       }
 
       // Connexions entre nœuds proches
-      const linkDist = 100 + cohesion * 150;
+      const linkDist = 110 + cohesion * 150;
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const a = nodes[i];
           const b = nodes[j];
           const d = Math.hypot(a.x - b.x, a.y - b.y);
           if (d < linkDist) {
-            const alpha = (1 - d / linkDist) * (0.1 + cohesion * 0.25);
+            const alpha = (1 - d / linkDist) * (0.05 + cohesion * 0.16);
             ctx.strokeStyle = `rgba(167, 139, 250, ${alpha.toFixed(3)})`;
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -131,16 +131,16 @@ export function ContextStage() {
         }
       }
 
-      // Nœuds
+      // Nœuds — discrets, halo doux
       for (const n of nodes) {
         const pulse = 0.6 + Math.sin(time * 1.2 + n.seed * 12) * 0.4;
-        const alpha = 0.55 + cohesion * 0.2 + pulse * 0.15;
+        const alpha = 0.32 + cohesion * 0.15 + pulse * 0.1;
         ctx.save();
-        ctx.shadowColor = "rgba(167, 139, 250, 0.9)";
-        ctx.shadowBlur = 14 + cohesion * 8;
+        ctx.shadowColor = "rgba(167, 139, 250, 0.55)";
+        ctx.shadowBlur = 6 + cohesion * 3;
         ctx.fillStyle = `rgba(210, 198, 255, ${alpha.toFixed(3)})`;
         ctx.beginPath();
-        ctx.arc(n.x, n.y, n.r * 1.7 * (1 + cohesion * 0.25), 0, Math.PI * 2);
+        ctx.arc(n.x, n.y, n.r * 1.4 * (1 + cohesion * 0.2), 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
@@ -148,7 +148,7 @@ export function ContextStage() {
       // Halo central discret quand le contexte se forme
       if (cohesion > 0.25) {
         const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 240);
-        glow.addColorStop(0, `rgba(139, 92, 246, ${(cohesion * 0.07).toFixed(3)})`);
+        glow.addColorStop(0, `rgba(139, 92, 246, ${(cohesion * 0.04).toFixed(3)})`);
         glow.addColorStop(1, "rgba(139, 92, 246, 0)");
         ctx.fillStyle = glow;
         ctx.fillRect(cx - 240, cy - 240, 480, 480);
