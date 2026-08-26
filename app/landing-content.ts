@@ -22,7 +22,7 @@ export const HERO = {
   eyebrow: "Votre second cerveau personnel",
   title: "Tout ce qui compte dans votre journée, enfin relié.",
   description:
-    "Backstage réunit vos conversations, votre mémoire et vos outils dans un espace personnel alimenté par l'IA. Retrouvez le contexte. Reliez les informations. Avancez sans repartir de zéro.",
+    "Vos conversations, votre mémoire et vos outils, reliés dans un même espace — sans repartir de zéro.",
   primaryCta: "Essayer la démo",
   secondaryCta: "Découvrir Backstage",
   loginCta: "Se connecter",
