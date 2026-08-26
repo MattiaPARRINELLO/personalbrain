@@ -3,19 +3,23 @@ const rateLimitMap = new Map<string, { tokens: number; lastRefill: number }>();
 const RATE_LIMIT_MAX = 30;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 
-export function checkRateLimit(key: string): boolean {
+export function checkRateLimit(
+  key: string,
+  max = RATE_LIMIT_MAX,
+  windowMs = RATE_LIMIT_WINDOW_MS
+): boolean {
   const now = Date.now();
   const existing = rateLimitMap.get(key);
 
   if (!existing) {
-    rateLimitMap.set(key, { tokens: RATE_LIMIT_MAX - 1, lastRefill: now });
+    rateLimitMap.set(key, { tokens: max - 1, lastRefill: now });
     return true;
   }
 
   const elapsed = now - existing.lastRefill;
-  const refill = Math.floor((elapsed / RATE_LIMIT_WINDOW_MS) * RATE_LIMIT_MAX);
+  const refill = Math.floor((elapsed / windowMs) * max);
   if (refill > 0) {
-    existing.tokens = Math.min(existing.tokens + refill, RATE_LIMIT_MAX);
+    existing.tokens = Math.min(existing.tokens + refill, max);
     existing.lastRefill = now;
   }
 

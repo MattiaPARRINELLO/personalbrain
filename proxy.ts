@@ -41,6 +41,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/cron",
   "/api/push",
   "/api/reminders/pending",
+  "/api/demo",
 ];
 
 function extractRoute(pathname: string): string {
