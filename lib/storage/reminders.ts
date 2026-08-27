@@ -1,15 +1,10 @@
 import type { Reminder, RemindersData } from "../types";
-import { maybeBackup, mutateJson, readOrCreate, writeJsonAtomic } from "../storage-core";
+import { mutateJson, readOrCreate } from "../storage-core";
 
 const defaultReminders: RemindersData = { reminders: [] };
 
 export async function getReminders(): Promise<RemindersData> {
   return readOrCreate("reminders.json", defaultReminders);
-}
-
-export async function saveReminders(data: RemindersData): Promise<void> {
-  await maybeBackup("reminders.json");
-  return writeJsonAtomic("reminders.json", data);
 }
 
 export async function addReminder(input: {

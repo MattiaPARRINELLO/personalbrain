@@ -150,15 +150,3 @@ export function useCachedFetch<T>(
     refetch,
   };
 }
-
-export function useOptimisticUpdate<T>(key: string) {
-  return useCallback(
-    (updater: (current: T) => T) => {
-      const entry = globalCache.get(key);
-      if (entry?.status === "success") {
-        setCacheEntry(key, { status: "success", data: updater(entry.data as T), fetchedAt: entry.fetchedAt });
-      }
-    },
-    [key]
-  );
-}

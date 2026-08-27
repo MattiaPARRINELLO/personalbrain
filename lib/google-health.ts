@@ -21,10 +21,10 @@ export type GoogleAccountHealth = {
 };
 
 /** Durée de vie typique d'un refresh token d'app non vérifiée (mode Testing). */
-export const TESTING_TOKEN_EXPIRY_DAYS = 7;
+const TESTING_TOKEN_EXPIRY_DAYS = 7;
 
 /** À partir de quel âge du lien on passe en alerte (5,5 jours). */
-export const WARN_AFTER_DAYS = TESTING_TOKEN_EXPIRY_DAYS - 1.5;
+const WARN_AFTER_DAYS = TESTING_TOKEN_EXPIRY_DAYS - 1.5;
 
 export type GoogleHealthInput = {
   hasRefreshToken: boolean;

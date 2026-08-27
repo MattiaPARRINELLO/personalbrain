@@ -119,22 +119,6 @@ describe("storage - memory", () => {
     const storage = await getStorage();
     expect(await storage.deleteMemoryFact("nope")).toBe(false);
   });
-
-  it("gère les relations mémoire", async () => {
-    const storage = await getStorage();
-    const f1 = await storage.addMemoryFact("Fact A", "dev");
-    const f2 = await storage.addMemoryFact("Fact B", "dev");
-    const rel = await storage.addMemoryRelationship(f1.id, f2.id, "related");
-    expect(rel.sourceId).toBe(f1.id);
-    expect(rel.targetId).toBe(f2.id);
-
-    const relationships = await storage.getMemoryRelationships();
-    expect(relationships).toHaveLength(1);
-
-    const related = await storage.getRelatedFacts(f1.id);
-    expect(related).toHaveLength(1);
-    expect(related[0].fact.id).toBe(f2.id);
-  });
 });
 
 describe("storage - watch later", () => {
@@ -183,15 +167,6 @@ describe("storage - watch later", () => {
     const b = await storage.addWatchLaterItem({ url: "https://b.com", title: "B", category: "video" });
     const ok = await storage.reorderWatchLaterItems([a.id, b.id]);
     expect(ok).toBe(true);
-  });
-
-  it("markWatchLaterRead marque comme lu", async () => {
-    const storage = await getStorage();
-    const item = await storage.addWatchLaterItem({ url: "https://example.com", title: "Test", category: "article" });
-    await storage.markWatchLaterRead(item.id);
-    const data = await storage.getWatchLater();
-    const found = data.items.find((i: { id: string }) => i.id === item.id);
-    expect(found?.read).toBe(true);
   });
 });
 
@@ -259,44 +234,12 @@ describe("storage - calendar", () => {
 });
 
 describe("storage - emails", () => {
-  it("marque un email comme lu", async () => {
-    const storage = await getStorage();
-    await storage.saveEmails({
-      emails: [{ id: "e1", from: "test@example.com", subject: "Test", body: "Hello", date: new Date().toISOString(), unread: true }],
-    });
-    await storage.markEmailRead("e1");
-    const data = await storage.getEmails();
-    const found = data.emails.find((e: { id: string }) => e.id === "e1");
-    expect(found?.unread).toBe(false);
-  });
-
-  it("sauvegarde et restaure les emails", async () => {
-    const storage = await getStorage();
-    const email = {
-      id: "test123",
-      from: "test@example.com",
-      subject: "Test",
-      body: "Hello",
-      date: new Date().toISOString(),
-      unread: true,
-    };
-    await storage.saveEmails({ emails: [email] });
-    const data = await storage.getEmails();
-    expect(data.emails).toHaveLength(1);
-    expect(data.emails[0].subject).toBe("Test");
-  });
-
   it("searchEmails cherche par contenu", async () => {
     const storage = await getStorage();
-    await storage.saveEmails({
-      emails: [
-        { id: "e1", from: "alice@test.com", subject: "Projet", body: "Discussion projet", date: new Date().toISOString(), unread: false },
-        { id: "e2", from: "bob@test.com", subject: "Vacances", body: "Préparer les valises", date: new Date().toISOString(), unread: true },
-      ],
-    });
-    const results = await storage.searchEmails("projet");
+    // Emails par défaut : "Shooting samedi" de Faustine
+    const results = await storage.searchEmails("shooting");
     expect(results).toHaveLength(1);
-    expect(results[0].from).toContain("alice");
+    expect(results[0].from).toContain("Faustine");
   });
 });
 
@@ -383,28 +326,6 @@ describe("storage - chat history", () => {
   });
 });
 
-describe("storage - gallery", () => {
-  it("CRUD gallery items", async () => {
-    const storage = await getStorage();
-    const item = await storage.addGalleryItem({
-      concertId: "concert-1",
-      title: "Portrait Sarah",
-      totalPhotos: 150,
-    });
-    expect(item.title).toBe("Portrait Sarah");
-
-    const updated = await storage.updateGalleryItem(item.id, { status: "selecting" });
-    expect(updated).not.toBeNull();
-    expect(updated!.status).toBe("selecting");
-
-    const gallery = await storage.getGallery();
-    expect(gallery.items.length).toBeGreaterThan(0);
-
-    const deleted = await storage.deleteGalleryItem(item.id);
-    expect(deleted).toBe(true);
-  });
-});
-
 describe("storage - computeNextRecurrence", () => {
   it("calcule la prochaine occurrence quotidienne", async () => {
     const storage = await getStorage();
@@ -431,16 +352,6 @@ describe("storage - computeNextRecurrence", () => {
     const storage = await getStorage();
     const next = storage.computeNextRecurrence("2026-07-15T10:00:00Z", undefined);
     expect(next).toBeNull();
-  });
-});
-
-describe("storage - concerts", () => {
-  it("updateConcertEvents sauvegarde des événements", async () => {
-    const storage = await getStorage();
-    await storage.updateConcertEvents([{ id: "1", artist: "Muse", venue: "Stade", date: "2026-07-15", status: "shooted" }]);
-    const data = await storage.getConcerts();
-    expect(data.events).toHaveLength(1);
-    expect(data.events[0].artist).toBe("Muse");
   });
 });
 
@@ -651,7 +562,7 @@ describe("storage - prepareConcert", () => {
 
     const storage = await getStorage();
     await storage.addAccreditation({ artist: "Muse", venue: "Stade", concertDate: "2026-07-15" });
-    await storage.updateConcertEvents([{ id: "c1", artist: "Muse", venue: "Stade", date: "2026-07-15", status: "shooted" }]);
+    await storage.saveConcerts({ events: [{ id: "c1", artist: "Muse", venue: "Stade", date: "2026-07-15", status: "shooted" }] });
 
     const prep = await storage.prepareConcert("c1");
     expect(prep.weather).toContain("25°C");

@@ -176,7 +176,6 @@ défaut. Testé par `proxy.test.ts` et les E2E (deny-by-default).
 | ----------------------- | ------------------- | -------------------------------------- |
 | `checkRateLimit(key)`   | `lib/rate-limit.ts` | `app/api/chat/route.ts` **uniquement** |
 | `isAuthorizedCron(req)` | `lib/cron-auth.ts`  | les 2 routes `/api/cron/*`             |
-| `assertSameOrigin(req)` | `lib/csrf.ts`       | ⚠️ **PERSONNE** — code mort            |
 
 ⚠️ **Dette connue** : pas de protection CSRF active (seule atténuation :
 `SameSite=lax`). Les Server Actions ne sont pas rate-limitées. Si tu ajoutes une
@@ -405,8 +404,7 @@ Modèle complet : `.deploy.env.example`.
 - **Alias** : `@/*` → racine. Utiliser l'alias partout (`lib/session.ts` importe
   `./session-core` en relatif — incohérence historique, ne pas propager).
 - **Nommage** : `kebab-case.ts` pour `lib/`, `PascalCase.tsx` pour les composants.
-  **ASCII uniquement** — cf. `app/actions/__tests__/accréditations.test.ts`, à
-  renommer.
+  **ASCII uniquement**.
 - **Logging** : `console.error` / `console.warn` avec préfixe module
   (`[watch-later]`, `[storage]`). Pas de lib dédiée.
 - **Directives** : `"use server"` en tête des 17 fichiers `app/actions/*`,
@@ -432,15 +430,11 @@ Modèle complet : `.deploy.env.example`.
 
 À ne pas « corriger » spontanément, mais à garder en tête :
 
-1. `lib/csrf.ts` — `assertSameOrigin` défini mais importé nulle part
-2. Server Actions non rate-limitées (seul `/api/chat` l'est)
-3. `components/reminders/` et `components/watch-later/` vides
-4. `app/actions/__tests__/accréditations.test.ts` — accent dans le nom
-5. `AUDIT.md` périmé (12/07, mentionne Capacitor)
-6. Route Handlers ↔ Server Actions : recouvrement à maintenir manuellement
-7. `.gitignore` : entrée résiduelle `android/app/google-services.json`
-8. Fichier `tree` non suivi à la racine — à supprimer
-9. `data/.setup-consumed` : marqueur « bootstrap SETUP_TOKEN consommé » —
+1. Server Actions non rate-limitées (seul `/api/chat` l'est)
+2. `components/reminders/` et `components/watch-later/` vides
+3. `AUDIT.md` périmé (12/07, mentionne Capacitor)
+4. Route Handlers ↔ Server Actions : recouvrement à maintenir manuellement
+5. `data/.setup-consumed` : marqueur « bootstrap SETUP_TOKEN consommé » —
     purge via `bun run reset:passkey` uniquement
 
 ---

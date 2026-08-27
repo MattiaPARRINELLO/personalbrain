@@ -53,7 +53,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Capacitor supprimé — le projet est PWA uniquement. Le fichier Firebase
-# android/app/google-services.json contient des identifiants : ne jamais committer.
-/android/app/google-services.json
+
 

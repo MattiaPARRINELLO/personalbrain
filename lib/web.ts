@@ -182,7 +182,7 @@ export async function isSafeFetchUrl(rawUrl: string): Promise<boolean> {
 
 // Nombre maximal d'octets lus pour une page/aperçu (anti OOM / anti SSRF
 // volumineux). 1 Mo est largement suffisant pour des métadonnées et résumés.
-export const MAX_FETCH_BYTES = 1_000_000;
+const MAX_FETCH_BYTES = 1_000_000;
 const MAX_REDIRECTS = 3;
 
 async function readBodyWithLimit(res: Response): Promise<string> {

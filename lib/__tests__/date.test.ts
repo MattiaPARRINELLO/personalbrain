@@ -1,11 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   formatRelative,
-  formatDateLong,
   formatDateShort,
   toLocalInputValue,
   fromLocalInputValue,
-  isDue,
   isOverdue,
 } from "@/lib/date";
 
@@ -43,19 +41,6 @@ describe("formatRelative", () => {
     const result = formatRelative(past);
     expect(result).not.toMatch(/il y a/);
     expect(result).toMatch(/^(\d{1,2} (janv|févr|mars|avr|mai|juin|juil|août|sept|oct|nov|déc))/);
-  });
-});
-
-describe("formatDateLong", () => {
-  it("retourne vide pour une date invalide", () => {
-    expect(formatDateLong("invalide")).toBe("");
-  });
-
-  it("formate une date ISO en français", () => {
-    const date = new Date(2025, 0, 15, 14, 30).toISOString();
-    const result = formatDateLong(date);
-    expect(result).toContain("2025");
-    expect(result).toContain("janvier");
   });
 });
 
@@ -99,22 +84,6 @@ describe("fromLocalInputValue", () => {
   it("retourne la date courante pour une chaîne vide", () => {
     const result = fromLocalInputValue("");
     expect(() => new Date(result)).not.toThrow();
-  });
-});
-
-describe("isDue", () => {
-  it("retourne true pour une date passée", () => {
-    const past = new Date(Date.now() - 3600_000).toISOString();
-    expect(isDue(past)).toBe(true);
-  });
-
-  it("retourne false pour une date future", () => {
-    const future = new Date(Date.now() + 3600_000).toISOString();
-    expect(isDue(future)).toBe(false);
-  });
-
-  it("retourne false pour une date invalide", () => {
-    expect(isDue("nope")).toBe(false);
   });
 });
 

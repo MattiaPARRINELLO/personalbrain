@@ -4,7 +4,7 @@ export interface ChatMessage {
   toolCalls?: { id: string; name: string; arguments: string }[];
 }
 
-export interface ChatSessionMessage {
+interface ChatSessionMessage {
   id: string;
   role: "user" | "assistant";
   content: string;

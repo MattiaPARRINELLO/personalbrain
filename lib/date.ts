@@ -13,19 +13,6 @@ export function formatRelative(iso: string): string {
   return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
-export function formatDateLong(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 export function formatDateShort(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
@@ -51,12 +38,6 @@ export function toLocalInputValue(iso: string): string {
 export function fromLocalInputValue(value: string): string {
   if (!value) return new Date().toISOString();
   return new Date(value).toISOString();
-}
-
-export function isDue(iso: string): boolean {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return false;
-  return date.getTime() <= Date.now();
 }
 
 export function isOverdue(iso: string): boolean {

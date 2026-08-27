@@ -126,38 +126,3 @@ export async function getMemoryRelationships(): Promise<MemoryRelationship[]> {
   const data = await getMemory();
   return data.relationships ?? [];
 }
-
-export async function addMemoryRelationship(
-  sourceId: string,
-  targetId: string,
-  type: string
-): Promise<MemoryRelationship> {
-  const rel: MemoryRelationship = {
-    sourceId,
-    targetId,
-    type,
-    createdAt: new Date().toISOString(),
-  };
-  await mutateJson<MemoryData>("memory.json", defaultMemory, (data) => {
-    const exists = data.relationships.some(
-      (r) => r.sourceId === sourceId && r.targetId === targetId && r.type === type
-    );
-    if (exists) return null;
-    data.relationships.push(rel);
-  });
-  return rel;
-}
-
-export async function getRelatedFacts(factId: string): Promise<{ fact: MemoryFact; relationship: MemoryRelationship }[]> {
-  const data = await getMemory();
-  const rels = data.relationships.filter(
-    (r) => r.sourceId === factId || r.targetId === factId
-  );
-  const result: { fact: MemoryFact; relationship: MemoryRelationship }[] = [];
-  for (const rel of rels) {
-    const otherId = rel.sourceId === factId ? rel.targetId : rel.sourceId;
-    const fact = data.facts.find((f) => f.id === otherId);
-    if (fact) result.push({ fact, relationship: rel });
-  }
-  return result;
-}

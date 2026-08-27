@@ -5,7 +5,7 @@ vi.mock("dns/promises", () => ({
   lookup: vi.fn().mockResolvedValue([{ address: "93.184.216.34", family: 4 }]),
 }));
 
-const { isSafeFetchUrl, safeFetchText, MAX_FETCH_BYTES } = await import("@/lib/web");
+const { isSafeFetchUrl, safeFetchText } = await import("@/lib/web");
 
 describe("isSafeFetchUrl — anti-SSRF", () => {
   it("refuse les hôtes et IP privés / réservés", async () => {
@@ -112,7 +112,7 @@ describe("safeFetchText — fetch serveur sûr", () => {
   });
 
   it("limite la taille du corps lu (anti OOM)", async () => {
-    const big = new Uint8Array(MAX_FETCH_BYTES + 1);
+    const big = new Uint8Array(1_000_001); // MAX_FETCH_BYTES + 1 (1 Mo, privé dans lib/web.ts)
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       status: 200,

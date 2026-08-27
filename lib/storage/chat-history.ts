@@ -1,5 +1,5 @@
 import type { ChatHistory, ChatSession } from "../types";
-import { mutateJson, readJsonSafe, writeJsonAtomic } from "../storage-core";
+import { mutateJson, readJsonSafe } from "../storage-core";
 
 const defaultChatHistory: ChatHistory = {
   sessions: [],
@@ -7,10 +7,6 @@ const defaultChatHistory: ChatHistory = {
 
 export async function getChatHistory(): Promise<ChatHistory> {
   return readJsonSafe<ChatHistory>("chat-history.json", defaultChatHistory);
-}
-
-export async function saveChatHistory(data: ChatHistory): Promise<void> {
-  await writeJsonAtomic("chat-history.json", data);
 }
 
 export async function saveChatSession(session: ChatSession): Promise<void> {

@@ -1,5 +1,4 @@
 import { headers } from "next/headers";
-import { randomUUID } from "crypto";
 
 const REQUEST_ID_HEADER = "x-request-id";
 
@@ -13,10 +12,6 @@ export async function getRequestId(): Promise<string> {
   } catch {
     return "bg";
   }
-}
-
-export function generateRequestId(): string {
-  return randomUUID().slice(0, 8);
 }
 
 // Logger serveur préfixé par module + identifiant de corrélation.

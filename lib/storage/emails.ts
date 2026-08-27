@@ -1,5 +1,5 @@
 import type { Email, EmailsData } from "../types";
-import { maybeBackup, mutateJson, readOrCreate, writeJsonAtomic } from "../storage-core";
+import { readOrCreate } from "../storage-core";
 
 const defaultEmails: EmailsData = {
   emails: [
@@ -24,19 +24,6 @@ const defaultEmails: EmailsData = {
 
 export async function getEmails(): Promise<EmailsData> {
   return readOrCreate("emails.json", defaultEmails);
-}
-
-export async function saveEmails(data: EmailsData): Promise<void> {
-  await maybeBackup("emails.json");
-  return writeJsonAtomic("emails.json", data);
-}
-
-export async function markEmailRead(id: string): Promise<void> {
-  await mutateJson<EmailsData>("emails.json", defaultEmails, (data) => {
-    const email = data.emails.find((e) => e.id === id);
-    if (!email) return null;
-    email.unread = false;
-  });
 }
 
 export async function searchEmails(query: string): Promise<Email[]> {

@@ -1,16 +1,11 @@
 import type { WatchLaterCategory, WatchLaterData, WatchLaterItem } from "../types";
-import { maybeBackup, mutateJson, readOrCreate, writeJsonAtomic } from "../storage-core";
+import { mutateJson, readOrCreate } from "../storage-core";
 import { isSafeFetchUrl, safeFetchText } from "../web";
 
 const defaultWatchLater: WatchLaterData = { items: [] };
 
 export async function getWatchLater(): Promise<WatchLaterData> {
   return readOrCreate("watch-later.json", defaultWatchLater);
-}
-
-export async function saveWatchLater(data: WatchLaterData): Promise<void> {
-  await maybeBackup("watch-later.json");
-  return writeJsonAtomic("watch-later.json", data);
 }
 
 export async function addWatchLaterItem(input: {
@@ -92,14 +87,6 @@ function detectCategory(url: string): WatchLaterCategory {
   if (/\.(jpg|jpeg|png|gif|webp|avif|unsplash|pexels|imgur)/.test(lower)) return "photo";
   if (/(medium\.|dev\.to|github\.com\/.*\/blob|arxiv\.|wikipedia|blog)/.test(lower)) return "article";
   return "other";
-}
-
-export async function markWatchLaterRead(id: string): Promise<void> {
-  await mutateJson<WatchLaterData>("watch-later.json", defaultWatchLater, (data) => {
-    const idx = data.items.findIndex((i) => i.id === id);
-    if (idx < 0) return null;
-    data.items[idx] = { ...data.items[idx], read: true };
-  });
 }
 
 export async function autoSummarize(url: string, title: string): Promise<{ summary: string; tags: string[] }> {

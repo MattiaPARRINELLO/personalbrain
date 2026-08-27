@@ -1,4 +1,4 @@
-export type IntentionStatus = "pending" | "done" | "cancelled";
+type IntentionStatus = "pending" | "done" | "cancelled";
 
 export interface Intention {
   id: string;

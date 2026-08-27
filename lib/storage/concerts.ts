@@ -1,4 +1,4 @@
-import type { ConcertPrep, ConcertEvent, ConcertsData } from "../types";
+import type { ConcertPrep, ConcertsData } from "../types";
 import { maybeBackup, readOrCreate, writeJsonAtomic } from "../storage-core";
 import { webSearch } from "../web";
 
@@ -22,10 +22,6 @@ export async function getConcerts(): Promise<ConcertsData> {
 export async function saveConcerts(data: ConcertsData): Promise<void> {
   await maybeBackup("concerts.json");
   return writeJsonAtomic("concerts.json", data);
-}
-
-export async function updateConcertEvents(events: ConcertEvent[]): Promise<void> {
-  await saveConcerts({ events });
 }
 
 export async function prepareConcert(concertId: string): Promise<ConcertPrep> {
