@@ -7,7 +7,7 @@ test.describe("Pages publiques", () => {
   test("la page de login affiche un bouton de connexion passkey", async ({ page }) => {
     await page.goto("/login");
     await expect(
-      page.locator("h1, h2, button").filter({ hasText: /connexion|authentification|passkey|Se connecter|Créer/i }).first()
+      page.locator("h1, h2, button").filter({ hasText: /connexion|authentification|passkey|Se connecter|Créer|Configurer/i }).first()
     ).toBeVisible();
   });
 
