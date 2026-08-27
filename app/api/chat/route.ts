@@ -489,7 +489,10 @@ export async function POST(request: NextRequest) {
           } catch (err) {
             if (streamClosed) throw err; // client parti : pas de fallback inutile
             void serverLog("chat", "error", `runModel(${currentModel}) failed`, err);
-            if (useFallback || currentModel === altModel) throw new Error(`Le modèle ${currentModel} a échoué après fallback`);
+            // Pas de fallback réel si le modèle de secours est identique au
+            // principal : remonter l'erreur d'origine plutôt qu'un faux
+            // « a échoué après fallback » sans seconde chance véritable.
+            if (useFallback || currentModel === altModel) throw err;
             useFallback = true;
             continue;
           }
