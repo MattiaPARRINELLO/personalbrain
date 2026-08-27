@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createOAuth2Client, saveTokens, clearGoogleBroken, type GoogleAccountType } from "@/lib/google-client";
+import { saveTokens, clearGoogleBroken, exchangeAuthorizationCode, type GoogleAccountType } from "@/lib/google-client";
 import { requireSession } from "@/lib/session";
 import { serverLog } from "@/lib/logger";
 
@@ -40,8 +40,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const oauth2Client = createOAuth2Client();
-    const { tokens } = await oauth2Client.getToken(code);
+    // Échange du code via fetch direct avec timeout (google-auth-library
+    // ne pose aucun timeout : il peut pendre sur un hébergeur partagé et
+    // laisser le navigateur « sur la page Google qui charge »).
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    if (!redirectUri) {
+      throw new Error("GOOGLE_REDIRECT_URI doit etre configure");
+    }
+    const tokens = await exchangeAuthorizationCode(code, redirectUri);
 
     if (!tokens.refresh_token) {
       return NextResponse.json(

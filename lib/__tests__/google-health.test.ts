@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import {
-  deriveGoogleHealth,
-  TESTING_TOKEN_EXPIRY_DAYS,
-  WARN_AFTER_DAYS,
-} from "../google-health";
+import { deriveGoogleHealth } from "../google-health";
 
+// Seuils documentés dans lib/google-health.ts (constantes privées) :
+// expiration Testing = 7 jours, alerte à partir de 5,5 jours.
+const EXPIRY_DAYS = 7;
+const WARN_AFTER_DAYS = 5.5;
 const DAY = 86_400_000;
 const NOW = 1_800_000_000_000;
 
@@ -51,11 +51,11 @@ describe("deriveGoogleHealth", () => {
     const state = deriveGoogleHealth({
       hasRefreshToken: true,
       brokenSinceMs: null,
-      obtainedAtMs: NOW - (TESTING_TOKEN_EXPIRY_DAYS - 1) * DAY,
+      obtainedAtMs: NOW - (EXPIRY_DAYS - 1) * DAY,
       nowMs: NOW,
     });
     expect(state.expiringSoon).toBe(true);
-    expect(state.ageDays).toBeCloseTo(TESTING_TOKEN_EXPIRY_DAYS - 1);
+    expect(state.ageDays).toBeCloseTo(EXPIRY_DAYS - 1);
   });
 
   it("should not report expiringSoon before the warning threshold", () => {

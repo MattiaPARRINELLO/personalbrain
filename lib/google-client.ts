@@ -157,6 +157,65 @@ export async function isGoogleLinked(type: GoogleAccountType): Promise<boolean> 
 }
 
 // ---------------------------------------------------------------------------
+// Échange du code OAuth — fetch direct avec timeout ferme.
+// google-auth-library (getToken) ne pose AUCUN timeout : sur un hébergeur
+// partagé, l'appel sortant vers oauth2.googleapis.com peut pendre et laisser
+// le navigateur « sur la page Google qui charge » indéfiniment. En dev,
+// le réseau local répond instantanément, d'où la différence de comportement.
+// ---------------------------------------------------------------------------
+
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+export const GOOGLE_CODE_TIMEOUT_MS = 25_000;
+
+export async function exchangeAuthorizationCode(
+  code: string,
+  redirectUri: string
+): Promise<GoogleTokens> {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error("GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET doivent etre configures");
+  }
+  if (!redirectUri) {
+    throw new Error("GOOGLE_REDIRECT_URI doit etre configure");
+  }
+
+  const res = await fetch(GOOGLE_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+      grant_type: "authorization_code",
+    }),
+    // Le code OAuth est à usage unique : un timeout ne doit pas gonfler en
+    // retry qui consommerait le code deux fois.
+    signal: AbortSignal.timeout(GOOGLE_CODE_TIMEOUT_MS),
+  });
+
+  const data = (await res.json().catch(() => null)) as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+    error?: string;
+    error_description?: string;
+  } | null;
+
+  if (!res.ok || !data?.access_token) {
+    const detail = data?.error_description ?? data?.error ?? `HTTP ${res.status}`;
+    throw new Error(`Échange du code Google refusé : ${detail}`);
+  }
+
+  return {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expiry_date: Date.now() + (data.expires_in ?? 3600) * 1000,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Santé des comptes (bannière « à reconnecter ») — marqueur persistant.
 // ---------------------------------------------------------------------------
 
