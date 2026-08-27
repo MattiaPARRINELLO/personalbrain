@@ -21,10 +21,6 @@ export const MONTHS = [
 
 export const DAYS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
-export function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-}
-
 export function isAllDay(evt: CalendarEvent): boolean {
   return !evt.start.includes("T");
 }

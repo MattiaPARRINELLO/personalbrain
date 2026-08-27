@@ -8,6 +8,7 @@ import { PageHeader, EmptyState } from "@/components/layout/Chrome";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { api, type CalendarEvent } from "@/lib/api-client";
 import { useCachedFetch } from "@/lib/cache";
+import { formatTime } from "@/lib/date";
 import type { Intention, Reminder } from "@/lib/types";
 
 function dayBounds(): { start: string; end: string } {
@@ -16,10 +17,6 @@ function dayBounds(): { start: string; end: string } {
   const end = new Date();
   end.setHours(23, 59, 59, 999);
   return { start: start.toISOString(), end: end.toISOString() };
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
 function isLate(iso: string): boolean {

@@ -4,19 +4,14 @@ import type {
   MicrosoftTodoList,
   MicrosoftTodoTask,
 } from "./types";
+import type { GoogleAccountHealth } from "./google-health";
+import type { StreamEvent } from "./ai-providers/types";
 
 export type { GmailMessage, CalendarEvent, MicrosoftTodoList, MicrosoftTodoTask };
 
 export type GoogleLinkStatus = {
   gmail: boolean;
   calendar: boolean;
-};
-
-export type GoogleAccountHealth = {
-  linked: boolean;
-  broken: boolean;
-  expiringSoon: boolean;
-  ageDays: number | null;
 };
 
 export type GoogleHealth = {
@@ -170,17 +165,5 @@ export const api = {
   },
 };
 
-export type ChatStreamEvent =
-  | { type: "reasoning"; content: string }
-  | { type: "delta"; content: string }
-  | { type: "tool_start"; toolCallId: string; name: string; arguments: string }
-  | { type: "tool_result"; name: string; result: string }
-  | {
-      type: "group_confirm";
-      id: string;
-      summary: string;
-      tools: { toolCallId: string; name: string; arguments: string }[];
-    }
-  | { type: "memory_facts"; facts: { content: string; category: string; confidence: number }[] }
-  | { type: "done"; content: string }
-  | { type: "error"; message: string };
+// Les événements SSE du chat sont exactement les StreamEvent du provider.
+export type ChatStreamEvent = StreamEvent;

@@ -15,10 +15,10 @@ import {
   welcomeMessage,
   generateId,
   generateTitle,
-  formatTime,
   activeToolsList,
   toolMeta,
 } from "@/components/chat/chat-data";
+import { formatTime } from "@/lib/date";
 import { MessageBlock, ToolCallTray, ThinkingIndicator, AssistantAvatar, GroupActionCard } from "@/components/chat/MessageBlocks";
 import { KeyboardSafe } from "@/components/ui/KeyboardSafe";
 

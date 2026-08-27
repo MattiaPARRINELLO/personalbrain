@@ -17,11 +17,11 @@ import { Input, Textarea, Field } from "@/components/ui/Input";
 import { api, type CalendarEvent } from "@/lib/api-client";
 import { useCachedFetch } from "@/lib/cache";
 import { cn } from "@/lib/utils";
+import { formatTime } from "@/lib/date";
 import {
   EVENT_COLORS,
   MONTHS,
   DAYS,
-  formatTime,
   isAllDay,
   dayStart,
   addDays,

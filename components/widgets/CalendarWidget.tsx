@@ -6,12 +6,7 @@ import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { api, type CalendarEvent } from "@/lib/api-client";
 import { useCachedFetch } from "@/lib/cache";
-
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-}
+import { formatTime } from "@/lib/date";
 
 function isToday(iso: string): boolean {
   const d = new Date(iso);

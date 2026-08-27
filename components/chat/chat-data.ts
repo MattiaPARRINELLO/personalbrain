@@ -235,13 +235,6 @@ export function generateTitle(text: string): string {
   return cleaned.slice(0, TITLE_MAX_LENGTH).replace(/\s\S*$/, "") + "…";
 }
 
-export function formatTime(iso: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-}
-
 export function activeToolsList(tools: Record<string, ToolCall>): ToolCall[] {
   return Object.values(tools);
 }

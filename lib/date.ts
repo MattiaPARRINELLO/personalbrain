@@ -13,6 +13,13 @@ export function formatRelative(iso: string): string {
   return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
+export function formatTime(iso: string): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
 export function formatDateShort(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
