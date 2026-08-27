@@ -1,5 +1,5 @@
 import type { CalendarEvent, ConcertsData } from "../types";
-import { maybeBackup, mutateJson, readJsonSafe } from "../storage-core";
+import { maybeBackup, mutateJson, newId, readJsonSafe } from "../storage-core";
 import { defaultConcerts, getConcerts } from "./concerts";
 
 export async function getCalendar(): Promise<CalendarEvent[]> {
@@ -20,7 +20,7 @@ export async function getCalendar(): Promise<CalendarEvent[]> {
 export async function addCalendarEvent(event: Omit<CalendarEvent, "id">): Promise<CalendarEvent> {
   const newEvent: CalendarEvent = {
     ...event,
-    id: crypto.randomUUID?.() ?? String(Date.now()),
+    id: newId(),
   };
 
   if (event.type === "concert") {

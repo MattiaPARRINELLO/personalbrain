@@ -1,5 +1,5 @@
 import type { PhotoShoot, PhotoShootStatus, PhotoShootsData } from "../types";
-import { maybeBackup, mutateJson, readOrCreate, writeJsonAtomic } from "../storage-core";
+import { maybeBackup, mutateJson, newId, readOrCreate, writeJsonAtomic } from "../storage-core";
 
 const defaultPhotoShoots: PhotoShootsData = { shoots: [] };
 
@@ -26,7 +26,7 @@ export async function addPhotoShoot(input: {
   const isPast = !Number.isNaN(shootDate.getTime()) && shootDate <= today;
   const defaultStatus: PhotoShootStatus = isPast ? "done" : "upcoming";
   const shoot: PhotoShoot = {
-    id: crypto.randomUUID?.() ?? String(Date.now()),
+    id: newId(),
     title: input.title,
     date: input.date,
     client: input.client,

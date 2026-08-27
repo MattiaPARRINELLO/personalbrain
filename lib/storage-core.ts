@@ -4,6 +4,10 @@ import path from "path";
 const DATA_DIR = path.join(process.cwd(), "data");
 const BACKUP_DIR = path.join(DATA_DIR, "backups");
 
+export function newId(): string {
+  return crypto.randomUUID?.() ?? String(Date.now());
+}
+
 async function ensureDir(dir: string) {
   await fs.mkdir(dir, { recursive: true });
 }
@@ -286,16 +290,5 @@ async function readOrCreateUnlocked<T>(filename: string, fallback: T): Promise<T
 }
 
 export async function readOrCreate<T>(filename: string, fallback: T): Promise<T> {
-  try {
-    return await readJson<T>(filename);
-  } catch {
-    const recovered = await readBackupJson<T>(filename);
-    if (recovered !== null) {
-      await writeJsonAtomic(filename, recovered);
-      return recovered;
-    }
-    const fresh = structuredClone(fallback);
-    await writeJsonAtomic(filename, fresh);
-    return fresh;
-  }
+  return withFileLock(filename, () => readOrCreateUnlocked(filename, fallback));
 }

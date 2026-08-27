@@ -1,5 +1,5 @@
 import type { MemoryData, MemoryFact, MemoryRelationship } from "../types";
-import { maybeBackup, mutateJson, readOrCreate, writeJsonAtomic } from "../storage-core";
+import { maybeBackup, mutateJson, newId, readOrCreate, writeJsonAtomic } from "../storage-core";
 
 const defaultMemory: MemoryData = {
   relationships: [],
@@ -28,7 +28,7 @@ export async function addMemoryFact(
   options?: { source?: MemoryFact["source"]; confidence?: number }
 ): Promise<MemoryFact> {
   const fact: MemoryFact = {
-    id: crypto.randomUUID?.() ?? String(Date.now()),
+    id: newId(),
     content,
     category,
     createdAt: new Date().toISOString(),

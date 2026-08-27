@@ -1,5 +1,5 @@
 import type { ActivityAction, ActivityData, ActivityEntry } from "../types";
-import { mutateJson, readOrCreate } from "../storage-core";
+import { mutateJson, newId, readOrCreate } from "../storage-core";
 
 const MAX_ACTIVITY_ENTRIES = 200;
 const defaultActivity: ActivityData = { entries: [] };
@@ -11,7 +11,7 @@ export async function getActivity(limit = 50): Promise<ActivityEntry[]> {
 
 export async function logActivity(action: ActivityAction, label: string, details?: string): Promise<void> {
   const entry: ActivityEntry = {
-    id: crypto.randomUUID?.() ?? String(Date.now()),
+    id: newId(),
     action,
     label,
     details,

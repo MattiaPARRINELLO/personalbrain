@@ -1,5 +1,5 @@
 import type { Reminder, RemindersData } from "../types";
-import { mutateJson, readOrCreate } from "../storage-core";
+import { mutateJson, newId, readOrCreate } from "../storage-core";
 
 const defaultReminders: RemindersData = { reminders: [] };
 
@@ -14,7 +14,7 @@ export async function addReminder(input: {
   recurrence?: Reminder["recurrence"];
 }): Promise<Reminder> {
   const reminder: Reminder = {
-    id: crypto.randomUUID?.() ?? String(Date.now()),
+    id: newId(),
     title: input.title.trim(),
     notes: input.notes?.trim() || undefined,
     dueAt: input.dueAt,

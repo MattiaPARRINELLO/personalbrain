@@ -1,5 +1,5 @@
 import type { Accreditation, AccreditationsData } from "../types";
-import { maybeBackup, mutateJson, readOrCreate, writeJsonAtomic } from "../storage-core";
+import { maybeBackup, mutateJson, newId, readOrCreate, writeJsonAtomic } from "../storage-core";
 
 const defaultAccreditations: AccreditationsData = { accreditations: [] };
 
@@ -21,7 +21,7 @@ export async function addAccreditation(input: {
 }): Promise<Accreditation> {
   const now = new Date().toISOString();
   const accreditation: Accreditation = {
-    id: crypto.randomUUID?.() ?? String(Date.now()),
+    id: newId(),
     artist: input.artist,
     venue: input.venue,
     concertDate: input.concertDate,

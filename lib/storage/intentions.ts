@@ -1,5 +1,5 @@
 import type { Intention, IntentionsData } from "../types";
-import { mutateJson, readOrCreate } from "../storage-core";
+import { mutateJson, newId, readOrCreate } from "../storage-core";
 
 const defaultIntentions: IntentionsData = { intentions: [] };
 
@@ -13,7 +13,7 @@ export async function addIntention(input: {
   dueAt: string;
 }): Promise<Intention> {
   const intention: Intention = {
-    id: crypto.randomUUID?.() ?? String(Date.now()),
+    id: newId(),
     subject: input.subject.trim(),
     message: input.message?.trim() || undefined,
     dueAt: input.dueAt,

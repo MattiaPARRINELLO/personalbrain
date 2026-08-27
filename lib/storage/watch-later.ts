@@ -1,5 +1,5 @@
 import type { WatchLaterCategory, WatchLaterData, WatchLaterItem } from "../types";
-import { mutateJson, readOrCreate } from "../storage-core";
+import { mutateJson, newId, readOrCreate } from "../storage-core";
 import { isSafeFetchUrl, safeFetchText } from "../web";
 
 const defaultWatchLater: WatchLaterData = { items: [] };
@@ -17,7 +17,7 @@ export async function addWatchLaterItem(input: {
   category?: WatchLaterCategory;
 }): Promise<WatchLaterItem> {
   const item: WatchLaterItem = {
-    id: crypto.randomUUID?.() ?? String(Date.now()),
+    id: newId(),
     url: input.url,
     title: input.title,
     description: input.description,
