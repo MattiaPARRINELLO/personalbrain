@@ -27,7 +27,10 @@ export async function GET(request: NextRequest) {
   }
 
   const oauth2Client = createOAuth2Client();
-  const state = Buffer.from(JSON.stringify({ type, redirect: "/" })).toString("base64url");
+  // Retour dans l'application après connexion, pas sur la landing marketing.
+  // Un `?redirect=` explicite (jamais utilisé par l'UI actuelle) reste possible.
+  const redirect = request.nextUrl.searchParams.get("redirect") ?? "/chat";
+  const state = Buffer.from(JSON.stringify({ type, redirect })).toString("base64url");
 
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: "offline",

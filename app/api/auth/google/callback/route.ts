@@ -16,10 +16,16 @@ export async function GET(request: NextRequest) {
   const stateRaw = searchParams.get("state");
 
   let type: GoogleAccountType = "gmail";
+  // Destination retour : par défaut l'application. Le state n'est pas signé,
+  // on ne suit donc que des chemins relatifs simples (anti open-redirect).
+  let redirect = "/chat";
   try {
     if (stateRaw) {
-      const parsed = JSON.parse(Buffer.from(stateRaw, "base64url").toString("utf-8")) as { type?: GoogleAccountType };
+      const parsed = JSON.parse(Buffer.from(stateRaw, "base64url").toString("utf-8")) as { type?: GoogleAccountType; redirect?: string };
       if (parsed.type === "calendar") type = "calendar";
+      if (typeof parsed.redirect === "string" && /^\/[^/]/.test(parsed.redirect)) {
+        redirect = parsed.redirect;
+      }
     }
   } catch {
     type = "gmail";
@@ -48,7 +54,9 @@ export async function GET(request: NextRequest) {
     // Re-link réussi : lève la bannière « à reconnecter » sans attendre
     // le premier refresh suivant (le marqueur de casse serait sinon obsolète).
     await clearGoogleBroken(type);
-    return NextResponse.redirect(new URL(`/?${type}=linked`, request.url));
+    const destination = new URL(redirect, request.url);
+    destination.searchParams.set(type, "linked");
+    return NextResponse.redirect(destination);
   } catch (err) {
     void serverLog("google-callback", "error", "Google callback error", err, true);
     const message = err instanceof Error ? err.message : "Erreur inconnue";
