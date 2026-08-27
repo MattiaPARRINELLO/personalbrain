@@ -12,6 +12,18 @@ export type GoogleLinkStatus = {
   calendar: boolean;
 };
 
+export type GoogleAccountHealth = {
+  linked: boolean;
+  broken: boolean;
+  expiringSoon: boolean;
+  ageDays: number | null;
+};
+
+export type GoogleHealth = {
+  gmail: GoogleAccountHealth;
+  calendar: GoogleAccountHealth;
+};
+
 export type MicrosoftTodoStatus = {
   linked: boolean;
 };
@@ -41,6 +53,8 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   googleStatus: () => jsonFetch<GoogleLinkStatus>("/api/auth/google/status"),
+
+  googleHealth: () => jsonFetch<GoogleHealth>("/api/auth/google/health"),
 
   microsoftStatus: () => jsonFetch<MicrosoftTodoStatus>("/api/auth/microsoft/status"),
 

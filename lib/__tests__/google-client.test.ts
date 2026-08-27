@@ -162,6 +162,40 @@ describe("google-client", () => {
         expect.not.stringContaining(".tmp"),
       );
     });
+
+    it("should preserve the original _obtainedAt across automatic refreshes", async () => {
+      // Le fichier existant porte la date de liaison d'origine.
+      mockReadFile.mockResolvedValue(
+        JSON.stringify({ access_token: "old", refresh_token: "old", _obtainedAt: 123456 }),
+      );
+      const { saveTokens } = await import("../google-client");
+      const fresh = { access_token: "new", refresh_token: "new" };
+
+      // L'écriture passe par writeJsonAtomic : on capture le payload écrit.
+      let written = "";
+      const fs = await import("fs");
+      (fs.promises.writeFile as Mock).mockImplementation(
+        async (_path: string, content: string) => { written = content; },
+      );
+
+      await saveTokens("gmail", fresh);
+      expect(JSON.parse(written)._obtainedAt).toBe(123456);
+    });
+
+    it("should stamp _obtainedAt when linking a brand-new account", async () => {
+      mockReadFile.mockRejectedValue(new Error("ENOENT"));
+      const { saveTokens } = await import("../google-client");
+      let written = "";
+      const fs = await import("fs");
+      (fs.promises.writeFile as Mock).mockImplementation(
+        async (_path: string, content: string) => { written = content; },
+      );
+
+      await saveTokens("gmail", { access_token: "abc", refresh_token: "def" });
+      const saved = JSON.parse(written) as { _obtainedAt?: number };
+      expect(typeof saved._obtainedAt).toBe("number");
+      expect(saved._obtainedAt).toBeGreaterThan(0);
+    });
   });
 
   // -----------------------------------------------------------------------

@@ -1,44 +1,52 @@
-import { getGoogleClient, loadTokens, type GoogleAccountType } from "./google-client";
+/**
+ * État de santé d'un compte Google lié (gmail / calendar).
+ *
+ * Contexte : pour un projet Google Cloud non vérifié (compte perso,
+ * scopes restreints), Google expire les refresh tokens après ~7 jours.
+ * On ne peut pas connaître l'échéance exacte à l'avance — on la détecte
+ * quand un refresh échoue (invalid_grant) et on l'estime via la date de
+ * liaison (TokenExpiry heuristic). Ce module fournit la dérivation pure
+ * de cet état ; l'I/O (tokens + marqueur de casse) vit dans
+ * lib/google-client.ts.
+ */
 
-const REFRESH_THRESHOLD_MS = 5 * 60 * 1000;
+export type GoogleAccountHealth = {
+  linked: boolean;
+  /** true si un refresh a échoué (invalid_grant) : il faut reconnecter. */
+  broken: boolean;
+  /** true si le lien est vieux (proche des 7 j de mode Testing) : reconnecter bientôt. */
+  expiringSoon: boolean;
+  /** Âge du lien en jours, ou null si inconnu. */
+  ageDays: number | null;
+};
 
-export interface GoogleHealthEntry {
-  ok: boolean;
-  expiresIn?: number;
-}
+/** Durée de vie typique d'un refresh token d'app non vérifiée (mode Testing). */
+export const TESTING_TOKEN_EXPIRY_DAYS = 7;
 
-export interface GoogleHealthResult {
-  gmail: GoogleHealthEntry;
-  calendar: GoogleHealthEntry;
-}
+/** À partir de quel âge du lien on passe en alerte (5,5 jours). */
+export const WARN_AFTER_DAYS = TESTING_TOKEN_EXPIRY_DAYS - 1.5;
 
-const ACCOUNT_TYPES: GoogleAccountType[] = ["gmail", "calendar"];
+export type GoogleHealthInput = {
+  hasRefreshToken: boolean;
+  brokenSinceMs: number | null;
+  obtainedAtMs: number | null;
+  nowMs: number;
+};
 
-export async function checkGoogleHealth(): Promise<GoogleHealthResult> {
-  const result: GoogleHealthResult = {
-    gmail: { ok: false },
-    calendar: { ok: false },
-  };
+export function deriveGoogleHealth(input: GoogleHealthInput): GoogleAccountHealth {
+  const { hasRefreshToken, brokenSinceMs, obtainedAtMs, nowMs } = input;
 
-  for (const type of ACCOUNT_TYPES) {
-    try {
-      const tokens = await loadTokens(type);
-      if (!tokens?.refresh_token) continue;
-
-      if (tokens.expiry_date && Date.now() >= tokens.expiry_date - REFRESH_THRESHOLD_MS) {
-        await getGoogleClient(type);
-      }
-
-      const refreshed = await loadTokens(type);
-      const expiry = refreshed?.expiry_date;
-      result[type] = {
-        ok: true,
-        expiresIn: typeof expiry === "number" ? expiry - Date.now() : undefined,
-      };
-    } catch (err) {
-      console.warn(`[google-health] Healthcheck failed for ${type}:`, err);
-    }
+  if (!hasRefreshToken) {
+    return { linked: false, broken: false, expiringSoon: false, ageDays: null };
   }
 
-  return result;
+  const ageDays =
+    obtainedAtMs === null ? null : (nowMs - obtainedAtMs) / 86_400_000;
+
+  return {
+    linked: true,
+    broken: brokenSinceMs !== null,
+    expiringSoon: brokenSinceMs === null && ageDays !== null && ageDays >= WARN_AFTER_DAYS,
+    ageDays: ageDays === null ? null : Math.max(0, ageDays),
+  };
 }

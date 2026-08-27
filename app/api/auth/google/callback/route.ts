@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createOAuth2Client, saveTokens, type GoogleAccountType } from "@/lib/google-client";
+import { createOAuth2Client, saveTokens, clearGoogleBroken, type GoogleAccountType } from "@/lib/google-client";
 import { requireSession } from "@/lib/session";
 import { serverLog } from "@/lib/logger";
 
@@ -45,6 +45,9 @@ export async function GET(request: NextRequest) {
     }
 
     await saveTokens(type, tokens);
+    // Re-link réussi : lève la bannière « à reconnecter » sans attendre
+    // le premier refresh suivant (le marqueur de casse serait sinon obsolète).
+    await clearGoogleBroken(type);
     return NextResponse.redirect(new URL(`/?${type}=linked`, request.url));
   } catch (err) {
     void serverLog("google-callback", "error", "Google callback error", err, true);
