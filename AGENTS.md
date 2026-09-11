@@ -397,6 +397,22 @@ avec AUTH_SECRET aléatoire et VAPID vides).
 
 Modèle complet : `.deploy.env.example`.
 
+### Contrat du provider IA (OpenCode Go)
+
+`NEXT_PUBLIC_API_URL` = `https://opencode.ai/zen/go/v1`. Le provider impose deux
+choses, réunies dans `lib/ai-providers/config.ts` :
+
+- **`x-opencode-session` obligatoire** (identifiant stable par conversation) —
+  sans lui : `400 MissingSessionID`. La session remonte depuis le client
+  (`ChatView` → `api.chat.stream` → body `sessionId` → route → adaptateur) ;
+  les appels hors conversation utilisent `DEFAULT_SESSION_ID`.
+- **User-Agent dédié** (`personalbrain/1.0`), pas celui du SDK.
+
+⚠️ Les deux SDK n'attendent pas la même baseURL : le SDK **OpenAI** reçoit
+l'URL complète (`/v1/chat/completions`), le SDK **Anthropic** ajoute lui-même
+`/v1` — d'où `getAnthropicClientConfig()` qui retire le suffixe `/v1`, sinon
+`/v1/v1/messages` → 404.
+
 ---
 
 ## Conventions

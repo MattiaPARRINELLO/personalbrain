@@ -91,7 +91,28 @@ describe("POST /api/chat", () => {
     expect(res.headers.get("content-type")).toContain("text/event-stream");
     const text = await res.text();
     expect(text).toContain('"type":"done"');
-    expect(mockStream).toHaveBeenCalledWith("model-test", expect.anything(), expect.anything(), expect.anything());
+    expect(mockStream).toHaveBeenCalledWith(
+      "model-test",
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      "personalbrain"
+    );
+  });
+
+  it("transmet le sessionId de la conversation au provider IA", async () => {
+    const res = await POST(
+      makeRequest({ messages: [{ role: "user", content: "Bonjour" }], sessionId: "conv-42" })
+    );
+    expect(res.status).toBe(200);
+    await res.text();
+    expect(mockStream).toHaveBeenCalledWith(
+      "model-test",
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      "conv-42"
+    );
   });
 
   it("bloque un outil à effet externe sans confirmation et ne l'exécute pas", async () => {

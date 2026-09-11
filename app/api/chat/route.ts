@@ -11,6 +11,7 @@ import {
   autoSummarize,
 } from "@/lib/storage";
 import { getModel } from "@/lib/config";
+import { DEFAULT_SESSION_ID } from "@/lib/ai-providers/config";
 import type { ChatMessage, MemoryCategory } from "@/lib/types";
 import { autoExtractMemoryFacts } from "@/app/actions/brain";
 import { getSession } from "@/lib/session";
@@ -44,6 +45,7 @@ const chatBodySchema = z.object({
     )
     .min(1, "Au moins un message est requis"),
   model: z.enum(["general", "code"]).optional(),
+  sessionId: z.string().trim().min(1).max(200).optional(),
 });
 
 // Consigne injectée après un résultat d'outil en échec ou bloqué : force le
@@ -98,7 +100,8 @@ function describeToolAction(name: string, args: Record<string, unknown>): string
 async function summarizeConfirmBatch(
   model: string,
   actions: { name: string; arguments: string }[],
-  describe: (name: string, args: Record<string, unknown>) => string
+  describe: (name: string, args: Record<string, unknown>) => string,
+  sessionId: string
 ): Promise<string> {
   const lines = actions.map((a) => {
     let args: Record<string, unknown> = {};
@@ -113,7 +116,9 @@ async function summarizeConfirmBatch(
         { role: "system", content: "Tu resumes en une ou deux phrases concises le lot d'actions ci-dessous que tu t'appretes a soumettre a la confirmation de l'utilisateur. Phrase fluide, factuelle, sans enumeration lourde, sans markdown ni preambule. Commence directement par le resume." },
         { role: "user", content: `Actions a confirmer :\n${fallback}` },
       ],
-      []
+      [],
+      undefined,
+      sessionId
     );
     const summary = result.content?.trim();
     return summary && summary.length > 2 ? summary : fallback;
@@ -143,7 +148,8 @@ function lastToolResultIsProblematic(messages: UnifiedMessage[]): boolean {
 
 async function extractMemoryFacts(
   model: string,
-  transcript: { role: "user" | "assistant"; content: string }[]
+  transcript: { role: "user" | "assistant"; content: string }[],
+  sessionId: string
 ): Promise<{ content: string; category: MemoryCategory; confidence: number }[]> {
   const sysPrompt = `Tu es un extracteur de memoire pour un second cerveau personnel.
 Analyse l'echange ci-dessous et extrais UNIQUEMENT les faits durables, stables et utiles a long terme sur l'utilisateur.
@@ -169,7 +175,9 @@ Faits a extraire :`;
         { role: "system", content: sysPrompt },
         { role: "user", content: userPrompt },
       ],
-      []
+      [],
+      undefined,
+      sessionId
     );
     const raw = result.content;
 
@@ -195,6 +203,7 @@ Faits a extraire :`;
 async function runMemoryExtraction(
   model: string,
   originalMessages: ChatMessage[],
+  sessionId: string,
   send?: (data: StreamEvent) => void,
   newAssistantContent?: string
 ): Promise<void> {
@@ -212,7 +221,7 @@ async function runMemoryExtraction(
     const lastAssistant = [...transcript].reverse().find((m) => m.role === "assistant");
     if (!lastAssistant || lastAssistant.content.length < 24) return;
 
-    const facts = await extractMemoryFacts(model, transcript);
+    const facts = await extractMemoryFacts(model, transcript, sessionId);
     if (facts.length > 0) {
       await autoExtractMemoryFacts({ facts });
       send?.({ type: "memory_facts", facts });
@@ -240,7 +249,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  let body: { messages: ChatMessage[]; model?: "general" | "code" };
+  let body: { messages: ChatMessage[]; model?: "general" | "code"; sessionId?: string };
   try {
     const parsed = chatBodySchema.safeParse(await request.json());
     if (!parsed.success) {
@@ -249,10 +258,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    body = parsed.data as unknown as { messages: ChatMessage[]; model?: "general" | "code" };
+    body = parsed.data as unknown as { messages: ChatMessage[]; model?: "general" | "code"; sessionId?: string };
   } catch {
     return NextResponse.json({ error: "Corps de requête invalide" }, { status: 400 });
   }
+
+  // Identifiant de session transmis au provider (routage + cache de prompt) :
+  // celui de la conversation côté client, sinon une session globale stable.
+  const sessionId = body.sessionId || DEFAULT_SESSION_ID;
 
   // Auto-parsing des liens dans le dernier message utilisateur
   const lastUserMsg = [...body.messages].reverse().find((m) => m.role === "user");
@@ -282,7 +295,9 @@ export async function POST(request: NextRequest) {
             { role: "system", content: "Tu résumes des messages en conservant TOUTES les informations utiles : dates, horaires, lieux, noms, actions demandées, numéros. Sois concis mais complet. Ne liste pas — raconte de façon fluide." },
             { role: "user", content: "Résumé conservant tous les détails pratiques :\n\n" + m.content },
           ],
-          []
+          [],
+          undefined,
+          sessionId
         );
         const summary = result.content.trim();
         if (summary) {
@@ -346,7 +361,7 @@ export async function POST(request: NextRequest) {
       const maxIterations = 20;
 
       async function runModel(model: string): Promise<boolean> {
-        const generator = streamChatCompletion(model, messages, tools, abortController.signal);
+        const generator = streamChatCompletion(model, messages, tools, abortController.signal, sessionId);
         const toolCallsToExecute: { toolCallId: string; name: string; arguments: string }[] = [];
         let assistantContent = "";
 
@@ -442,7 +457,7 @@ export async function POST(request: NextRequest) {
 
         if (pendingConfirms.length > 0) {
           // Résumé du lot rédigé par le modèle + évènement unique de lot.
-          const summary = await summarizeConfirmBatch(modelName, pendingConfirms, describeToolAction);
+          const summary = await summarizeConfirmBatch(modelName, pendingConfirms, describeToolAction, sessionId);
           send({
             type: "group_confirm",
             id: `group-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
@@ -473,7 +488,7 @@ export async function POST(request: NextRequest) {
           try {
             const shouldContinue = await runModel(currentModel);
             if (!shouldContinue) {
-              void runMemoryExtraction(modelName, body.messages, send, lastAssistantContent);
+              void runMemoryExtraction(modelName, body.messages, sessionId, send, lastAssistantContent);
               return;
             }
             const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
@@ -499,7 +514,7 @@ export async function POST(request: NextRequest) {
           useFallback = false;
         }
 
-        void runMemoryExtraction(modelName, body.messages, send, lastAssistantContent);
+        void runMemoryExtraction(modelName, body.messages, sessionId, send, lastAssistantContent);
         send({ type: "done", content: "" });
         controller.close();
       } catch (error) {

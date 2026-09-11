@@ -6,9 +6,10 @@ export async function chatOpenAI(
   model: string,
   messages: UnifiedMessage[],
   tools: UnifiedTool[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string
 ): Promise<ChatCompletionResult> {
-  const client = new OpenAI(getClientConfig());
+  const client = new OpenAI(getClientConfig(sessionId));
 
   const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((t) => ({
     type: "function",
@@ -66,9 +67,10 @@ export async function* streamOpenAI(
   model: string,
   messages: UnifiedMessage[],
   tools: UnifiedTool[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string
 ): AsyncGenerator<StreamEvent> {
-  const client = new OpenAI(getClientConfig());
+  const client = new OpenAI(getClientConfig(sessionId));
 
   const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((t) => ({
     type: "function",

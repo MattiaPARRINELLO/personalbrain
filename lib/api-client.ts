@@ -104,12 +104,15 @@ export const api = {
     stream: async (
       messages: { role: "user" | "assistant"; content: string }[],
       onEvent: (event: ChatStreamEvent) => void,
-      signal?: AbortSignal
+      signal?: AbortSignal,
+      sessionId?: string
     ) => {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, model: "general" }),
+        // sessionId : identifiant de conversation transmis au provider IA
+        // (routage + cache de prompt), stable sur toute la conversation.
+        body: JSON.stringify({ messages, model: "general", sessionId }),
         credentials: "same-origin",
         signal,
       });

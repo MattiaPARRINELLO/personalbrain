@@ -498,7 +498,8 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
               }
             }
           },
-          controller.signal
+          controller.signal,
+          sessionId
         );
       } catch (err) {
         if ((err as Error).name !== "AbortError") {

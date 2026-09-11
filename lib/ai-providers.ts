@@ -11,22 +11,24 @@ export async function chatCompletion(
   model: string,
   messages: UnifiedMessage[],
   tools: UnifiedTool[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string
 ): Promise<ChatCompletionResult> {
   if (isAnthropicModel(model)) {
-    return chatAnthropic(model, messages, tools, signal);
+    return chatAnthropic(model, messages, tools, signal, sessionId);
   }
-  return chatOpenAI(model, messages, tools, signal);
+  return chatOpenAI(model, messages, tools, signal, sessionId);
 }
 
 export async function* streamChatCompletion(
   model: string,
   messages: UnifiedMessage[],
   tools: UnifiedTool[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string
 ): AsyncGenerator<StreamEvent> {
   if (isAnthropicModel(model)) {
-    return yield* streamAnthropic(model, messages, tools, signal);
+    return yield* streamAnthropic(model, messages, tools, signal, sessionId);
   }
-  return yield* streamOpenAI(model, messages, tools, signal);
+  return yield* streamOpenAI(model, messages, tools, signal, sessionId);
 }

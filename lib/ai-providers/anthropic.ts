@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ChatCompletionResult, StreamEvent, UnifiedMessage, UnifiedTool, UnifiedToolCall } from "./types";
-import { getClientConfig, REQUEST_TIMEOUT_MS } from "./config";
+import { getAnthropicClientConfig, REQUEST_TIMEOUT_MS } from "./config";
 
 function toAnthropicMessages(messages: UnifiedMessage[]): {
   systemParts: string[];
@@ -51,9 +51,10 @@ export async function* streamAnthropic(
   model: string,
   messages: UnifiedMessage[],
   tools: UnifiedTool[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string
 ): AsyncGenerator<StreamEvent> {
-  const client = new Anthropic(getClientConfig());
+  const client = new Anthropic(getAnthropicClientConfig(sessionId));
 
   const anthropicTools: Anthropic.Tool[] = tools.map((t) => ({
     name: t.name,
@@ -152,9 +153,10 @@ export async function chatAnthropic(
   model: string,
   messages: UnifiedMessage[],
   tools: UnifiedTool[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string
 ): Promise<ChatCompletionResult> {
-  const client = new Anthropic(getClientConfig());
+  const client = new Anthropic(getAnthropicClientConfig(sessionId));
 
   const anthropicTools: Anthropic.Tool[] = tools.map((t) => ({
     name: t.name,

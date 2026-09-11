@@ -1,11 +1,37 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const API_KEY = process.env.IA_API_KEY;
 
-export function getClientConfig() {
+// Le provider (OpenCode Go) exige un identifiant de session stable par
+// conversation dans `x-opencode-session` : sans lui il repond
+// 400 MissingSessionID. Il demande aussi que le client s'identifie avec son
+// propre User-Agent plutot qu'un User-Agent de SDK generique.
+const CLIENT_USER_AGENT = "personalbrain/1.0";
+
+// Session des appels hors conversation (titres, resumes, extraction memoire,
+// brief quotidien) : constante pour rester stable d'un appel a l'autre.
+export const DEFAULT_SESSION_ID = "personalbrain";
+
+export function getClientConfig(sessionId?: string) {
   if (!API_URL || !API_KEY) {
     throw new Error("NEXT_PUBLIC_API_URL et IA_API_KEY doivent etre configures");
   }
-  return { baseURL: API_URL, apiKey: API_KEY };
+  return {
+    baseURL: API_URL,
+    apiKey: API_KEY,
+    defaultHeaders: {
+      "User-Agent": CLIENT_USER_AGENT,
+      "x-opencode-session": sessionId || DEFAULT_SESSION_ID,
+    },
+  };
+}
+
+// Le SDK Anthropic prefixe lui-meme ses routes par `/v1` (`/v1/messages`) :
+// une baseURL deja terminee par `/v1` donnerait `/v1/v1/messages` (404). On
+// retire donc le suffixe pour cette SDK uniquement — le SDK OpenAI, lui,
+// attend la baseURL complete (`/v1/chat/completions`).
+export function getAnthropicClientConfig(sessionId?: string) {
+  const config = getClientConfig(sessionId);
+  return { ...config, baseURL: config.baseURL.replace(/\/v1\/?$/, "") };
 }
 
 // Source unique des modèles proposés à l'utilisateur (Paramètres → Modèles d'IA).
