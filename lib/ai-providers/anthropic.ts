@@ -71,8 +71,8 @@ export async function* streamAnthropic(
         model,
         system: systemParts.join("\n\n"),
         messages: conversation,
-        tools: anthropicTools,
-        tool_choice: { type: "auto" },
+        tools: anthropicTools.length > 0 ? anthropicTools : undefined,
+        tool_choice: anthropicTools.length > 0 ? { type: "auto" } : undefined,
         max_tokens: 2048,
         temperature: 0.7,
         stream: true,
@@ -107,22 +107,28 @@ export async function* streamAnthropic(
         fullContent += event.delta.text;
         yield { type: "delta", content: event.delta.text };
       }
+      // Les modeles a raisonnement (qwen, minimax) streament leur reflexion
+      // dans un bloc `thinking` : on la remonte comme le fait l'adaptateur
+      // OpenAI avec `reasoning_content`, sinon la sortie differe selon le SDK.
+      if (event.delta.type === "thinking_delta") {
+        yield { type: "reasoning", content: event.delta.thinking };
+      }
       if (event.delta.type === "input_json_delta" && currentToolUse) {
         currentToolUse.args += event.delta.partial_json;
       }
     }
 
     if (event.type === "content_block_stop" && currentToolUse) {
-      try {
-        JSON.parse(currentToolUse.args);
-      } catch {
-        // args may be incomplete, pad to valid JSON
-        currentToolUse.args += "}";
-      }
+      // Un outil sans parametre peut n'arriver avec aucun fragment : « aucun
+      // argument » ne s'exprime alors que par `{}`. En revanche on ne complete
+      // JAMAIS un JSON tronque (`{"due_at":"2026` + `}` donnerait un JSON
+      // valide mais faux, donc une action executee avec de mauvais arguments) :
+      // le fragment incomplet part tel quel et la route le rejette avec une
+      // erreur explicite renvoyee au modele.
       toolCalls.push({
         id: currentToolUse.id,
         name: currentToolUse.name,
-        arguments: currentToolUse.args,
+        arguments: currentToolUse.args.trim() === "" ? "{}" : currentToolUse.args,
       });
       currentToolUse = null;
     }
@@ -171,8 +177,8 @@ export async function chatAnthropic(
       model,
       system: systemParts.join("\n\n"),
       messages: conversation,
-      tools: anthropicTools,
-      tool_choice: { type: "auto" },
+      tools: anthropicTools.length > 0 ? anthropicTools : undefined,
+      tool_choice: anthropicTools.length > 0 ? { type: "auto" } : undefined,
       max_tokens: 2048,
       temperature: 0.7,
     },
