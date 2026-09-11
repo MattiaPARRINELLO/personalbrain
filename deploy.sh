@@ -50,7 +50,10 @@ cp -r "${BUILD_DIR}/static/"* "${DEPLOY_TMP}/.next/static/"
 # Dossier public
 cp -r "${SCRIPT_DIR}/public" "${DEPLOY_TMP}/public"
 
-# Dossier data (si pas déjà sur le serveur)
+# Dossier data (si pas déjà sur le serveur). Le standalone embarque déjà un
+# data/ (file tracing de Next, qui trace les JSON lus par le code) : sans le
+# rm -rf, le cp copierait dans le dossier existant et créerait data/data/.
+rm -rf "${DEPLOY_TMP}/data"
 cp -r "${SCRIPT_DIR}/data" "${DEPLOY_TMP}/data"
 
 # Génération du .env production
@@ -154,12 +157,15 @@ if command -v curl &>/dev/null && [ -n "${CPANEL_TOKEN:-}" ] && [ -n "${CPANEL_U
   curl -s -H "Authorization: cpanel ${CPANEL_USER}:${CPANEL_TOKEN}" \
     "https://${SSH_HOST}:2083/execute/NodeApps/restart_app?app_name=$(basename ${SSH_TARGET_DIR})" \
     || echo -e "${YELLOW}  API échouée — restart manuel requis${NC}"
-# Tentative 2 : SSH avec restart (si cagefs/shell accessible)
-elif ssh -p "$SSH_PORT" "${SSH_USER}@${SSH_HOST}" "command -v node &>/dev/null" 2>/dev/null; then
-  echo -e "${CYAN}  Restart via SSH + touch…${NC}"
-  ssh -p "$SSH_PORT" "${SSH_USER}@${SSH_HOST}" \
-    "cd ${SSH_TARGET_DIR} && touch tmp/restart.txt 2>/dev/null; \
-     echo 'Si vous utilisez cPanel Node.js Selector, redémarrez manuellement depuis l\'UI.'"
+# Tentative 2 : Passenger — méthode `tmp/restart.txt` (cPanel Node.js Selector).
+# On ne teste PAS `command -v node` pour décider : en cagefs le binaire node
+# reste invisible alors que le shell SSH fonctionne, ce test faisait donc
+# toujours échouer le restart automatique.
+elif ssh -p "$SSH_PORT" -o ConnectTimeout=10 "${SSH_USER}@${SSH_HOST}" \
+  "mkdir -p '${SSH_TARGET_DIR}/tmp' && touch '${SSH_TARGET_DIR}/tmp/restart.txt' && echo ok" 2>/dev/null | grep -q '^ok$'; then
+  echo -e "${GREEN}  ✓ Redémarrage Passenger demandé (tmp/restart.txt)${NC}"
+  echo -e "${YELLOW}    Le rechargement est appliqué à la prochaine requête HTTP sur l'app.${NC}"
+  echo -e "${YELLOW}    Si la version servie ne change pas, redémarre via cPanel → Setup Node.js App → Stop / Start${NC}"
 else
   echo -e "${YELLOW}  ⚠  Redémarre manuellement depuis cPanel :${NC}"
   echo -e "      cPanel → Setup Node.js App → Stop / Start"
