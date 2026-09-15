@@ -54,6 +54,14 @@ function extractHeader(headers: GmailHeader[], name: string): string {
   return headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
 }
 
+// Encodage RFC 2047 pour les headers contenant des caractères non-ASCII.
+// Ex: "Validation photos Dina – Pagaille" → "=?UTF-8?B?VmFsaWRhdGlv...?="
+function encodeRfc2047(value: string): string {
+  if (!/[^\x00-\x7F]/.test(value)) return value;
+  const encoded = Buffer.from(value, "utf-8").toString("base64");
+  return `=?UTF-8?B?${encoded}?=`;
+}
+
 // Les emails HTML-only n'ont pas de version texte : on extrait le texte du HTML
 // plutôt que de renvoyer un contenu vide ou du HTML brut illisible.
 function extractTextFromHtml(html: string): string {
@@ -195,7 +203,7 @@ export async function sendGmailReply(emailId: string, responseText: string): Pro
   const replySubject = subject.startsWith("Re:") ? subject : `Re: ${subject}`;
 
   let raw = `To: ${replyTo}\n`;
-  raw += `Subject: ${replySubject}\n`;
+  raw += `Subject: ${encodeRfc2047(replySubject)}\n`;
   if (messageId) raw += `In-Reply-To: ${messageId}\n`;
   if (messageId || references) raw += `References: ${references ? `${references} ` : ""}${messageId}\n`;
   raw += `Content-Type: text/plain; charset="UTF-8"\n\n`;
