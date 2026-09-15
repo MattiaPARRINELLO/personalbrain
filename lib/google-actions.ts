@@ -173,20 +173,28 @@ export async function sendGmailReply(emailId: string, responseText: string): Pro
 
   const original = await googleFetch<GmailMessageRaw>(
     auth,
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${emailId}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=References`
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${emailId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=References`
   );
 
   const headers = original.payload?.headers ?? [];
   const from = extractHeader(headers, "From");
+  const toHeader = extractHeader(headers, "To");
   const subject = extractHeader(headers, "Subject");
   const messageId = extractHeader(headers, "Message-ID");
   const references = extractHeader(headers, "References");
   const threadId = original.threadId ?? "";
+  const isSent = original.labelIds?.includes("SENT") ?? false;
 
-  const to = from.match(/<([^>]+)>/ )?.[1] ?? from;
+  const emailFrom = from.match(/<([^>]+)>/ )?.[1] ?? from;
+  // Si le mail original est dans SENT, l'utilisateur est l'expéditeur :
+  // on répond au destinataire (To), pas à soi-même.
+  const replyTo = isSent && toHeader
+    ? (toHeader.match(/<([^>]+)>/ )?.[1] ?? toHeader)
+    : emailFrom;
+
   const replySubject = subject.startsWith("Re:") ? subject : `Re: ${subject}`;
 
-  let raw = `To: ${to}\n`;
+  let raw = `To: ${replyTo}\n`;
   raw += `Subject: ${replySubject}\n`;
   if (messageId) raw += `In-Reply-To: ${messageId}\n`;
   if (messageId || references) raw += `References: ${references ? `${references} ` : ""}${messageId}\n`;
