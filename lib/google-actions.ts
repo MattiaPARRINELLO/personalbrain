@@ -1,6 +1,5 @@
 import { getGmailClient, getCalendarClient } from "./google-client";
-import type { GmailMessage } from "@/app/api/gmail/route";
-import type { CalendarEventItem } from "@/app/api/calendar/route";
+import type { GmailMessage, GoogleCalendarEvent as CalendarEventItem } from "@/lib/types";
 import type { OAuth2Client } from "google-auth-library";
 
 type GmailHeader = { name?: string; value?: string };
@@ -145,7 +144,7 @@ export async function fetchGmailMessages(query?: string, maxResults = 10): Promi
 
   const messages = list.messages ?? [];
 
-  const details = await Promise.all(
+  const results = await Promise.allSettled(
     messages.map(async ({ id }) => {
       const msg = await googleFetch<GmailMessageRaw>(
         auth,
@@ -173,7 +172,9 @@ export async function fetchGmailMessages(query?: string, maxResults = 10): Promi
     })
   );
 
-  return details;
+  return results
+    .filter((r) => r.status === "fulfilled")
+    .map((r) => (r as { status: "fulfilled"; value: GmailMessage }).value);
 }
 
 export async function sendGmailReply(emailId: string, responseText: string): Promise<string> {
@@ -181,29 +182,52 @@ export async function sendGmailReply(emailId: string, responseText: string): Pro
 
   const original = await googleFetch<GmailMessageRaw>(
     auth,
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${emailId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=References`
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${emailId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Reply-To&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=References`
   );
 
   const headers = original.payload?.headers ?? [];
   const from = extractHeader(headers, "From");
   const toHeader = extractHeader(headers, "To");
+  const ccHeader = extractHeader(headers, "Cc");
+  const replyToHeader = extractHeader(headers, "Reply-To");
   const subject = extractHeader(headers, "Subject");
   const messageId = extractHeader(headers, "Message-ID");
   const references = extractHeader(headers, "References");
   const threadId = original.threadId ?? "";
   const isSent = original.labelIds?.includes("SENT") ?? false;
 
-  const emailFrom = from.match(/<([^>]+)>/ )?.[1] ?? from;
-  // Si le mail original est dans SENT, l'utilisateur est l'expéditeur :
-  // on répond au destinataire (To), pas à soi-même.
-  const replyTo = isSent && toHeader
-    ? (toHeader.match(/<([^>]+)>/ )?.[1] ?? toHeader)
-    : emailFrom;
+  // Extraire toutes les adresses email d'une ligne multi-destinataires
+  const extractAllEmails = (header: string): string[] => {
+    if (!header) return [];
+    return [...header.matchAll(/<([^>]+)>/g)].map((m) => m[1]);
+  };
 
-  const replySubject = subject.startsWith("Re:") ? subject : `Re: ${subject}`;
+  // Déterminer le ou les destinataires de la réponse
+  let toRecipients: string[];
+  if (isSent && toHeader) {
+    // Mail envoyé par l'utilisateur : répondre aux destinataires originaux
+    toRecipients = extractAllEmails(toHeader);
+  } else if (replyToHeader) {
+    // RFC 5322 : Reply-To a priorité
+    toRecipients = extractAllEmails(replyToHeader);
+  } else {
+    // Cas normal : répondre à l'expéditeur
+    toRecipients = extractAllEmails(from);
+  }
 
-  let raw = `To: ${replyTo}\n`;
+  // Si aucun email extrait (pas de <...> dans le header), utiliser le header brut
+  if (toRecipients.length === 0) {
+    toRecipients = [isSent && toHeader ? toHeader : from].filter(Boolean);
+  }
+
+  const replySubject = subject.match(/^Re:/i) ? subject : `Re: ${subject}`;
+
+  let raw = `To: ${toRecipients.join(", ")}\n`;
   raw += `Subject: ${encodeRfc2047(replySubject)}\n`;
+  // Conserver les CC originaux (sauf l'utilisateur lui-même dans un mail envoyé)
+  if (ccHeader) {
+    raw += `Cc: ${ccHeader}\n`;
+  }
   if (messageId) raw += `In-Reply-To: ${messageId}\n`;
   if (messageId || references) raw += `References: ${references ? `${references} ` : ""}${messageId}\n`;
   raw += `Content-Type: text/plain; charset="UTF-8"\n\n`;

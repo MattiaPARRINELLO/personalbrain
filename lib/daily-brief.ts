@@ -1,5 +1,5 @@
-import { getReminders, getConcerts, getEmails, getLeetcode, getCalendar, writeJsonAtomic, readJsonSafe, prepareConcert } from "./storage";
-import { fetchGoogleCalendarEvents } from "./google-actions";
+import { getReminders, getConcerts, getLeetcode, getCalendar, writeJsonAtomic, readJsonSafe, prepareConcert } from "./storage";
+import { fetchGoogleCalendarEvents, fetchGmailMessages } from "./google-actions";
 import { chatCompletion } from "./ai-providers";
 import { getConfig } from "./config";
 import { toISODate, toHHMM } from "./utils";
@@ -18,10 +18,10 @@ export async function generateDailyBrief(): Promise<string | null> {
 
     const today = new Date().toISOString().slice(0, 10);
 
-    const [remindersData, concertsData, emailsData, leetcodeData, calendarEvents] = await Promise.all([
+    const [remindersData, concertsData, unreadEmails, leetcodeData, calendarEvents] = await Promise.all([
       getReminders(),
       getConcerts(),
-      getEmails(),
+      fetchGmailMessages("is:unread", 20).catch(() => []),
       getLeetcode(),
       getCalendar().catch(() => []),
     ]);
@@ -48,9 +48,8 @@ export async function generateDailyBrief(): Promise<string | null> {
     ];
 
     // Emails non lus + urgents
-    const unreadEmails = emailsData.emails.filter((e) => e.unread);
     const urgentEmails = unreadEmails.filter(
-      (e) => e.triage?.priority === "urgent"
+      (e) => /urgent|rappel|relance|deadline|échéance/i.test(e.subject)
     );
 
     // LeetCode

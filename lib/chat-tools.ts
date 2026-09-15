@@ -19,6 +19,7 @@ import {
   isSafeFetchUrl,
 } from "@/lib/storage";
 import type { PhotoShootStatus, Accreditation } from "@/lib/types";
+import { invalidateServerCachePattern } from "@/lib/server-cache";
 import {
   fetchGmailMessages,
   sendGmailReply,
@@ -343,6 +344,7 @@ export async function executeTool(
       const responseText = String(args.response_text ?? "");
       if (!emailId || !responseText) return "Erreur : email_id et response_text requis.";
       const sentId = await sendGmailReply(emailId, responseText);
+      invalidateServerCachePattern(/^gmail:list/);
       return `Reponse envoyee (message id: ${sentId}).`;
     }
     case "create_calendar_event": {
