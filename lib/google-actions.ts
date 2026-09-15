@@ -126,7 +126,6 @@ export async function fetchGmailMessages(query?: string, maxResults = 10): Promi
   const auth = await getGmailClient();
   const params = new URLSearchParams({
     userId: "me",
-    labelIds: "INBOX",
     maxResults: String(maxResults),
   });
   if (query) params.set("q", query);
@@ -146,6 +145,7 @@ export async function fetchGmailMessages(query?: string, maxResults = 10): Promi
       );
       const headers = msg.payload?.headers ?? [];
       const from = extractHeader(headers, "From");
+      const to = extractHeader(headers, "To");
       const subject = extractHeader(headers, "Subject");
       const date = extractHeader(headers, "Date");
       const messageId = extractHeader(headers, "Message-ID");
@@ -154,6 +154,7 @@ export async function fetchGmailMessages(query?: string, maxResults = 10): Promi
         id: msg.id,
         threadId: msg.threadId,
         from,
+        to: to || undefined,
         subject,
         date,
         snippet,

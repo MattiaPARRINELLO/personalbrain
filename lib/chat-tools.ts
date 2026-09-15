@@ -58,7 +58,7 @@ export const tools: UnifiedTool[] = [  {
   },
   {
     name: "fetch_and_search_emails",
-    description: "Recupere les derniers emails de la boite Gmail et cherche par mot-cle dans les expediteurs, sujets ou contenus.",
+    description: "Recupere les emails Gmail (recus et envoyes) et cherche par mot-cle dans les expediteurs, destinataires, sujets ou contenus. Utilise 'in:sent' pour les mails envoyes, 'is:unread' pour les non-lus.",
     parameters: {
       type: "object",
       properties: {
@@ -331,8 +331,10 @@ export async function executeTool(
       if (emails.length === 0) return "Aucun email trouve.";
       return emails
         .map(
-          (e) =>
-            `ID: ${e.id}\nDe: ${e.from}\nSujet: ${e.subject}\nDate: ${e.date}\nExtrait: ${e.snippet}`
+          (e) => {
+            const contact = e.to ? `De: ${e.from}\nA: ${e.to}` : `De: ${e.from}`;
+            return `ID: ${e.id}\n${contact}\nSujet: ${e.subject}\nDate: ${e.date}\nExtrait: ${e.snippet}`;
+          }
         )
         .join("\n\n---\n\n");
     }
