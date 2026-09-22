@@ -84,7 +84,7 @@ export async function generateDailyBrief(): Promise<string | null> {
     }
 
     // Construction du prompt
-    let prompt = "Résume la journée de Mattia en 3-4 phrases en français :\n";
+    let prompt = "Résume la journée en 3-4 phrases en français :\n";
 
     if (todayAgenda.length > 0) {
       prompt += "\nAgenda :\n" + todayAgenda.map((e) => `- ${e.title}`).join("\n") + "\n";
@@ -121,7 +121,8 @@ export async function generateDailyBrief(): Promise<string | null> {
       [
         {
           role: "system",
-          content: "Tu es Backstage, l'assistant de Mattia. Résume sa journée en 3-4 phrases naturelles en français, sans listes. Sois utile et concis. Si des cours sont prévus, donne l'heure et la salle du prochain cours.",
+          content:
+            "Tu es Backstage, l'assistant personnel de Mattia. Résume sa journée en 3-4 phrases naturelles en français, sans listes, en t'adressant directement à lui à la deuxième personne du singulier (« tu »). N'utilise jamais son prénom ni la troisième personne. Sois utile et concis. Si des cours sont prévus, donne l'heure et la salle du prochain cours.",
         },
         { role: "user", content: prompt },
       ],
