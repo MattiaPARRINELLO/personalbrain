@@ -85,9 +85,11 @@ contraintes d'origine.
   rendu client doivent coïncider (pas d'erreur d'hydratation).
 
 **Inactivité (idle)**
-- Anneau conique de 1,5 px tournant en 24 s autour du badge de l'accueil.
-  Masqué au centre (`.home-conic-ring`) pour ne jamais recouvrir l'ambiance.
-- Flottement du badge sur 8 s (±5 px) et halo qui respire sur 9 s.
+- Balancement de pendule du badge d'accueil (`.home-swing`, ±0,8° en 9,5 s).
+  L'origine de rotation est le bord **haut** de la boîte, c'est-à-dire la ligne de
+  coupe : le balancement se lit donc comme celui d'un badge accroché au-dessus de
+  l'écran, sans jamais déplacer le point d'attache.
+- Halo derrière le badge qui respire sur 9 s.
 - Lueur qui respire (5,5 s) **réservée aux éléments vivants** : rendez-vous en
   cours, rappel en retard. Jamais plus d'une poignée à l'écran.
 - Curseur de veille clignotant (1,15 s) en fin de ligne de briefing : l'IA
@@ -98,9 +100,15 @@ contraintes d'origine.
   donc l'animation rejoue à chaque bascule.
 
 **Composition**
-- Accueil : contenu centré verticalement, `max-w-lg`. eyebrow date + heure →
-  salutation → briefing → carte du prochain rendez-vous → puces de contexte →
-  4 raccourcis. Entrée échelonnée 620 ms (délais inline 60 → 330 ms).
+- Accueil : contenu **ancré en haut** (pas de padding haut sur le conteneur),
+  `max-w-lg`. Le badge est le logo **détaillé** (`/backstage-logo.png`, tour de
+  cou + carte de scène), 176 px en mobile / 240 px au-delà de `sm` : sa marge
+  négative rogne le haut du tour de cou pour que l'attache sorte de l'écran et
+  que le badge paraisse pendu au bord supérieur. Le logo **simple**
+  (`/backstage-logo-simple.png`) reste l'icône partout ailleurs (favicon, rail,
+  avatars, en-têtes). Puis : eyebrow date + heure → salutation → briefing → carte
+  du prochain rendez-vous → puces de contexte → 4 raccourcis. Entrée échelonnée
+  620 ms (délais inline 60 → 330 ms).
 - Panneau : en-tête sur deux lignes (titre + heure live + repli, puis sélecteur
   segmenté de 5 vues). Vue « Flux » = une ligne de temps unique qui fusionne
   cours, événements agenda et rappels, groupée par jour avec une puce

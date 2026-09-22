@@ -914,40 +914,19 @@ textarea::placeholder {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* --- Inactivité (idle) : respiration du badge, anneau conique, halo ------ */
+/* --- Inactivité (idle) : balancement du badge, respiration du halo ------- */
 
-.home-float {
-  animation: home-float 8s ease-in-out infinite;
+/* Pendule : le pivot est le bord haut de la boîte, c'est-à-dire la ligne où le
+   tour de cou est rogné par le bord de l'écran — le badge se balance donc comme
+   s'il était accroché au-dessus de la fenêtre. */
+.home-swing {
+  transform-origin: 50% 0;
+  animation: home-swing 9.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
-@keyframes home-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
-}
-
-.home-ring {
-  transform-origin: center;
-  animation: home-ring-spin 24s linear infinite;
-}
-
-/* Anneau d'un pixel et demi : le centre est masqué, donc il peut tourner
-   au-dessus de l'ambiance sans jamais la recouvrir. */
-.home-conic-ring {
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg,
-    rgba(165, 180, 252, 0.06) 45deg,
-    var(--accent) 95deg,
-    transparent 155deg,
-    transparent 360deg
-  );
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
-}
-
-@keyframes home-ring-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@keyframes home-swing {
+  0%, 100% { transform: rotate(-0.8deg); }
+  50% { transform: rotate(0.8deg); }
 }
 
 .home-halo {

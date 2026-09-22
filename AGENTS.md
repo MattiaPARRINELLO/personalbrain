@@ -117,6 +117,12 @@ scripts/            cron-scheduler, reset-passkey, cesar-smoke, scripts de QA/sc
   les mêmes clés, sinon l'accueil déclenche des requêtes réseau en double.
   Exception visuelle assumée (dégradés radiaux, sheen, animations d'inactivité) :
   cf. `DESIGN.md > Console IA`.
+  ⚠️ La composition d'accueil est **ancrée en haut** et le conteneur de
+  `ChatView.tsx` n'a **pas** de padding haut dans ce cas : c'est ce qui permet au
+  badge détaillé (`/backstage-logo.png`, marge négative dans `HomeHero.tsx`) de
+  sortir par le haut. Réintroduire `py-8 sm:py-12` ou `justify-center` casse
+  l'effet (et fait déborder la colonne). Le logo simple reste l'icône partout
+  ailleurs.
 - Panneau de droite (`components/layout/ContextPanel.tsx`) — 5 vues : « Flux »
   (défaut) = `FluxTimeline.tsx`, qui **fusionne cours + événements agenda +
   rappels** en une ligne de temps groupée par jour ; puis Agenda / Inbox / Code /

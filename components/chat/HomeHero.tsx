@@ -323,25 +323,26 @@ export function HomeHero({
 
   return (
     <section aria-label="Accueil du chat" className="flex flex-col items-center text-center">
-      <div className="home-rise relative flex items-center justify-center">
+      {/* Badge détaillé suspendu : la marge négative rogne le haut du tour de cou,
+          donc l'attache sort de l'écran et le badge paraît pendu au bord
+          supérieur de la zone de défilement. Le pivot du balancement est le bord
+          haut de la boîte, c'est-à-dire exactement la ligne de coupe. */}
+      <div className="home-rise relative flex justify-center -mt-9 sm:-mt-11">
         <div
-          className="home-halo absolute w-52 h-52 rounded-full bg-[var(--accent)]/10 blur-[64px]"
+          className="home-halo absolute top-16 w-44 h-44 rounded-full bg-[var(--accent)]/10 blur-[64px]"
           aria-hidden
         />
-        <div className="home-float relative flex items-center justify-center">
-          <div
-            className="home-ring home-conic-ring absolute w-[76px] h-[76px] rounded-full"
-            aria-hidden
+        <div className="home-swing relative w-[176px] sm:w-[240px]">
+          <Image
+            src="/backstage-logo.png"
+            alt="BACKSTAGE"
+            width={1254}
+            height={1254}
+            sizes="(min-width: 640px) 240px, 176px"
+            loading="eager"
+            fetchPriority="high"
+            className="w-full h-auto"
           />
-          <div className="relative w-14 h-14 rounded-2xl border border-[var(--border-2)] bg-[var(--surface-1)] flex items-center justify-center overflow-hidden">
-            <Image
-              src="/backstage-logo-simple.png"
-              alt="BACKSTAGE"
-              width={36}
-              height={36}
-              className="w-9 h-9 object-contain"
-            />
-          </div>
         </div>
       </div>
 

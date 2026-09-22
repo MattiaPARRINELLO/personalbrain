@@ -612,10 +612,13 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
         <div
           className={cn(
-            "max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12",
-            // L'accueil est centré verticalement tant qu'il tient dans l'écran,
-            // puis défile normalement (min-h-full n'écrase pas py-*).
-            isWelcome && "min-h-full flex flex-col justify-center"
+            "max-w-3xl mx-auto px-4 sm:px-6",
+            // L'accueil est ancré en haut : son badge est suspendu au bord
+            // supérieur de la zone de défilement, donc le padding haut est
+            // annulé et la coupe du tour de cou est posée par HomeHero.
+            isWelcome
+              ? "min-h-full flex flex-col pb-10"
+              : "py-8 sm:py-12"
           )}
         >
           {isWelcome ? (
