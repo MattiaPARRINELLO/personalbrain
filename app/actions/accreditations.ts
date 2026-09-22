@@ -9,6 +9,7 @@ import {
   addAccreditation,
   updateAccreditation,
   deleteAccreditation,
+  saveAccreditations,
   logActivity,
 } from "@/lib/storage";
 import type { Accreditation } from "@/lib/types";
@@ -106,11 +107,14 @@ export async function scanAccreditationsAction(): Promise<{ message: string; cre
   }
 
   let created = 0;
-  let updated = 0;
-  const existing = await getAccreditations();
+  const snapshot = await getAccreditations();
   const existingKeys = new Set(
-    existing.accreditations.map((a) => `${a.artist}|${a.venue}`.toLowerCase())
+    snapshot.accreditations.map((a) => `${a.artist}|${a.venue}`.toLowerCase())
   );
+  // Statuts à appliquer aux fiches existantes : collectés pendant le scan, puis
+  // persistés en une seule écriture relue depuis le disque (sinon une création
+  // concurrente serait écrasée par la mutation de l'instantané).
+  const pendingStatuses: { id: string; status: Accreditation["status"] }[] = [];
 
   for (const msg of messages) {
     const subj = msg.subject ?? "";
@@ -138,13 +142,11 @@ export async function scanAccreditationsAction(): Promise<{ message: string; cre
 
     const key = `${artist}|${venue || "inconnu"}`.toLowerCase();
     if (existingKeys.has(key)) {
-      const idx = existing.accreditations.findIndex(
+      const target = snapshot.accreditations.find(
         (a) => `${a.artist}|${a.venue}`.toLowerCase() === key
       );
-      if (idx >= 0 && existing.accreditations[idx].status !== status) {
-        existing.accreditations[idx].status = status;
-        existing.accreditations[idx].updatedAt = new Date().toISOString();
-        updated++;
+      if (target && target.status !== status) {
+        pendingStatuses.push({ id: target.id, status });
       }
     } else {
       const newAcc = await addAccreditation({
@@ -159,6 +161,22 @@ export async function scanAccreditationsAction(): Promise<{ message: string; cre
       created++;
       existingKeys.add(key);
     }
+  }
+
+  let updated = 0;
+  if (pendingStatuses.length > 0) {
+    const fresh = await getAccreditations();
+    const byId = new Map(pendingStatuses.map((u) => [u.id, u.status]));
+    const now = new Date().toISOString();
+    for (const acc of fresh.accreditations) {
+      const newStatus = byId.get(acc.id);
+      if (newStatus) {
+        acc.status = newStatus;
+        acc.updatedAt = now;
+        updated++;
+      }
+    }
+    if (updated > 0) await saveAccreditations(fresh);
   }
 
   revalidatePath("/photos");

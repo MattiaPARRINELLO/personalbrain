@@ -137,6 +137,39 @@ describe("accreditations actions", () => {
       expect(updated.status).toBe("accepted");
     });
 
+    it("conserve les accréditations créées pendant le scan lors de la mise à jour", async () => {
+      // Le scan relit le disque avant d'écrire : une fiche créée entre-temps
+      // (ici "Autre") ne doit pas être perdue par la sauvegarde des statuts.
+      const existing = mockAccreditation({ artist: "Muse", venue: "Stade", status: "pending" });
+      const concurrence = mockAccreditation({ id: "2", artist: "Autre", venue: "Zénith", status: "pending" });
+      mockGoogleActions.fetchGmailMessages.mockResolvedValue([
+        { id: "email1", subject: "Concert de Muse. au Stade, accepté", from: "contact@venue.com", snippet: "" },
+      ]);
+      mockStorage.getAccreditations
+        .mockResolvedValueOnce({ accreditations: [existing] })
+        .mockResolvedValue({ accreditations: [existing, concurrence] });
+
+      const result = await scanAccreditationsAction();
+
+      expect(result.updated).toBe(1);
+      const saved = mockStorage.saveAccreditations.mock.calls[0][0];
+      expect(saved.accreditations.map((a: { artist: string }) => a.artist).sort()).toEqual(["Autre", "Muse"]);
+      expect(saved.accreditations.find((a: { artist: string }) => a.artist === "Muse").status).toBe("accepted");
+    });
+
+    it("n'écrit pas quand aucun statut ne change", async () => {
+      const existing = mockAccreditation({ artist: "Muse", venue: "Stade", status: "accepted" });
+      mockGoogleActions.fetchGmailMessages.mockResolvedValue([
+        { id: "email1", subject: "Concert de Muse. au Stade, accepté", from: "contact@venue.com", snippet: "" },
+      ]);
+      mockStorage.getAccreditations.mockResolvedValue({ accreditations: [existing] });
+
+      const result = await scanAccreditationsAction();
+
+      expect(result.updated).toBe(0);
+      expect(mockStorage.saveAccreditations).not.toHaveBeenCalled();
+    });
+
     it("ignore les messages sans artiste identifiable", async () => {
       mockGoogleActions.fetchGmailMessages.mockResolvedValue([
         { id: "email1", subject: "Hello", from: "test@test.com", snippet: "No relevant info" },
