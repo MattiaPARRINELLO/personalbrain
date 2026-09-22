@@ -64,8 +64,18 @@ export const Markdown = memo(function Markdown({ children, className }: Markdown
         hr: () => <hr className="my-5 border-[var(--border-1)]" />,
         table: ({ children }) => (
           <div className="my-4 overflow-x-auto rounded-lg border border-[var(--border-1)]">
-            <table className="w-full text-[13px]">{children}</table>
+            <table className="w-full text-[13px] border-collapse">{children}</table>
           </div>
+        ),
+        th: ({ children }) => (
+          <th className="text-left font-mono text-[11px] uppercase tracking-wider text-[var(--text-3)] px-3 py-2 border-b border-[var(--border-1)] bg-[var(--surface-2)]">
+            {children}
+          </th>
+        ),
+        td: ({ children }) => (
+          <td className="px-3 py-2 border-b border-[var(--border-1)]/60 text-[var(--text-2)] align-top">
+            {children}
+          </td>
         ),
       }}
     >

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cn } from "@/lib/utils";
+import { cn, markdownToText } from "@/lib/utils";
 
 describe("cn", () => {
   it("merge des classes simples", () => {
@@ -16,5 +16,21 @@ describe("cn", () => {
 
   it("ignore les valeurs falsy", () => {
     expect(cn("", null, undefined, "block")).toBe("block");
+  });
+});
+
+describe("markdownToText", () => {
+  it("laisse un paragraphe simple intact", () => {
+    expect(markdownToText("Tu as deux cours aujourd'hui.")).toBe("Tu as deux cours aujourd'hui.");
+  });
+
+  it("retire gras, puces, titres et liens", () => {
+    const md = "## Résumé\n\n- **Maths** à 8h\n- [Mail](https://example.com) urgent";
+    expect(markdownToText(md)).toBe("Résumé Maths à 8h Mail urgent");
+  });
+
+  it("aplatit un tableau et ses séparateurs", () => {
+    const md = "| Heure | Cours |\n| --- | --- |\n| 8h | Maths |";
+    expect(markdownToText(md)).toBe("Heure · Cours 8h · Maths");
   });
 });

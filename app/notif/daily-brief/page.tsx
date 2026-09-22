@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { DailyBrief } from "@/lib/types";
+import { Markdown } from "@/components/ui/Markdown";
 import { formatRelative } from "@/lib/date";
 
 export default function DailyBriefPage() {
@@ -78,9 +79,7 @@ export default function DailyBriefPage() {
       </header>
 
       <div className="p-6 rounded-2xl border border-[var(--border-1)] bg-[var(--surface-1)] mb-8">
-        <p className="text-sm leading-relaxed text-[var(--text-1)]">
-          {brief.summary}
-        </p>
+        <Markdown className="text-sm">{brief.summary}</Markdown>
       </div>
 
       {brief.weather && (

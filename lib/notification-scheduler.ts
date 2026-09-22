@@ -3,6 +3,7 @@ import { getSubscriptions, type StoredPushSubscription } from "./push-subscripti
 import { getConfig } from "./config";
 import { configureVapid, getVapidDetails, sendPushNotification } from "./send-push";
 import { serverLog } from "./logger";
+import { markdownToText } from "./utils";
 
 let schedulerStarted = false;
 let reminderInterval: ReturnType<typeof setInterval> | null = null;
@@ -275,9 +276,10 @@ export async function triggerDailyBrief(
       }
     }
 
+    const briefBody = markdownToText(todayBrief.summary);
     const payload = JSON.stringify({
       title: "Brief du jour",
-      body: todayBrief.summary.slice(0, 180) + (todayBrief.summary.length > 180 ? "…" : ""),
+      body: briefBody.slice(0, 180) + (briefBody.length > 180 ? "…" : ""),
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
       tag: "daily-brief",
