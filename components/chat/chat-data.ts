@@ -15,7 +15,8 @@ export const toolMeta: Record<string, { label: string; icon: typeof Globe }> = {
   fetch_page_meta: { label: "Aperçu lien", icon: Globe },
 };
 
-export const SUGGESTIONS = [
+// Repli de l'accueil du chat quand aucun raccourci contextuel ne s'applique.
+export const DEFAULT_SHORTCUTS = [
   { label: "Que dois-je faire aujourd'hui ?", icon: Sparkles },
   { label: "Cherche mes derniers mails non lus", icon: Mail },
   { label: "Aide-moi sur un algo LeetCode", icon: Brain },

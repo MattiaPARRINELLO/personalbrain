@@ -14,22 +14,24 @@ function extractName(from: string): string {
   return em ? em[1] : from;
 }
 
-const GMAIL_CACHE_KEY = "gmail:widget:list";
+// Clé et fetcher partagés : l'accueil du chat compte les non-lus sur la même
+// entrée de cache, donc aucune requête Gmail supplémentaire au chargement.
+export const GMAIL_CACHE_KEY = "gmail:widget:list";
 
-async function fetchWidgetGmail(): Promise<GmailMessage[]> {
+export async function fetchInboxMessages(): Promise<GmailMessage[]> {
   const res = await api.gmail.list();
   if (res.error) throw new Error(res.error);
-  return (res.messages ?? []).slice(0, 4);
+  return res.messages ?? [];
 }
 
 export function GmailWidget() {
   const { data: messages, loading, error } = useCachedFetch<GmailMessage[]>(
     GMAIL_CACHE_KEY,
-    fetchWidgetGmail,
+    fetchInboxMessages,
     { ttl: 2 * 60 * 1000 }
   );
 
-  const visible = messages ?? [];
+  const visible = (messages ?? []).slice(0, 4);
 
   return (
     <Card className="h-full">

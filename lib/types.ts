@@ -16,3 +16,4 @@ export * from "./types/accreditations";
 export * from "./types/photography";
 export * from "./types/activity";
 export * from "./types/intentions";
+export * from "./types/home";

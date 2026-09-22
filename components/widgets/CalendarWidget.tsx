@@ -28,21 +28,23 @@ function dayLabel(iso: string): string {
   return new Date(iso).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
 }
 
-const CALENDAR_CACHE_KEY = "calendar:list";
+// Clé et fetcher partagés : l'accueil du chat lit la même entrée de cache,
+// donc aucune requête supplémentaire n'est déclenchée par le Hero.
+export const CALENDAR_CACHE_KEY = "calendar:list";
 
-async function fetchWidgetCalendar(): Promise<CalendarEvent[]> {
+export async function fetchUpcomingCalendarEvents(): Promise<CalendarEvent[]> {
   const now = new Date();
   const timeMin = now.toISOString();
   const timeMax = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
   const res = await api.calendar.list(timeMin, timeMax);
   if (res.error) throw new Error(res.error);
-  return (res.events ?? []).slice(0, 5);
+  return res.events ?? [];
 }
 
 export function CalendarWidget() {
   const { data: events, loading, error } = useCachedFetch<CalendarEvent[]>(
     CALENDAR_CACHE_KEY,
-    fetchWidgetCalendar,
+    fetchUpcomingCalendarEvents,
     { ttl: 2 * 60 * 1000 }
   );
 

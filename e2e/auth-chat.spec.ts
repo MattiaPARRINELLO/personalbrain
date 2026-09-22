@@ -38,4 +38,16 @@ test.describe("Chat", () => {
     const composer = page.locator("textarea").first();
     await expect(composer).toBeVisible({ timeout: 10_000 });
   });
+
+  test("l'accueil affiche le hero et ses raccourcis", async ({ page }) => {
+    await page.goto("/chat");
+    const home = page.getByRole("region", { name: "Accueil du chat" });
+    await expect(home).toBeVisible({ timeout: 10_000 });
+    await expect(home.locator("h1")).toBeVisible();
+    // Les libellés sont contextuels : on vérifie le nombre de raccourcis, pas
+    // leur texte (qui dépend des données réelles du serveur de dev).
+    await expect(
+      home.getByRole("region", { name: "Raccourcis" }).locator("button")
+    ).toHaveCount(4);
+  });
 });

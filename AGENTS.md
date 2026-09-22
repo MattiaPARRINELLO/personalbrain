@@ -87,7 +87,7 @@ pas l'app Next.
 
 ```
 app/
-  actions/          18 Server Actions ("use server") + __tests__/
+  actions/          19 Server Actions ("use server") + __tests__/
   api/              Route Handlers
   <page>/           page.tsx + composants LOCAUX à cette page
 components/
@@ -100,7 +100,7 @@ components/
 lib/
   cesar-client.ts   client CESAR (emploi du temps) — fetch HTTP pur, SANS navigateur
   storage/          CRUD par domaine (14 fichiers)
-  types/            définitions par domaine (15 fichiers)
+  types/            définitions par domaine (16 fichiers)
   ai-providers/     openai, anthropic, config, types
   __tests__/        tests unitaires
 e2e/                specs Playwright (helpers, global-setup, projets no-auth/chromium)
@@ -109,6 +109,13 @@ scripts/            cron-scheduler, reset-passkey, cesar-smoke, scripts de QA/sc
 
 ### Pages particulières
 
+- `/chat` — accueil = `components/chat/HomeHero.tsx` (affiché seulement quand la
+  conversation est vide). Agrégat serveur `getHomeOverview()` (`app/actions/home.ts`,
+  lectures `data/*.json` uniquement — aucun appel réseau) + **cache client partagé**
+  avec les widgets du panneau de droite (`CALENDAR_CACHE_KEY`, `GMAIL_CACHE_KEY`
+  exportés par `components/widgets/`). ➡️ Ne jamais dupliquer ces fetchers : réutiliser
+  les mêmes clés, sinon l'accueil déclenche des requêtes réseau en double.
+  Exception visuelle assumée (dégradés radiaux, sheen) : cf. `DESIGN.md`.
 - `/today` — page d'agrégat « Aujourd'hui » (rappels du jour, agenda, relances), 2e destination du rail.
 - `/gallery` — redirige vers `/photos` (la galerie de livraison est la vue « Livraison » de Photos, `app/photos/GalleryKanban.tsx`).
 - `/photos` — kanban shootings + toggle de vue « Shootings / Livraison ».
@@ -177,6 +184,9 @@ Ne jamais réintroduire Playwright ici : ça casse la prod standalone.
 
 - Sortie normalisée : `ScheduleCourse` (matière, prof, salle+bâtiment, start/end
   en ms, annulés filtrés) dans `data/schedule.json`.
+- ⚠️ `getNextCourse()` (`lib/storage/schedule.ts`) retourne le premier cours dont
+  `end > now` — donc **le cours en cours s'il y en a un**, et il ne filtre pas
+  `cancelled`. Pour « le prochain à venir », filtrer `!cancelled` puis `start > now`.
 - Sync automatique : `syncScheduleIfStale()` (notification-scheduler) si l'EDT a
   plus de 6 h, est vide, ou si le dernier sync a échoué. Garde anti-concurrence
   dans `lib/storage/schedule.ts`.

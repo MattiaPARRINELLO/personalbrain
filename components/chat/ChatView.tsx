@@ -1,16 +1,15 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { api, type ChatStreamEvent } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/ui/Markdown";
 import { ChatComposer } from "@/components/chat/ChatComposer";
+import { HomeHero } from "@/components/chat/HomeHero";
 import { useChatContext } from "@/lib/chat-context";
 import { useToast } from "@/components/ui/Toast";
 import type { Message, ToolCall } from "@/components/chat/types";
 import {
-  SUGGESTIONS,
   FUNNY_THOUGHTS,
   welcomeMessage,
   generateId,
@@ -49,44 +48,6 @@ function describeAction(name: string, args: Record<string, unknown>): string {
     default:
       return "";
   }
-}
-
-function Hero({ onPrompt, disabled }: { onPrompt: (p: string) => void; disabled: boolean }) {  return (
-    <div className="flex flex-col items-center text-center pt-6">
-      <div className="relative flex items-center justify-center">
-        <div className="absolute w-44 h-44 rounded-full bg-[var(--accent)]/8 blur-[60px]" aria-hidden />
-        <div className="relative w-14 h-14 rounded-2xl border border-[var(--border-2)] bg-[var(--surface-1)] flex items-center justify-center overflow-hidden">
-          <Image
-            src="/backstage-logo-simple.png"
-            alt="BACKSTAGE"
-            width={36}
-            height={36}
-            className="w-9 h-9 object-contain"
-          />
-        </div>
-      </div>
-      <h1 className="mt-6 text-[24px] sm:text-[32px] font-display font-bold tracking-tight text-[var(--text-1)] text-balance">
-        Que puis-je faire pour toi ?
-      </h1>
-      <p className="mt-2.5 text-[13px] sm:text-[14px] text-[var(--text-3)] max-w-md leading-relaxed">
-        Gmail, agenda, rappels, mémoire, recherche : pose ta question ou donne
-        une consigne, je m&apos;occupe du reste.
-      </p>
-      <div className="mt-9 grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-lg">
-        {SUGGESTIONS.map((s) => (
-          <button
-            key={s.label}
-            onClick={() => void onPrompt(s.label)}
-            disabled={disabled}
-            className="group flex items-start gap-3 px-4 py-3.5 text-left text-[13px] text-[var(--text-2)] bg-[var(--surface-1)] border border-[var(--border-1)] rounded-xl hover:border-[var(--border-3)] hover:text-[var(--text-1)] transition-all duration-200 disabled:opacity-40"
-          >
-            <s.icon className="w-4 h-4 shrink-0 mt-0.5 text-[var(--text-3)] group-hover:text-[var(--accent)] transition-colors duration-200" />
-            <span className="leading-relaxed">{s.label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 interface ChatViewProps {
@@ -613,8 +574,11 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
     return () => window.removeEventListener("keydown", handler);
   }, [loading, stop]);
 
+  const isWelcome = messages.length <= 1 && messages[0]?.id === "welcome";
+
   return (
     <div className="flex flex-col h-full min-h-0 relative">
+      {isWelcome && <div className="home-ambience" aria-hidden />}
       {consent.loaded && !consent.accepted && (
         <div className="shrink-0 px-4 py-3 border-b border-[var(--border-1)] bg-[var(--surface-2)]/80 backdrop-blur fade-in">
           <div className="max-w-3xl mx-auto flex flex-col sm:flex-row sm:items-center gap-3">
@@ -645,9 +609,16 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
         </div>
       )}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-          {messages.length <= 1 && messages[0]?.id === "welcome" ? (
-            <Hero onPrompt={(p) => void send(p)} disabled={loading} />
+        <div
+          className={cn(
+            "max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12",
+            // L'accueil est centré verticalement tant qu'il tient dans l'écran,
+            // puis défile normalement (min-h-full n'écrase pas py-*).
+            isWelcome && "min-h-full flex flex-col justify-center"
+          )}
+        >
+          {isWelcome ? (
+            <HomeHero onPrompt={(p) => void send(p)} disabled={loading} />
           ) : (
             <div className="space-y-6 chat-stagger">
               {messages.map((m) => {

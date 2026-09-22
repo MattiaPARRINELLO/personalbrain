@@ -65,6 +65,23 @@ No box-shadows. Depth via 1px borders and subtle background shifts only.
 - User messages: right warm accent dot
 - Input: single-line auto-growing textarea, submit on Enter, Shift+Enter newline
 
+### Écran d'accueil du chat (exception assumée)
+L'accueil du chat (`components/chat/HomeHero.tsx`) est le seul écran autorisé à
+déroger aux règles « pas de dégradé en fond » et « pas de shimmer » :
+
+- **Ambiance** : dégradés radiaux très basse opacité (`--accent` 22 %,
+  `--accent-cool` / `--accent-warm` 13 %) + trame de 56 px masquée en cercle.
+  Le dégradé s'éteint **avant** les bords du conteneur — jamais de liseré
+  rectangulaire — et ne se met pas à l'échelle (seule l'opacité respire, 28 s).
+- **Sheen** : bandeau lumineux lent (9 s) sur la seule carte « prochain
+  rendez-vous ». Jamais plus d'un shimmer à l'écran.
+- **Entrée** : montée échelonnée 620 ms, délais inline de 60 à 330 ms.
+- **Composition** : contenu centré verticalement, largeur max `max-w-lg`.
+  eyebrow date + heure → salutation → briefing d'une ligne → carte du prochain
+  rendez-vous → puces de contexte → 4 raccourcis.
+
+Le reste de l'app garde les contraintes d'origine.
+
 ## Kanban style
 - Columns separated by consistent 1px vertical borders
 - Column headers: mono uppercase + small square accent marker
