@@ -420,7 +420,8 @@ avec AUTH_SECRET aléatoire et VAPID vides).
 `MICROSOFT_CLIENT_ID` / `_SECRET` / `_REDIRECT_URI` · `SETUP_TOKEN`
 (enregistrement passkey initial) · `OPENWEATHERMAP_API_KEY` ·
 `BRAVE_SEARCH_API_KEY` · `VAPID_SUBJECT` / `VAPID_PRIVATE_KEY` /
-`NEXT_PUBLIC_VAPID_PUBLIC_KEY` · `CRON_BASE_URL` · `ANALYZE` · `CESAR_BASE` (défaut `https://cesar.emineo-education.fr`)
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY` · `CRON_BASE_URL` · `ANALYZE` · `CESAR_BASE` (défaut `https://cesar.emineo-education.fr`) ·
+`GOOGLE_TESTING_EXPIRY` (`"true"` uniquement si projet Google en mode Testing : réactive l'alerte d'âge ~7 j, sinon seul un refresh échoué déclenche « à reconnecter »)
 
 Modèle complet : `.deploy.env.example`.
 

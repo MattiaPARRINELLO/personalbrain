@@ -196,6 +196,40 @@ describe("google-client", () => {
       expect(typeof saved._obtainedAt).toBe("number");
       expect(saved._obtainedAt).toBeGreaterThan(0);
     });
+
+    it("should restart the _obtainedAt clock on manual re-link", async () => {
+      mockReadFile.mockResolvedValue(
+        JSON.stringify({ access_token: "old", refresh_token: "old", _obtainedAt: 123456 }),
+      );
+      const { saveTokens } = await import("../google-client");
+      let written = "";
+      const fs = await import("fs");
+      (fs.promises.writeFile as Mock).mockImplementation(
+        async (_path: string, content: string) => { written = content; },
+      );
+
+      await saveTokens("gmail", { access_token: "new", refresh_token: "new" }, { resetObtainedAt: true });
+      const saved = JSON.parse(written) as { _obtainedAt?: number };
+      expect(saved._obtainedAt).not.toBe(123456);
+      expect(saved._obtainedAt).toBeGreaterThan(123456);
+    });
+
+    it("should preserve the stored refresh_token when the refresh response lacks one", async () => {
+      mockReadFile.mockResolvedValue(
+        JSON.stringify({ access_token: "old", refresh_token: "stored-refresh", _obtainedAt: 123456 }),
+      );
+      const { saveTokens } = await import("../google-client");
+      let written = "";
+      const fs = await import("fs");
+      (fs.promises.writeFile as Mock).mockImplementation(
+        async (_path: string, content: string) => { written = content; },
+      );
+
+      await saveTokens("gmail", { access_token: "new", expiry_date: Date.now() + 3600_000 });
+      const saved = JSON.parse(written) as { refresh_token?: string; _obtainedAt?: number };
+      expect(saved.refresh_token).toBe("stored-refresh");
+      expect(saved._obtainedAt).toBe(123456);
+    });
   });
 
   // -----------------------------------------------------------------------

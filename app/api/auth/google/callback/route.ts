@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await saveTokens(type, tokens);
+    await saveTokens(type, tokens, { resetObtainedAt: true });
     // Re-link réussi : lève la bannière « à reconnecter » sans attendre
     // le premier refresh suivant (le marqueur de casse serait sinon obsolète).
     await clearGoogleBroken(type);

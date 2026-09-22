@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { deriveGoogleHealth } from "../google-health";
 
 // Seuils documentés dans lib/google-health.ts (constantes privées) :
-// expiration Testing = 7 jours, alerte à partir de 5,5 jours.
+// expiration Testing = 7 jours, alerte à partir de 5,5 jours — actifs
+// uniquement avec testingExpiry: true (GOOGLE_TESTING_EXPIRY=true).
 const EXPIRY_DAYS = 7;
 const WARN_AFTER_DAYS = 5.5;
 const DAY = 86_400_000;
@@ -53,9 +54,22 @@ describe("deriveGoogleHealth", () => {
       brokenSinceMs: null,
       obtainedAtMs: NOW - (EXPIRY_DAYS - 1) * DAY,
       nowMs: NOW,
+      testingExpiry: true,
     });
     expect(state.expiringSoon).toBe(true);
     expect(state.ageDays).toBeCloseTo(EXPIRY_DAYS - 1);
+  });
+
+  it("should not warn on age outside testing mode (production app)", () => {
+    const state = deriveGoogleHealth({
+      hasRefreshToken: true,
+      brokenSinceMs: null,
+      obtainedAtMs: NOW - 26 * DAY,
+      nowMs: NOW,
+    });
+    expect(state.linked).toBe(true);
+    expect(state.expiringSoon).toBe(false);
+    expect(state.ageDays).toBeCloseTo(26);
   });
 
   it("should not report expiringSoon before the warning threshold", () => {
@@ -64,6 +78,7 @@ describe("deriveGoogleHealth", () => {
       brokenSinceMs: null,
       obtainedAtMs: NOW - (WARN_AFTER_DAYS - 0.5) * DAY,
       nowMs: NOW,
+      testingExpiry: true,
     });
     expect(state.expiringSoon).toBe(false);
   });
@@ -74,6 +89,7 @@ describe("deriveGoogleHealth", () => {
       brokenSinceMs: NOW - 60_000,
       obtainedAtMs: NOW - 6.5 * DAY,
       nowMs: NOW,
+      testingExpiry: true,
     });
     expect(state.broken).toBe(true);
     expect(state.expiringSoon).toBe(false);

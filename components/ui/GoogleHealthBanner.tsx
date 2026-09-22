@@ -16,8 +16,8 @@ const ACCOUNT_LABELS: Record<AccountKey, string> = {
 /**
  * Bannière de santé des connexions Google.
  * - broken : un refresh a échoué (invalid_grant) — reconnecter est obligatoire.
- * - expiringSoon : le lien approche des 7 jours du mode Testing (app non
- *   vérifiée) — reconnecter bientôt, avant la casse.
+ * - expiringSoon : actif uniquement si GOOGLE_TESTING_EXPIRY=true (projet
+ *   Google en mode Testing, limite ~7 j) — reconnecter bientôt, avant la casse.
  * Re-fetch au retour du focus ; état rechargé depuis le serveur à chaque fois.
  */
 export function GoogleHealthBanner() {

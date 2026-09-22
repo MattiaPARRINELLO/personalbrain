@@ -49,15 +49,24 @@ export async function loadTokens(type: GoogleAccountType): Promise<GoogleTokens 
   }
 }
 
-export async function saveTokens(type: GoogleAccountType, tokens: GoogleTokens): Promise<void> {
-  // Préserve la date de liaison d'origine : un rafraîchissement automatique
-  // ne doit PAS réinitialiser l'horloge des 7 jours du mode Testing (sinon
-  // l'avertissement proactif ne se déclencherait jamais). Seul un re-link
-  // manuel (callback OAuth) redémarre l'horloge.
+export async function saveTokens(
+  type: GoogleAccountType,
+  tokens: GoogleTokens,
+  opts?: { resetObtainedAt?: boolean },
+): Promise<void> {
   const existing = await loadTokens(type);
   const toWrite: GoogleTokens = { ...tokens };
+  // Google ne renvoie pas de refresh_token lors d'un rafraîchissement :
+  // ne jamais écraser celui stocké par une valeur vide, sinon le compte
+  // bascule en « non lié » dès le premier refresh automatique.
+  if (!toWrite.refresh_token && existing?.refresh_token) {
+    toWrite.refresh_token = existing.refresh_token;
+  }
+  // Un re-link manuel (callback OAuth) redémarre l'horloge de liaison ;
+  // un rafraîchissement automatique la préserve.
   if (!toWrite._obtainedAt) {
-    toWrite._obtainedAt = existing?._obtainedAt ?? Date.now();
+    toWrite._obtainedAt =
+      opts?.resetObtainedAt || !existing?._obtainedAt ? Date.now() : existing._obtainedAt;
   }
   // Réutilise l'écriture atomique du projet (tmp + rename, backups 30 min).
   await writeJsonAtomic(`${type}-token.json`, toWrite);
@@ -280,5 +289,7 @@ export async function getGoogleHealth(type: GoogleAccountType): Promise<GoogleAc
     brokenSinceMs,
     obtainedAtMs: tokens?._obtainedAt ?? null,
     nowMs: Date.now(),
+    // Avertissement d'âge actif uniquement en mode Testing Google (limite ~7 j).
+    testingExpiry: process.env.GOOGLE_TESTING_EXPIRY === "true",
   });
 }
