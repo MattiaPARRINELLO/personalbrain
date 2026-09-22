@@ -74,14 +74,25 @@ export async function getHomeOverview(): Promise<HomeOverview> {
     .filter((c) => c.start > nowMs)
     .sort((a, b) => a.start - b.start);
 
+  // Jours suivants uniquement : `laterToday` couvre déjà le reste de la
+  // journée, les deux listes sont donc disjointes.
+  const weekEnd = start + 7 * 24 * 60 * 60 * 1000;
+  const coursesLater = getCoursesInRange(activeCourses, end + 1, weekEnd).sort(
+    (a, b) => a.start - b.start
+  );
+
   const pending = reminders.reminders.filter((r) => r.status === "pending");
   const todayIso = localDayIso(now);
+  const late = pending
+    .filter((r) => new Date(r.dueAt).getTime() < start)
+    .sort((a, b) => +new Date(b.dueAt) - +new Date(a.dueAt));
 
   return {
     name: memory.profile.name?.trim() || null,
     currentCourse: currentCourse ? toHomeCourse(currentCourse) : null,
     nextCourse: nextCourse ? toHomeCourse(nextCourse) : null,
     laterToday: laterToday.map(toHomeCourse),
+    coursesLater: coursesLater.map(toHomeCourse),
     remindersToday: pending
       .filter((r) => {
         const due = new Date(r.dueAt).getTime();
@@ -89,7 +100,8 @@ export async function getHomeOverview(): Promise<HomeOverview> {
       })
       .sort((a, b) => +new Date(a.dueAt) - +new Date(b.dueAt))
       .map((r) => ({ title: r.title, dueAt: r.dueAt, late: new Date(r.dueAt).getTime() < nowMs })),
-    remindersLateCount: pending.filter((r) => new Date(r.dueAt).getTime() < start).length,
+    remindersLate: late.map((r) => ({ title: r.title, dueAt: r.dueAt, late: true })),
+    remindersLateCount: late.length,
     pendingFollowups: intentions.length,
     leetcodeStreak: leetcode.streak ?? 0,
     leetcodeSolvedToday: (leetcode.history ?? []).some(

@@ -28,8 +28,15 @@ export interface HomeOverview {
   nextCourse: HomeCourse | null;
   /** Cours de la journée restants, prochain inclus. */
   laterToday: HomeCourse[];
+  /**
+   * Cours des jours suivants (demain → +7 j), disjoint de `laterToday`.
+   * Alimente la ligne de temps du panneau de droite.
+   */
+  coursesLater: HomeCourse[];
   /** Rappels en attente échéance aujourd'hui (triés par heure). */
   remindersToday: HomeReminder[];
+  /** Rappels en retard (échéance avant aujourd'hui), du plus récent au plus ancien. */
+  remindersLate: HomeReminder[];
   /** Nombre de rappels en retard (échéance avant aujourd'hui). */
   remindersLateCount: number;
   /** Relances (intentions) en attente. */

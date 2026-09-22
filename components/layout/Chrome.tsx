@@ -101,7 +101,7 @@ export function LeftNav() {
   };
 
   return (
-    <aside className="hidden lg:flex flex-col w-[68px] shrink-0 h-full border-r border-[var(--border-1)] bg-[var(--surface-1)]/40" style={{ viewTransitionName: "sidebar" }}>
+    <aside aria-label="Navigation" className="hidden lg:flex flex-col w-[68px] shrink-0 h-full border-r border-[var(--border-1)] bg-[var(--surface-1)]/40" style={{ viewTransitionName: "sidebar" }}>
       <div className="flex items-center justify-center h-16 border-b border-[var(--border-1)]">
         <Image
           src="/backstage-logo-simple.png"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCachedFetch } from "@/lib/cache";
+import { useNow } from "@/lib/clock";
 import { getHomeOverview } from "@/app/actions/home";
 import { DEFAULT_SHORTCUTS } from "@/components/chat/chat-data";
 import { CALENDAR_CACHE_KEY, fetchUpcomingCalendarEvents } from "@/components/widgets/CalendarWidget";
@@ -26,39 +27,6 @@ import { formatTime } from "@/lib/date";
 import type { HomeOverview } from "@/lib/types";
 
 type Icon = typeof Sparkles;
-
-// Horloge partagée, rafraîchie toutes les 30 s. Snapshot serveur = 0 : le
-// rendu serveur et le premier rendu client sont donc identiques.
-const CLOCK_TICK_MS = 30_000;
-let clockNow = 0;
-let clockTimer: ReturnType<typeof setInterval> | null = null;
-const clockListeners = new Set<() => void>();
-
-function subscribeClock(listener: () => void): () => void {
-  clockListeners.add(listener);
-  if (clockNow === 0) clockNow = Date.now();
-  if (clockTimer === null) {
-    clockTimer = setInterval(() => {
-      clockNow = Date.now();
-      for (const cb of clockListeners) cb();
-    }, CLOCK_TICK_MS);
-  }
-  return () => {
-    clockListeners.delete(listener);
-    if (clockListeners.size === 0 && clockTimer !== null) {
-      clearInterval(clockTimer);
-      clockTimer = null;
-    }
-  };
-}
-
-function getClockSnapshot(): number {
-  return clockNow;
-}
-
-function getClockServerSnapshot(): number {
-  return 0;
-}
 
 interface Focus {
   title: string;
@@ -246,7 +214,7 @@ export function HomeHero({
   // Horloge client via useSyncExternalStore : le snapshot serveur vaut 0, donc
   // le HTML rendu par le serveur est identique au premier rendu client (aucune
   // erreur d'hydratation) et la salutation apparaît dès la première frame.
-  const now = useSyncExternalStore(subscribeClock, getClockSnapshot, getClockServerSnapshot);
+  const now = useNow();
 
   const { data: overview } = useCachedFetch<HomeOverview>("home:overview", getHomeOverview, {
     ttl: 60_000,
@@ -356,15 +324,24 @@ export function HomeHero({
   return (
     <section aria-label="Accueil du chat" className="flex flex-col items-center text-center">
       <div className="home-rise relative flex items-center justify-center">
-        <div className="absolute w-52 h-52 rounded-full bg-[var(--accent)]/10 blur-[64px]" aria-hidden />
-        <div className="relative w-14 h-14 rounded-2xl border border-[var(--border-2)] bg-[var(--surface-1)] flex items-center justify-center overflow-hidden">
-          <Image
-            src="/backstage-logo-simple.png"
-            alt="BACKSTAGE"
-            width={36}
-            height={36}
-            className="w-9 h-9 object-contain"
+        <div
+          className="home-halo absolute w-52 h-52 rounded-full bg-[var(--accent)]/10 blur-[64px]"
+          aria-hidden
+        />
+        <div className="home-float relative flex items-center justify-center">
+          <div
+            className="home-ring home-conic-ring absolute w-[76px] h-[76px] rounded-full"
+            aria-hidden
           />
+          <div className="relative w-14 h-14 rounded-2xl border border-[var(--border-2)] bg-[var(--surface-1)] flex items-center justify-center overflow-hidden">
+            <Image
+              src="/backstage-logo-simple.png"
+              alt="BACKSTAGE"
+              width={36}
+              height={36}
+              className="w-9 h-9 object-contain"
+            />
+          </div>
         </div>
       </div>
 
@@ -399,6 +376,11 @@ export function HomeHero({
         style={{ animationDelay: "160ms" }}
       >
         {briefing}
+        {now > 0 && (
+          <span className="home-caret" aria-hidden>
+            ▍
+          </span>
+        )}
       </p>
 
       {focus && (
@@ -406,7 +388,12 @@ export function HomeHero({
           className="home-rise home-sheen mt-8 w-full max-w-lg text-left"
           style={{ animationDelay: "220ms" }}
         >
-          <div className="relative flex items-start gap-3.5 rounded-2xl border border-[var(--border-2)] bg-[var(--surface-1)]/70 backdrop-blur px-4 py-3.5 overflow-hidden">
+          <div
+            className={cn(
+              "relative flex items-start gap-3.5 rounded-2xl border border-[var(--border-2)] bg-[var(--surface-1)]/70 backdrop-blur px-4 py-3.5 overflow-hidden",
+              focus.live && "home-glow"
+            )}
+          >
             <span
               className={cn("absolute left-0 top-0 bottom-0 w-[2px]", TONE_BAR[focus.origin])}
               aria-hidden

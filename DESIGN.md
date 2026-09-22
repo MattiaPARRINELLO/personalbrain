@@ -51,13 +51,13 @@ No box-shadows. Depth via 1px borders and subtle background shifts only.
 - Collapsible with a simple bar icon
 
 ## Layout
-- Desktop: narrow left icon rail (48px), main content area, right AI panel (320px collapsible)
+- Desktop: narrow left icon rail (68px), main content area, right AI panel (340px collapsible)
 - Mobile: icon rail hidden, top tab bar, content stacks, chat as full panel
 
 ## Motion
 - Transitions: `transition-colors duration-200` for color/border, `transition-all duration-300` for width/height
 - Loading: single small spinner or 3-dot pulse, never more than 2s loops
-- No parallax, no infinite floating, no background shimmer
+- No parallax, no infinite floating, no background shimmer — **sauf sur la console IA**, voir ci-dessous
 
 ## Chat style
 - Terminal transcript: `assistant` / `toi` labels
@@ -65,22 +65,53 @@ No box-shadows. Depth via 1px borders and subtle background shifts only.
 - User messages: right warm accent dot
 - Input: single-line auto-growing textarea, submit on Enter, Shift+Enter newline
 
-### Écran d'accueil du chat (exception assumée)
-L'accueil du chat (`components/chat/HomeHero.tsx`) est le seul écran autorisé à
-déroger aux règles « pas de dégradé en fond » et « pas de shimmer » :
+### Console IA — exception assumée
+La console IA est la seule zone autorisée à déroger aux règles « pas de dégradé
+en fond », « pas de box-shadow » et « pas d'animation infinie ». Elle couvre
+trois surfaces : l'accueil du chat (`components/chat/HomeHero.tsx`), le panneau
+de flux (`components/layout/ContextPanel.tsx` + `FluxTimeline.tsx`) et
+l'historique (`components/chat/SessionSidebar.tsx`). Le reste de l'app garde les
+contraintes d'origine.
 
-- **Ambiance** : dégradés radiaux très basse opacité (`--accent` 22 %,
-  `--accent-cool` / `--accent-warm` 13 %) + trame de 56 px masquée en cercle.
-  Le dégradé s'éteint **avant** les bords du conteneur — jamais de liseré
-  rectangulaire — et ne se met pas à l'échelle (seule l'opacité respire, 28 s).
-- **Sheen** : bandeau lumineux lent (9 s) sur la seule carte « prochain
-  rendez-vous ». Jamais plus d'un shimmer à l'écran.
-- **Entrée** : montée échelonnée 620 ms, délais inline de 60 à 330 ms.
-- **Composition** : contenu centré verticalement, largeur max `max-w-lg`.
-  eyebrow date + heure → salutation → briefing d'une ligne → carte du prochain
-  rendez-vous → puces de contexte → 4 raccourcis.
+**Ambiance** (`components/chat/HomeAmbience.tsx`, accueil uniquement)
+- Dégradés radiaux très basse opacité (`--accent` 22 %, `--accent-cool` /
+  `--accent-warm` 13 %). Le dégradé s'éteint **avant** les bords du conteneur —
+  jamais de liseré rectangulaire — et ne se met pas à l'échelle (seule l'opacité
+  respire, 28 s).
+- Trame de 56 px masquée en cercle, qui dérive d'une cellule en 60 s
+  (`background-position`, pour que le masque reste fixe).
+- 12 particules montantes (18–29 s, dérive latérale ±20 px, opacité ≤ 0,5).
+  **Valeurs figées**, jamais tirées au hasard : le rendu serveur et le premier
+  rendu client doivent coïncider (pas d'erreur d'hydratation).
 
-Le reste de l'app garde les contraintes d'origine.
+**Inactivité (idle)**
+- Anneau conique de 1,5 px tournant en 24 s autour du badge de l'accueil.
+  Masqué au centre (`.home-conic-ring`) pour ne jamais recouvrir l'ambiance.
+- Flottement du badge sur 8 s (±5 px) et halo qui respire sur 9 s.
+- Lueur qui respire (5,5 s) **réservée aux éléments vivants** : rendez-vous en
+  cours, rappel en retard. Jamais plus d'une poignée à l'écran.
+- Curseur de veille clignotant (1,15 s) en fin de ligne de briefing : l'IA
+  attend une instruction.
+- Balayage lumineux (13 s) sur les en-têtes de la console, un seul à l'écran.
+  Le sheen de la carte principale de l'accueil reste à 9 s.
+- Changement de vue du panneau : remontage par clé React + `flux-enter` (340 ms),
+  donc l'animation rejoue à chaque bascule.
+
+**Composition**
+- Accueil : contenu centré verticalement, `max-w-lg`. eyebrow date + heure →
+  salutation → briefing → carte du prochain rendez-vous → puces de contexte →
+  4 raccourcis. Entrée échelonnée 620 ms (délais inline 60 → 330 ms).
+- Panneau : en-tête sur deux lignes (titre + heure live + repli, puis sélecteur
+  segmenté de 5 vues). Vue « Flux » = une ligne de temps unique qui fusionne
+  cours, événements agenda et rappels, groupée par jour avec une puce
+  « maintenant » ; puis inbox / code / photos en dessous. Un bloc « En retard »
+  rouge plafonné à 4 entrées précède la ligne de temps.
+- Historique : en-tête compact (badge 32 px + titre + sous-titre), action
+  principale teintée à la place du bouton en pointillés, groupes par jour avec
+  compteur, session active marquée d'une barre d'accent, bandeau de 3 compteurs
+  en pied de panneau.
+- Le repli et le mobile restent inchangés ; `prefers-reduced-motion` neutralise
+  déjà toutes ces animations globalement (`app/globals.css`).
 
 ## Kanban style
 - Columns separated by consistent 1px vertical borders

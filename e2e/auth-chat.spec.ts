@@ -50,4 +50,37 @@ test.describe("Chat", () => {
       home.getByRole("region", { name: "Raccourcis" }).locator("button")
     ).toHaveCount(4);
   });
+
+  test("le panneau de droite expose ses vues et bascule sans erreur", async ({ page }) => {
+    await page.goto("/chat");
+    const panel = page.getByRole("complementary", { name: "Panneau de contexte" });
+    await expect(panel).toBeVisible({ timeout: 10_000 });
+
+    const tabs = panel.getByRole("tablist", { name: "Vues du panneau" });
+    await expect(tabs).toBeVisible();
+    await expect(tabs.getByRole("tab")).toHaveCount(5);
+    // La vue par défaut est le flux chronologique.
+    await expect(tabs.getByRole("tab", { name: "Flux" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+
+    // Bascule vers l'agenda : la carte dédiée remplace la ligne de temps.
+    await tabs.getByRole("tab", { name: "Agenda" }).click();
+    await expect(tabs.getByRole("tab", { name: "Agenda" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    await expect(panel.getByRole("heading", { name: "Agenda" })).toBeVisible();
+  });
+
+  test("l'historique expose son bandeau de compteurs", async ({ page }) => {
+    await page.goto("/chat");
+    const history = page.getByRole("complementary", { name: "Historique des conversations" });
+    await expect(history).toBeVisible({ timeout: 10_000 });
+    await expect(history.getByRole("link", { name: "Rappels ouverts" })).toBeVisible();
+    await expect(history.getByRole("link", { name: "Mails non lus" })).toBeVisible();
+    await expect(history.getByRole("link", { name: "Série LeetCode" })).toBeVisible();
+    await expect(history.getByRole("button", { name: "Nouvelle conversation" })).toBeVisible();
+  });
 });

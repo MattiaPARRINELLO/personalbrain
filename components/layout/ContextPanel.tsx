@@ -1,15 +1,34 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings2, X, Sparkles, Loader2, Mail, CalendarRange, Brain, Bookmark, Bell, Globe, SendHorizontal, CalendarPlus, Inbox, ListChecks, Lightbulb } from "lucide-react";
+import {
+  Settings2,
+  X,
+  Sparkles,
+  Loader2,
+  Mail,
+  CalendarRange,
+  Brain,
+  Bookmark,
+  Bell,
+  Globe,
+  SendHorizontal,
+  CalendarPlus,
+  Inbox,
+  ListChecks,
+  Lightbulb,
+} from "lucide-react";
 import { CalendarWidget } from "@/components/widgets/CalendarWidget";
 import { GmailWidget } from "@/components/widgets/GmailWidget";
 import { LeetCodeWidget } from "@/components/widgets/LeetCodeWidget";
 import { AccreditationsWidget } from "@/components/widgets/AccreditationsWidget";
+import { FluxTimeline } from "@/components/layout/FluxTimeline";
 import { useChatContext, type ContextTool } from "@/lib/chat-context";
+import { useNow } from "@/lib/clock";
+import { formatTime } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
-type View = "all" | "calendar" | "gmail" | "leetcode" | "photos";
+type View = "flux" | "calendar" | "gmail" | "leetcode" | "photos";
 
 const TOOL_CONTEXT_MAP: Record<string, "calendar" | "gmail" | "memory" | "reminder" | "watch" | "search"> = {
   create_calendar_event: "calendar",
@@ -34,6 +53,14 @@ const CONTEXT_LABELS: Record<string, { title: string; icon: typeof Sparkles }> =
   search: { title: "Recherche", icon: Globe },
 };
 
+const VIEWS: { id: View; label: string }[] = [
+  { id: "flux", label: "Flux" },
+  { id: "calendar", label: "Agenda" },
+  { id: "gmail", label: "Inbox" },
+  { id: "leetcode", label: "Code" },
+  { id: "photos", label: "Photos" },
+];
+
 function pickContextKey(tools: Record<string, ContextTool>): string | null {
   const running = Object.values(tools);
   if (running.length > 0) {
@@ -44,15 +71,17 @@ function pickContextKey(tools: Record<string, ContextTool>): string | null {
 }
 
 export function ContextPanel() {
-  const [view, setView] = useState<View>("all");
+  const [view, setView] = useState<View>("flux");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const chatCtx = useChatContext();
+  const now = useNow();
 
   const contextKey = pickContextKey(chatCtx.activeTools);
   const lastTool = chatCtx.lastFinishedTool;
   const lastToolKey = lastTool ? TOOL_CONTEXT_MAP[lastTool.name] ?? null : null;
   const activeContext = contextKey ?? lastToolKey;
+  const busy = Object.values(chatCtx.activeTools).length > 0;
 
   return (
     <>
@@ -68,6 +97,7 @@ export function ContextPanel() {
       )}
 
       <aside
+        aria-label="Panneau de contexte"
         className={cn(
           "flex flex-col shrink-0 h-full border-l border-[var(--border-1)] bg-[var(--surface-1)]/40 backdrop-blur transition-[width,transform] duration-300 ease-out",
           "xl:relative xl:translate-x-0",
@@ -78,30 +108,48 @@ export function ContextPanel() {
           mobileOpen && "max-h-[82vh]"
         )}
       >
-        <div className="flex items-center justify-between h-14 px-4 border-b border-[var(--border-1)] shrink-0">
+        <header className="shrink-0 border-b border-[var(--border-1)]">
+          <div className="panel-sheen flex items-center gap-2 h-11 px-3">
+            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-3)]">
+              {activeContext ? CONTEXT_LABELS[activeContext]?.title ?? "Contexte" : "Panneau"}
+            </span>
+            {now > 0 && (
+              <span className="text-[10px] font-mono tabular-nums text-[var(--text-4)]">
+                {formatTime(new Date(now).toISOString())}
+              </span>
+            )}
+            <button
+              onClick={() => {
+                if (mobileOpen) {
+                  setMobileOpen(false);
+                } else {
+                  setCollapsed((c) => !c);
+                }
+              }}
+              className="ml-auto w-8 h-8 -mr-1 rounded-lg flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
+              title={mobileOpen ? "Fermer" : collapsed ? "Étendre" : "Réduire"}
+              aria-label={mobileOpen ? "Fermer le panneau" : collapsed ? "Étendre le panneau" : "Réduire le panneau"}
+            >
+              {mobileOpen ? (
+                <X className="w-3.5 h-3.5" />
+              ) : collapsed ? (
+                <Settings2 className="w-3.5 h-3.5" />
+              ) : (
+                <X className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
+
           {!collapsed && (
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="px-2.5 pb-2.5">
               {activeContext ? (
-                <ContextBadge contextKey={activeContext} />
+                <ContextBadge contextKey={activeContext} running={busy} />
               ) : (
                 <ViewSwitcher view={view} onChange={setView} />
               )}
             </div>
           )}
-          <button
-            onClick={() => {
-              if (mobileOpen) {
-                setMobileOpen(false);
-              } else {
-                setCollapsed((c) => !c);
-              }
-            }}
-            className="ml-auto w-10 h-10 -mr-1.5 rounded-lg flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
-            title={mobileOpen ? "Fermer" : collapsed ? "Étendre" : "Réduire"}
-          >
-            {mobileOpen ? <X className="w-4 h-4" /> : collapsed ? <Settings2 className="w-4 h-4" /> : <X className="w-4 h-4" />}
-          </button>
-        </div>
+        </header>
 
         {!collapsed && (
           <div className="flex-1 overflow-y-auto overscroll-contain p-3 space-y-3 context-panel-body">
@@ -112,14 +160,22 @@ export function ContextPanel() {
                 lastTool={lastTool}
                 onDismissLast={() => chatCtx.dismissLastFinishedTool()}
               />
+            ) : view === "flux" ? (
+              <div key="flux" className="flux-enter space-y-3">
+                <FluxTimeline />
+                <div className="pt-1 space-y-3">
+                  <GmailWidget />
+                  <LeetCodeWidget />
+                  <AccreditationsWidget />
+                </div>
+              </div>
             ) : (
-              <>
-                {(view === "all" || view === "calendar") && <CalendarWidget />}
-                {(view === "all" || view === "gmail") && <GmailWidget />}
-                {(view === "all" || view === "leetcode") && <LeetCodeWidget />}
-                {(view === "all" || view === "photos") && <AccreditationsWidget />}
-                {view === "all" && <UrgentRemindersWidget />}
-              </>
+              <div key={view} className="flux-enter space-y-3">
+                {view === "calendar" && <CalendarWidget />}
+                {view === "gmail" && <GmailWidget />}
+                {view === "leetcode" && <LeetCodeWidget />}
+                {view === "photos" && <AccreditationsWidget />}
+              </div>
             )}
           </div>
         )}
@@ -128,13 +184,13 @@ export function ContextPanel() {
   );
 }
 
-function ContextBadge({ contextKey }: { contextKey: string }) {
+function ContextBadge({ contextKey, running }: { contextKey: string; running: boolean }) {
   const meta = CONTEXT_LABELS[contextKey];
   if (!meta) return null;
   const Icon = meta.icon;
   return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/30">
-      <Icon className="w-3 h-3 text-[var(--accent-soft)]" />
+    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/30">
+      <Icon className={cn("w-3 h-3 text-[var(--accent-soft)]", running && "animate-pulse")} />
       <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--accent-soft)]">
         {meta.title}
       </span>
@@ -143,29 +199,28 @@ function ContextBadge({ contextKey }: { contextKey: string }) {
 }
 
 function ViewSwitcher({ view, onChange }: { view: View; onChange: (v: View) => void }) {
-  const tabs: { id: View; label: string }[] = [
-    { id: "all", label: "Tout" },
-    { id: "calendar", label: "Agenda" },
-    { id: "gmail", label: "Inbox" },
-    { id: "leetcode", label: "Code" },
-    { id: "photos", label: "Photos" },
-  ];
   return (
-    <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-1)]">
-      {tabs.map((t) => {
+    <div
+      role="tablist"
+      aria-label="Vues du panneau"
+      className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-1)]"
+    >
+      {VIEWS.map((t) => {
         const active = view === t.id;
         return (
           <button
             key={t.id}
+            role="tab"
+            aria-selected={active}
             onClick={() => onChange(t.id)}
             className={cn(
-              "px-2.5 py-1 rounded-md text-[10px] font-medium font-mono uppercase tracking-wider transition-all duration-200",
+              "flex-1 min-w-0 px-1.5 py-1.5 rounded-md text-[10px] font-medium font-mono uppercase tracking-wider transition-all duration-200",
               active
-                ? "bg-[var(--surface-3)] text-[var(--text-1)] shadow-sm"
-                : "text-[var(--text-3)] hover:text-[var(--text-1)]"
+                ? "bg-[var(--surface-3)] text-[var(--text-1)] border border-[var(--border-2)]"
+                : "text-[var(--text-3)] border border-transparent hover:text-[var(--text-1)]"
             )}
           >
-            {t.label}
+            <span className="block truncate">{t.label}</span>
           </button>
         );
       })}
@@ -186,9 +241,7 @@ function ContextualView({
 }) {
   return (
     <div className="context-view-enter space-y-3">
-      {runningTools.length > 0 && (
-        <RunningToolsCard tools={runningTools} />
-      )}
+      {runningTools.length > 0 && <RunningToolsCard tools={runningTools} />}
       {contextKey === "calendar" && (
         <div className={cn(runningTools.length > 0 && "context-pulse")}>
           <CalendarWidget />
@@ -201,17 +254,18 @@ function ContextualView({
       {contextKey === "search" && <SearchContextCard lastTool={lastTool} />}
 
       {lastTool && runningTools.length === 0 && (
-        <div className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)] px-1">
-          Dernier résultat
+        <div className="flex items-center gap-3 pt-1">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-4)]">
+            Dernier résultat
+          </span>
+          <span className="flex-1 h-px bg-[var(--border-1)]" />
+          <button
+            onClick={onDismissLast}
+            className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-3)] hover:text-[var(--text-1)] transition-colors duration-200"
+          >
+            Réinitialiser
+          </button>
         </div>
-      )}
-      {lastTool && runningTools.length === 0 && (
-        <button
-          onClick={onDismissLast}
-          className="text-[10px] text-[var(--text-3)] hover:text-[var(--text-1)] underline-offset-2 hover:underline self-start"
-        >
-          Réinitialiser
-        </button>
       )}
     </div>
   );
@@ -249,7 +303,7 @@ function ToolDuration({ startedAt }: { startedAt: number }) {
     return () => clearInterval(id);
   }, [startedAt]);
   return (
-    <span className="ml-auto text-[10px] text-[var(--text-4)] font-mono">
+    <span className="ml-auto text-[10px] text-[var(--text-4)] font-mono tabular-nums">
       {(elapsed / 1000).toFixed(1)}s
     </span>
   );
@@ -269,100 +323,88 @@ const TOOL_LABELS: Record<string, { label: string; icon: typeof Sparkles }> = {
   fetch_page_meta: { label: "Aperçu lien", icon: Inbox },
 };
 
-function MemoryContextCard({ lastTool }: { lastTool: ContextTool | null }) {
+function ToolResultCard({
+  icon,
+  iconClass,
+  title,
+  empty,
+  result,
+  clamp,
+}: {
+  icon: typeof Sparkles;
+  iconClass: string;
+  title: string;
+  empty: string;
+  result?: string;
+  clamp?: boolean;
+}) {
+  const Icon = icon;
   return (
     <div className="rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)] p-3 space-y-2">
       <div className="flex items-center gap-1.5">
-        <Brain className="w-3.5 h-3.5 text-[var(--accent-soft)]" />
+        <Icon className={cn("w-3.5 h-3.5", iconClass)} />
         <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-3)]">
-          Faits utilisés
+          {title}
         </span>
       </div>
-      {lastTool?.result ? (
-        <p className="text-[12px] text-[var(--text-1)] leading-relaxed whitespace-pre-wrap">
-          {lastTool.result}
-        </p>
-      ) : (
-        <p className="text-[12px] text-[var(--text-3)]">
-          L'IA puise dans ta mémoire longue pour contextualiser ses réponses.
-        </p>
-      )}
+      <p
+        className={cn(
+          "text-[12px] leading-relaxed whitespace-pre-wrap",
+          result ? "text-[var(--text-1)]" : "text-[var(--text-3)]",
+          result && clamp && "line-clamp-8"
+        )}
+      >
+        {result || empty}
+      </p>
     </div>
+  );
+}
+
+function MemoryContextCard({ lastTool }: { lastTool: ContextTool | null }) {
+  return (
+    <ToolResultCard
+      icon={Brain}
+      iconClass="text-[var(--accent-soft)]"
+      title="Faits utilisés"
+      empty="L'IA puise dans ta mémoire longue pour contextualiser ses réponses."
+      result={lastTool?.result}
+    />
   );
 }
 
 function ReminderContextCard({ lastTool }: { lastTool: ContextTool | null }) {
   return (
-    <div className="rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)] p-3 space-y-2">
-      <div className="flex items-center gap-1.5">
-        <Bell className="w-3.5 h-3.5 text-[var(--warm)]" />
-        <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-3)]">
-          Rappel créé
-        </span>
-      </div>
-      {lastTool?.result ? (
-        <p className="text-[12px] text-[var(--text-1)] leading-relaxed whitespace-pre-wrap">
-          {lastTool.result}
-        </p>
-      ) : (
-        <p className="text-[12px] text-[var(--text-3)]">L'IA ajoute un rappel à ton agenda.</p>
-      )}
-    </div>
+    <ToolResultCard
+      icon={Bell}
+      iconClass="text-[var(--warm)]"
+      title="Rappel créé"
+      empty="L'IA ajoute un rappel à ton agenda."
+      result={lastTool?.result}
+    />
   );
 }
 
 function WatchContextCard({ lastTool }: { lastTool: ContextTool | null }) {
   return (
-    <div className="rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)] p-3 space-y-2">
-      <div className="flex items-center gap-1.5">
-        <Bookmark className="w-3.5 h-3.5 text-[var(--accent-warm)]" />
-        <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-3)]">
-          Ajouté à la liste
-        </span>
-      </div>
-      {lastTool?.result ? (
-        <p className="text-[12px] text-[var(--text-1)] leading-relaxed whitespace-pre-wrap">
-          {lastTool.result}
-        </p>
-      ) : (
-        <p className="text-[12px] text-[var(--text-3)]">L'IA classe un lien pour plus tard.</p>
-      )}
-    </div>
+    <ToolResultCard
+      icon={Bookmark}
+      iconClass="text-[var(--accent-warm)]"
+      title="Ajouté à la liste"
+      empty="L'IA classe un lien pour plus tard."
+      result={lastTool?.result}
+    />
   );
 }
 
 function SearchContextCard({ lastTool }: { lastTool: ContextTool | null }) {
   return (
-    <div className="rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)] p-3 space-y-2">
-      <div className="flex items-center gap-1.5">
-        <Lightbulb className="w-3.5 h-3.5 text-[var(--accent-cool)]" />
-        <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-3)]">
-          Résultats de recherche
-        </span>
-      </div>
-      {lastTool?.result ? (
-        <p className="text-[12px] text-[var(--text-1)] leading-relaxed whitespace-pre-wrap line-clamp-8">
-          {lastTool.result}
-        </p>
-      ) : (
-        <p className="text-[12px] text-[var(--text-3)]">L'IA parcourt le web pour toi.</p>
-      )}
-    </div>
-  );
-}
-
-function UrgentRemindersWidget() {
-  return (
-    <div className="rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)] p-3 space-y-2">
-      <div className="flex items-center gap-1.5">
-        <Bell className="w-3.5 h-3.5 text-[var(--warm)]" />
-        <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-3)]">
-          Rappels urgents
-        </span>
-      </div>
-      <p className="text-[12px] text-[var(--text-3)]">
-        Consulte la page Rappels pour la liste complète.
-      </p>
-    </div>
+    <ToolResultCard
+      icon={Lightbulb}
+      iconClass="text-[var(--accent-cool)]"
+      title="Résultats de recherche"
+      empty="L'IA parcourt le web pour toi."
+      result={lastTool?.result}
+      clamp
+    />
   );
 }

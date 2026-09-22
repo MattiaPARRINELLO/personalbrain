@@ -92,7 +92,7 @@ app/
   <page>/           page.tsx + composants LOCAUX à cette page
 components/
   ui/               primitives partagées (Button, Card, Toast, Skeleton…)
-  layout/           AppShell, Chrome, ContextPanel
+  layout/           AppShell, Chrome, ContextPanel, FluxTimeline
   chat/             composants du chat
   widgets/          cartes dashboard
   landing/          composants de la page publique
@@ -115,7 +115,21 @@ scripts/            cron-scheduler, reset-passkey, cesar-smoke, scripts de QA/sc
   avec les widgets du panneau de droite (`CALENDAR_CACHE_KEY`, `GMAIL_CACHE_KEY`
   exportés par `components/widgets/`). ➡️ Ne jamais dupliquer ces fetchers : réutiliser
   les mêmes clés, sinon l'accueil déclenche des requêtes réseau en double.
-  Exception visuelle assumée (dégradés radiaux, sheen) : cf. `DESIGN.md`.
+  Exception visuelle assumée (dégradés radiaux, sheen, animations d'inactivité) :
+  cf. `DESIGN.md > Console IA`.
+- Panneau de droite (`components/layout/ContextPanel.tsx`) — 5 vues : « Flux »
+  (défaut) = `FluxTimeline.tsx`, qui **fusionne cours + événements agenda +
+  rappels** en une ligne de temps groupée par jour ; puis Agenda / Inbox / Code /
+  Photos, qui réutilisent les widgets de `components/widgets/`. Un bloc « En
+  retard » plafonné à 4 entrées précède la ligne de temps. Quand un outil IA
+  tourne, le panneau bascule sur une vue contextuelle (ne pas casser ce chemin).
+- `components/chat/SessionSidebar.tsx` — historique des conversations. Bandeau de
+  3 compteurs en pied, alimenté par `home:overview` + `GMAIL_CACHE_KEY`
+  (mêmes clés partagées, aucune requête supplémentaire).
+- ⏱️ `lib/clock.ts` expose `useNow()` : horloge partagée (tick 30 s) dont le
+  **snapshot serveur vaut 0**. C'est ce qui rend les salutations et l'heure live
+  hydratation-safe. Ne pas réintroduire de `useState`/`useEffect` pour ça :
+  la règle ESLint `react-hooks/set-state-in-effect` du projet le refuse.
 - `/today` — page d'agrégat « Aujourd'hui » (rappels du jour, agenda, relances), 2e destination du rail.
 - `/gallery` — redirige vers `/photos` (la galerie de livraison est la vue « Livraison » de Photos, `app/photos/GalleryKanban.tsx`).
 - `/photos` — kanban shootings + toggle de vue « Shootings / Livraison ».

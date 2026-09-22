@@ -64,7 +64,9 @@ describe("getHomeOverview", () => {
       currentCourse: null,
       nextCourse: null,
       laterToday: [],
+      coursesLater: [],
       remindersToday: [],
+      remindersLate: [],
       remindersLateCount: 0,
       pendingFollowups: 0,
       leetcodeStreak: 0,
@@ -90,6 +92,19 @@ describe("getHomeOverview", () => {
     expect(overview.currentCourse?.subject).toBe("En cours");
     expect(overview.nextCourse?.subject).toBe("Suivant");
     expect(overview.laterToday.map((c) => c.subject)).toEqual(["Suivant", "Plus tard"]);
+    expect(overview.coursesLater.map((c) => c.subject)).toEqual(["Demain"]);
+  });
+
+  it("borne les cours des jours suivants à 7 jours", async () => {
+    mockStorage.getCourses.mockResolvedValue([
+      course({ subject: "Demain", start: at("2026-03-11T09:00:00"), end: at("2026-03-11T10:00:00") }),
+      course({ subject: "Dans 6 j", start: at("2026-03-16T09:00:00"), end: at("2026-03-16T10:00:00") }),
+      course({ subject: "Dans 8 j", start: at("2026-03-18T09:00:00"), end: at("2026-03-18T10:00:00") }),
+    ]);
+
+    const overview = await getHomeOverview();
+
+    expect(overview.coursesLater.map((c) => c.subject)).toEqual(["Demain", "Dans 6 j"]);
   });
 
   it("retient le premier cours du jour quand rien n'est en cours", async () => {
@@ -137,7 +152,22 @@ describe("getHomeOverview", () => {
     expect(overview.remindersToday.map((r) => r.title)).toEqual(["Tôt", "Tard"]);
     expect(overview.remindersToday[0].late).toBe(true);
     expect(overview.remindersToday[1].late).toBe(false);
+    expect(overview.remindersLate.map((r) => r.title)).toEqual(["Hier"]);
     expect(overview.remindersLateCount).toBe(1);
+  });
+
+  it("trie les rappels en retard du plus récent au plus ancien", async () => {
+    mockStorage.getReminders.mockResolvedValue({
+      reminders: [
+        { id: "r1", title: "Il y a 5 j", dueAt: "2026-03-05T10:00:00", status: "pending" },
+        { id: "r2", title: "Hier", dueAt: "2026-03-09T10:00:00", status: "pending" },
+        { id: "r3", title: "Il y a 3 j", dueAt: "2026-03-07T10:00:00", status: "pending" },
+      ],
+    });
+
+    const overview = await getHomeOverview();
+
+    expect(overview.remindersLate.map((r) => r.title)).toEqual(["Hier", "Il y a 3 j", "Il y a 5 j"]);
   });
 
   it("remonte les relances en attente et la série LeetCode du jour", async () => {
