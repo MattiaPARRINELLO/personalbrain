@@ -102,13 +102,14 @@ contraintes d'origine.
 **Composition**
 - Accueil : contenu **ancré en haut** (pas de padding haut sur le conteneur),
   `max-w-lg`. Le badge est le logo **détaillé** (`/backstage-logo.png`, tour de
-  cou + carte de scène), 176 px en mobile / 240 px au-delà de `sm` : sa marge
-  négative rogne le haut du tour de cou pour que l'attache sorte de l'écran et
-  que le badge paraisse pendu au bord supérieur. Le logo **simple**
-  (`/backstage-logo-simple.png`) reste l'icône partout ailleurs (favicon, rail,
-  avatars, en-têtes). Puis : eyebrow date + heure → salutation → briefing → carte
-  du prochain rendez-vous → puces de contexte → 4 raccourcis. Entrée échelonnée
-  620 ms (délais inline 60 → 330 ms).
+  cou + carte de scène), 176 px en mobile / 240 px au-delà de `sm`. Le tour de
+  cou va jusqu'au bord supérieur de la fenêtre et c'est ce bord qui fait ligne de
+  coupe : **rien n'est rogné sur desktop**. En mobile seulement, une marge
+  négative rogne son haut (hauteur utile trop rare pour la garder entière). Le
+  logo **simple** (`/backstage-logo-simple.png`) reste l'icône partout ailleurs
+  (favicon, rail, avatars, en-têtes). Puis : eyebrow date + heure → salutation →
+  briefing → carte du prochain rendez-vous → puces de contexte → 4 raccourcis.
+  Entrée échelonnée 620 ms (délais inline 60 → 330 ms).
 - Panneau : en-tête sur deux lignes (titre + heure live + repli, puis sélecteur
   segmenté de 5 vues). Vue « Flux » = une ligne de temps unique qui fusionne
   cours, événements agenda et rappels, groupée par jour avec une puce

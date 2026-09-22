@@ -323,11 +323,13 @@ export function HomeHero({
 
   return (
     <section aria-label="Accueil du chat" className="flex flex-col items-center text-center">
-      {/* Badge détaillé suspendu : la marge négative rogne le haut du tour de cou,
-          donc l'attache sort de l'écran et le badge paraît pendu au bord
-          supérieur de la zone de défilement. Le pivot du balancement est le bord
-          haut de la boîte, c'est-à-dire exactement la ligne de coupe. */}
-      <div className="home-rise relative flex justify-center -mt-9 sm:-mt-11">
+      {/* Badge détaillé suspendu au bord supérieur de la zone de défilement : le
+          logo est posé sans padding haut, donc le tour de cou sort de l'écran —
+          le bord de la fenêtre tient lieu de ligne de coupe et rien n'est rogné.
+          En mobile seulement, une marge négative rogne son haut pour ne pas
+          manger la hauteur utile. Le pivot du balancement est le bord haut de la
+          boîte, c'est-à-dire exactement cette ligne de coupe. */}
+      <div className="home-rise relative flex justify-center -mt-9 sm:mt-0">
         <div
           className="home-halo absolute top-16 w-44 h-44 rounded-full bg-[var(--accent)]/10 blur-[64px]"
           aria-hidden

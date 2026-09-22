@@ -617,7 +617,7 @@ export function ChatView({ sessionId: externalSessionId, resetSignal = 0, onSess
             // supérieur de la zone de défilement, donc le padding haut est
             // annulé et la coupe du tour de cou est posée par HomeHero.
             isWelcome
-              ? "min-h-full flex flex-col pb-10"
+              ? "min-h-full flex flex-col pb-6"
               : "py-8 sm:py-12"
           )}
         >
