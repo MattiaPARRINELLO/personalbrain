@@ -1,7 +1,7 @@
 export interface DailyBrief {
   date: string;
   summary: string;
-  events: { title: string; type: "concert" | "reminder" }[];
+  events: { title: string; type: "concert" | "reminder" | "course"; time?: string; location?: string }[];
   reminders: { title: string; dueAt: string }[];
   emails: { from: string; subject: string }[];
   generatedAt: string;

@@ -1,4 +1,4 @@
-import { getReminders, getConcerts, getLeetcode, getCalendar, writeJsonAtomic, readJsonSafe, prepareConcert } from "./storage";
+import { getReminders, getConcerts, getLeetcode, getCalendar, getCourses, getCoursesForDay, writeJsonAtomic, readJsonSafe, prepareConcert, formatCourse } from "./storage";
 import { fetchGoogleCalendarEvents, fetchGmailMessages } from "./google-actions";
 import { chatCompletion } from "./ai-providers";
 import { getConfig } from "./config";
@@ -25,6 +25,8 @@ export async function generateDailyBrief(): Promise<string | null> {
       getLeetcode(),
       getCalendar().catch(() => []),
     ]);
+    const courses = await getCourses();
+    const todayCourses = getCoursesForDay(courses, today);
 
     // Rappels du jour encore pending
     const todayReminders = remindersData.reminders.filter(
@@ -87,6 +89,9 @@ export async function generateDailyBrief(): Promise<string | null> {
     if (todayAgenda.length > 0) {
       prompt += "\nAgenda :\n" + todayAgenda.map((e) => `- ${e.title}`).join("\n") + "\n";
     }
+    if (todayCourses.length > 0) {
+      prompt += "\nCours du jour (emploi du temps CESAR) :\n" + todayCourses.map(formatCourse).join("\n") + "\n";
+    }
     if (todayConcerts.length > 0) {
       prompt += "\nConcerts aujourd'hui :\n" + todayConcerts.map((c) => `- ${c.artist} @ ${c.venue}`).join("\n") + "\n";
     }
@@ -106,7 +111,7 @@ export async function generateDailyBrief(): Promise<string | null> {
       prompt += `\nMétéo du jour à Paris : ${weather}\n`;
     }
 
-    if (todayConcerts.length === 0 && todayReminders.length === 0 && urgentEmails.length === 0) {
+    if (todayConcerts.length === 0 && todayReminders.length === 0 && urgentEmails.length === 0 && todayCourses.length === 0) {
       prompt += "\nRien de particulier de prévu aujourd'hui.\n";
     }
 
@@ -116,7 +121,7 @@ export async function generateDailyBrief(): Promise<string | null> {
       [
         {
           role: "system",
-          content: "Tu es Backstage, l'assistant de Mattia. Résume sa journée en 3-4 phrases naturelles en français, sans listes. Sois utile et concis.",
+          content: "Tu es Backstage, l'assistant de Mattia. Résume sa journée en 3-4 phrases naturelles en français, sans listes. Sois utile et concis. Si des cours sont prévus, donne l'heure et la salle du prochain cours.",
         },
         { role: "user", content: prompt },
       ],
@@ -136,6 +141,12 @@ export async function generateDailyBrief(): Promise<string | null> {
         ...todayReminders.map((r) => ({
           title: r.title,
           type: "reminder" as const,
+        })),
+        ...todayCourses.map((c) => ({
+          title: c.subject,
+          type: "course" as const,
+          time: new Date(c.start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+          location: c.room || undefined,
         })),
       ],
       reminders: todayReminders.map((r) => ({ title: r.title, dueAt: r.dueAt })),

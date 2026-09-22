@@ -5,6 +5,7 @@ export * from "./storage/concerts";
 export * from "./storage/gallery";
 export * from "./storage/leetcode";
 export * from "./storage/memory";
+export * from "./storage/schedule";
 export * from "./storage/emails";
 export * from "./storage/calendar";
 export * from "./storage/reminders";

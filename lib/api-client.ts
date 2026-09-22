@@ -3,11 +3,12 @@ import type {
   GoogleCalendarEvent as CalendarEvent,
   MicrosoftTodoList,
   MicrosoftTodoTask,
+  ScheduleCourse,
 } from "./types";
 import type { GoogleAccountHealth } from "./google-health";
 import type { StreamEvent } from "./ai-providers/types";
 
-export type { GmailMessage, CalendarEvent, MicrosoftTodoList, MicrosoftTodoTask };
+export type { GmailMessage, CalendarEvent, MicrosoftTodoList, MicrosoftTodoTask, ScheduleCourse };
 
 export type GoogleLinkStatus = {
   gmail: boolean;
@@ -52,6 +53,14 @@ export const api = {
   googleHealth: () => jsonFetch<GoogleHealth>("/api/auth/google/health"),
 
   microsoftStatus: () => jsonFetch<MicrosoftTodoStatus>("/api/auth/microsoft/status"),
+
+  schedule: {
+    get: () => jsonFetch<{ syncedAt?: string; ok?: boolean; error?: string; courses?: ScheduleCourse[] }>("/api/schedule"),
+    sync: () =>
+      jsonFetch<{ syncedAt?: string; ok?: boolean; courses?: ScheduleCourse[]; error?: string }>("/api/schedule", {
+        method: "POST",
+      }),
+  },
 
   todo: {
     lists: () => jsonFetch<{ lists?: MicrosoftTodoList[]; error?: string }>("/api/todo"),

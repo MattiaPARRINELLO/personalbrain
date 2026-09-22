@@ -23,6 +23,8 @@ export type ActivityAction =
   | "leetcode_solved"
   | "chat_message_sent"
   | "daily_brief_sent"
+  | "schedule_synced"
+  | "course_notified"
   | "login"
   | "logout"
   | "ai_action";

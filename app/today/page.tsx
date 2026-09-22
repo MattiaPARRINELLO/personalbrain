@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Bell, CalendarRange, RefreshCw, ChevronRight, ExternalLink } from "lucide-react";
+import { Bell, CalendarClock, CalendarRange, RefreshCw, ChevronRight, ExternalLink } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader, EmptyState } from "@/components/layout/Chrome";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { api, type CalendarEvent } from "@/lib/api-client";
+import { api, type CalendarEvent, type ScheduleCourse } from "@/lib/api-client";
 import { useCachedFetch } from "@/lib/cache";
 import { formatTime } from "@/lib/date";
 import type { Intention, Reminder } from "@/lib/types";
@@ -106,6 +106,29 @@ export default function TodayPage() {
     refetch: refetchEvents,
   } = useCachedFetch<CalendarEvent[]>("today:events", fetchEvents, { ttl: 2 * 60 * 1000 });
 
+  const {
+    data: courses,
+    loading: coursesLoading,
+    error: coursesError,
+  } = useCachedFetch<ScheduleCourse[]>(
+    "schedule:today",
+    useCallback(async () => {
+      const res = await api.schedule.get();
+      if (res.error) throw new Error(res.error);
+      return res.courses ?? [];
+    }, []),
+    { ttl: 10 * 60 * 1000 }
+  );
+
+  const now = new Date();
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const dayCourses = (courses ?? [])
+    .filter((c) => {
+      const d = new Date(c.start);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` === todayKey;
+    })
+    .sort((a, b) => a.start - b.start);
+
   const loadLocal = useCallback(() => {
     import("@/app/actions/reminders")
       .then(({ loadReminders }) => loadReminders())
@@ -138,7 +161,9 @@ export default function TodayPage() {
     todayReminders.length === 0 &&
     todayIntentions.length === 0 &&
     !eventsLoading &&
-    (dayEvents.length === 0 || !!eventsError);
+    (dayEvents.length === 0 || !!eventsError) &&
+    !coursesLoading &&
+    (dayCourses.length === 0 || !!coursesError);
 
   return (
     <AppShell>
@@ -244,6 +269,37 @@ export default function TodayPage() {
                         title={e.summary}
                         meta={e.location ?? undefined}
                         href="/calendar"
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Cours */}
+              <section>
+                <SectionTitle icon={<CalendarClock className="w-3.5 h-3.5" />} href="/schedule">
+                  Cours
+                </SectionTitle>
+                {coursesError && (
+                  <p className="text-[11px] text-[var(--danger)] mb-2">{coursesError.message}</p>
+                )}
+                {coursesLoading && dayCourses.length === 0 ? (
+                  <div className="space-y-1.5">
+                    {Array.from({ length: 2 }).map((_, i) => (
+                      <Skeleton key={i} className="h-9 w-full" />
+                    ))}
+                  </div>
+                ) : dayCourses.length === 0 ? (
+                  <p className="text-[12px] text-[var(--text-3)] px-3 py-1.5">Aucun cours aujourd'hui.</p>
+                ) : (
+                  <div className="border border-[var(--border-1)] rounded-xl overflow-hidden">
+                    {dayCourses.map((c) => (
+                      <Row
+                        key={`${c.uuid}-${c.start}`}
+                        time={formatTime(new Date(c.start).toISOString())}
+                        title={c.subject}
+                        meta={c.room || undefined}
+                        href="/schedule"
                       />
                     ))}
                   </div>

@@ -127,6 +127,7 @@ app/
   ├─ api/              # Route handlers (SSE chat, auth, google, cron, push…)
   ├─ brain/            # Mémoire (faits, CRUD)
   ├─ reminders/        # Rappels + notifications natives
+  ├─ schedule/         # Emploi du temps CESAR (sync auto, notif -30 min)
   ├─ watch-later/      # Liens, articles, vidéos
   ├─ calendar/         # Google Calendar
   ├─ gmail/            # Gmail

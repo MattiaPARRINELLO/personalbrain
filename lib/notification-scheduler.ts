@@ -1,4 +1,4 @@
-import { getReminders } from "./storage";
+import { getReminders, getCourses, getCoursesStartingSoon, courseNotifKey } from "./storage";
 import { getSubscriptions, type StoredPushSubscription } from "./push-subscriptions";
 import { getConfig } from "./config";
 import { configureVapid, getVapidDetails, sendPushNotification } from "./send-push";
@@ -12,6 +12,7 @@ let dailyBriefInterval: ReturnType<typeof setInterval> | null = null;
 const REMINDER_INTERVAL_MS = 60_000;
 const DAILY_BRIEF_HOUR = 7;
 const NOTIFIED_FILE = "notified-reminders.json";
+const NOTIFIED_COURSES_FILE = "notified-courses.json";
 
 // Focus mode actif : les notifications sont mises en silence. Les rappels et
 // relances restent en attente et seront envoyés après la fin de la session.
@@ -45,6 +46,72 @@ async function markReminderNotified(id: string): Promise<void> {
     });
   } catch (err) {
     void serverLog("scheduler", "error", "Erreur persistance notification", err);
+  }
+}
+
+const COURSE_LEAD_MIN = 30;
+
+/** Notifications "Cours dans 30 min" : matière + salle, déduites de l'EDT CESAR. */
+export async function checkScheduleNotifs(): Promise<void> {
+  try {
+    if (await isFocusActive()) return;
+    const courses = await getCourses();
+    if (!courses.length) return;
+
+    const now = Date.now();
+    const dueCourses = getCoursesStartingSoon(courses, COURSE_LEAD_MIN, now);
+
+    if (!dueCourses.length) return;
+    const { readJsonSafe, writeJsonAtomic } = await import("./storage");
+    const notified = new Set(
+      (await readJsonSafe<{ keys: string[] }>(NOTIFIED_COURSES_FILE, { keys: [] })).keys
+    );
+
+    let dirty = false;
+    for (const c of dueCourses) {
+      const key = courseNotifKey(c, COURSE_LEAD_MIN);
+      if (notified.has(key)) continue;
+
+      const at = new Date(c.start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+      const payload = JSON.stringify({
+        title: `Cours dans ${COURSE_LEAD_MIN} min : ${c.subject}`,
+        body: [at, c.room, c.teacher].filter(Boolean).join(" — ") || "Séance",
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: `course-${key}`,
+        data: { type: "course", url: "/schedule" },
+        requireInteraction: false,
+        vibrate: [200, 100, 200],
+      });
+      const { sent } = await sendPushToAll(payload, `course-${key}`);
+      if (sent) {
+        notified.add(key);
+        dirty = true;
+        const { logActivity } = await import("./storage");
+        await logActivity("course_notified", `Cours à venir : ${c.subject}`, `${at} — ${c.room}`);
+      }
+    }
+    if (dirty) {
+      // purge les clés de séances passées (> 1 h après la fin)
+      const allKeys = new Set(
+        courses.filter((c) => c.end > now - 3 * 3_600_000).map((c) => courseNotifKey(c, COURSE_LEAD_MIN))
+      );
+      await writeJsonAtomic("notified-courses.json", { keys: [...notified].filter((k) => allKeys.has(k)) });
+    }
+  } catch (err) {
+    void serverLog("scheduler", "error", "checkScheduleNotifs failed", err);
+  }
+}
+
+/** Sync EDT CESAR si périmé (> 6 h, 0 séance, ou dernier sync en échec). Non bloquant. */
+export async function syncScheduleIfStale(): Promise<void> {
+  try {
+    const { isScheduleStale, syncSchedule } = await import("./storage");
+    if (await isScheduleStale()) {
+      await syncSchedule();
+    }
+  } catch (err) {
+    void serverLog("scheduler", "error", "syncScheduleIfStale failed", err);
   }
 }
 
@@ -262,9 +329,13 @@ export function startScheduler() {
 
   checkReminders();
   checkIntentions();
+  checkScheduleNotifs();
+  syncScheduleIfStale();
   reminderInterval = setInterval(() => {
     checkReminders();
     checkIntentions();
+    checkScheduleNotifs();
+    syncScheduleIfStale();
   }, REMINDER_INTERVAL_MS);
 
   startDailyBrief();

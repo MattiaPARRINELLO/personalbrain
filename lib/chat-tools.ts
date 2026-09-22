@@ -309,6 +309,19 @@ export const tools: UnifiedTool[] = [  {
       required: [],
     },
   },
+  {
+    name: "get_schedule",
+    description:
+      "Emploi du temps de l'utilisateur (cours du format CESAR). scope='today' ou 'week' → jour de la semaine courante ; scope='next' avec subject optionnel → le prochain cours correspondant (ex: 'dans combien de temps est mon prochain cours de base de donnees'). Retourne matiere, horaires, salle et prof.",
+    parameters: {
+      type: "object",
+      properties: {
+        scope: { type: "string", enum: ["today", "week", "next"], description: "Periode demandee" },
+        subject: { type: "string", description: "Filtre matiere (optionnel, ex: 'base de donnees')" },
+      },
+      required: ["scope"],
+    },
+  },
 ];
 
 export async function executeTool(
@@ -607,6 +620,35 @@ export async function executeTool(
       return data.shoots.map((s) =>
         `- ${s.title} (${s.client}) le ${new Date(s.date).toLocaleDateString("fr-FR")} [${s.status}]${s.galleryLink ? ` - ${s.galleryLink}` : ""}${s.photosSent ? ` - ${s.photosSent} photos` : ""}`
       ).join("\n");
+    }
+    case "get_schedule": {
+      const { getCourses, formatCourse, getCoursesForDay, getNextCourse, getUpcomingCourses } = await import("@/lib/storage/schedule");
+      const courses = await getCourses();
+      if (!courses.length) return "Emploi du temps inconnu (aucun sync CESAR effectue).";
+      const scope = String(args.scope ?? "next");
+      const subject = args.subject ? String(args.subject) : undefined;
+      if (scope === "next") {
+        const next = getNextCourse(courses, subject);
+        if (!next) return subject ? `Aucun cours a venir pour "${subject}".` : "Aucun cours a venir.";
+        return `Prochain cours${subject ? ` (${subject})` : ""} :\n${formatCourse(next)}`;
+      }
+      if (scope === "today") {
+        const t = new Date();
+        const todayIso = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+        const day = getCoursesForDay(courses, todayIso);
+        if (!day.length) return "Pas de cours aujourd'hui.";
+        return `Cours du jour :\n${day.map(formatCourse).join("\n")}`;
+      }
+      // week : cours restants de la semaine en cours
+      const now = new Date();
+      const nowMs = Date.now();
+      const upcoming = getUpcomingCourses(courses, nowMs).filter((c) => {
+        const d = new Date(c.start);
+        const diffDays = Math.floor((new Date(c.start).setHours(0,0,0,0) - new Date(now).setHours(0,0,0,0)) / 86_400_000);
+        return diffDays < 7 && d.getTime() >= nowMs - 86_400_000;
+      });
+      if (!upcoming.length) return "Pas de cours a venir cette semaine.";
+      return `Cours a venir (7 jours) :\n${upcoming.slice(0, 40).map(formatCourse).join("\n")}`;
     }
     default:
       return `Outil inconnu : ${name}`;

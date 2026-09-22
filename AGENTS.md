@@ -87,7 +87,7 @@ pas l'app Next.
 
 ```
 app/
-  actions/          17 Server Actions ("use server") + __tests__/
+  actions/          18 Server Actions ("use server") + __tests__/
   api/              Route Handlers
   <page>/           page.tsx + composants LOCAUX à cette page
 components/
@@ -98,12 +98,13 @@ components/
   landing/          composants de la page publique
   brain/            KnowledgeGraph
 lib/
-  storage/          CRUD par domaine (13 fichiers)
+  cesar-client.ts   client CESAR (emploi du temps) — fetch HTTP pur, SANS navigateur
+  storage/          CRUD par domaine (14 fichiers)
   types/            définitions par domaine (15 fichiers)
   ai-providers/     openai, anthropic, config, types
   __tests__/        tests unitaires
 e2e/                specs Playwright (helpers, global-setup, projets no-auth/chromium)
-scripts/            cron-scheduler, reset-passkey, scripts de QA/screenshots
+scripts/            cron-scheduler, reset-passkey, cesar-smoke, scripts de QA/screenshots
 ```
 
 ### Pages particulières
@@ -111,6 +112,8 @@ scripts/            cron-scheduler, reset-passkey, scripts de QA/screenshots
 - `/today` — page d'agrégat « Aujourd'hui » (rappels du jour, agenda, relances), 2e destination du rail.
 - `/gallery` — redirige vers `/photos` (la galerie de livraison est la vue « Livraison » de Photos, `app/photos/GalleryKanban.tsx`).
 - `/photos` — kanban shootings + toggle de vue « Shootings / Livraison ».
+- `/schedule` — emploi du temps CESAR (vue semaine + bouton Sync). Nourrit aussi
+  la section « Cours » de `/today`, le daily brief et les notifications −30 min.
 
 ### Où placer un composant
 
@@ -161,6 +164,28 @@ défaut. Testé par `proxy.test.ts` et les E2E (deny-by-default).
 - `/api/auth/set-session` — **supprimé** (reliquat Capacitor, 0 appelant).
 - `/api/reminders/[id]/done` — reproduit `markReminderStatus` (push MS +
   revalidation) ; appelé par le service worker.
+- `/api/schedule` — `GET` = emploi du temps en cache, `POST` = sync CESAR forcée.
+  Doublon assumé de `syncScheduleNow` (`app/actions/schedule.ts`).
+
+### Emploi du temps CESAR (`lib/cesar-client.ts`)
+
+⚠️ **Aucun navigateur en prod** (cPanel `npm install --production`, pas de
+Chromium) : le client est du **fetch HTTP pur** — `GET /connexion` (CSRF) →
+`POST` login → skip de l'écran CVEC → `GET /schedule` → décodage de l'attribut
+`data-tui-calendar-event-lesson-schedules-value` (JSON de toutes les séances).
+Ne jamais réintroduire Playwright ici : ça casse la prod standalone.
+
+- Sortie normalisée : `ScheduleCourse` (matière, prof, salle+bâtiment, start/end
+  en ms, annulés filtrés) dans `data/schedule.json`.
+- Sync automatique : `syncScheduleIfStale()` (notification-scheduler) si l'EDT a
+  plus de 6 h, est vide, ou si le dernier sync a échoué. Garde anti-concurrence
+  dans `lib/storage/schedule.ts`.
+- Notifications : `checkScheduleNotifs()` envoie un push **30 min avant** chaque
+  cours (matière + salle + heure), anti-doublon dans `data/notified-courses.json`.
+- Chat : outil **lecture seule** `get_schedule` (`scope: today|week|next`,
+  `subject` optionnel) — jamais dans `REQUIRE_CONFIRMATION`.
+- Daily brief : bloc « Cours du jour » + instruction de citer la salle du
+  prochain cours.
 
 ### Trois implémentations de session — ne pas confondre
 
@@ -275,8 +300,8 @@ Ré-exporte `export *` des 13 domaines + `./web`, mais de `storage-core` seuleme
 
 `accreditations` · `activity` · `chat-history` · `concerts` · `config` ·
 `consent` · `emails` · `gallery` · `intentions` · `leetcode` · `memory` ·
-`notified-reminders` · `photo-shoots` · `push-subscriptions` · `reminders` ·
-`server-cache` · `users` · `watch-later`
+`notified-courses` · `notified-reminders` · `photo-shoots` · `push-subscriptions` ·
+`reminders` · `schedule` · `server-cache` · `users` · `watch-later`
 
 Tokens OAuth : `calendar-token` · `gmail-token` · `microsoft-todo-token` ·
 `firebase-service-account`
@@ -303,6 +328,7 @@ Nouveau domaine → nouveau fichier dans `lib/types/` + ajout au barrel.
 | Microsoft To Do          | `lib/microsoft-client.ts`, `lib/reminder-sync.ts`                | `data/microsoft-todo-token.json`                 |
 | LeetCode                 | `lib/leetcode-api.ts`                                            | —                                                |
 | Web search               | `lib/web.ts` — Brave + fallback DuckDuckGo, garde SSRF           | —                                                |
+| Emploi du temps CESAR    | `lib/cesar-client.ts` (fetch pur, aucun navigateur)              | `CESAR_USERNAME` / `CESAR_PASSWORD`              |
 | Météo                    | OpenWeatherMap (`lib/daily-brief.ts`, `lib/storage/concerts.ts`) | —                                                |
 | Push                     | `lib/send-push.ts`, `lib/push-subscriptions.ts`                  | VAPID                                            |
 
@@ -387,13 +413,14 @@ avec AUTH_SECRET aléatoire et VAPID vides).
 | `WEBAUTHN_ORIGIN`                                | passkey                                |
 | `GOOGLE_CLIENT_ID` / `_SECRET` / `_REDIRECT_URI` | OAuth Google                           |
 | `CRON_SECRET`                                    | obligatoire en prod pour `/api/cron/*` |
+| `CESAR_USERNAME` / `CESAR_PASSWORD`              | emploi du temps CESAR                  |
 
 ### Optionnelles
 
 `MICROSOFT_CLIENT_ID` / `_SECRET` / `_REDIRECT_URI` · `SETUP_TOKEN`
 (enregistrement passkey initial) · `OPENWEATHERMAP_API_KEY` ·
 `BRAVE_SEARCH_API_KEY` · `VAPID_SUBJECT` / `VAPID_PRIVATE_KEY` /
-`NEXT_PUBLIC_VAPID_PUBLIC_KEY` · `CRON_BASE_URL` · `ANALYZE`
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY` · `CRON_BASE_URL` · `ANALYZE` · `CESAR_BASE` (défaut `https://cesar.emineo-education.fr`)
 
 Modèle complet : `.deploy.env.example`.
 
@@ -423,7 +450,7 @@ l'URL complète (`/v1/chat/completions`), le SDK **Anthropic** ajoute lui-même
   **ASCII uniquement**.
 - **Logging** : `console.error` / `console.warn` avec préfixe module
   (`[watch-later]`, `[storage]`). Pas de lib dédiée.
-- **Directives** : `"use server"` en tête des 17 fichiers `app/actions/*`,
+- **Directives** : `"use server"` en tête des 18 fichiers `app/actions/*`,
   `"use client"` sur les composants interactifs. Systématique.
 - **Langue** : messages utilisateur et commits en français, code et
   identifiants en anglais.

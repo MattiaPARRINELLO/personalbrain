@@ -3,6 +3,7 @@
 export * from "./types/concerts";
 export * from "./types/leetcode";
 export * from "./types/memory";
+export * from "./types/schedule";
 export * from "./types/calendar";
 export * from "./types/email";
 export * from "./types/microsoft";
