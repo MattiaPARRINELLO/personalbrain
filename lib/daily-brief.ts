@@ -43,10 +43,10 @@ export async function generateDailyBrief(): Promise<string | null> {
     const todayAgenda = [
       ...calendarEvents
         .filter((e) => toISODate(e.date) === today)
-        .map((e) => ({ title: e.title, date: e.date })),
+        .map((e) => ({ title: e.title, time: toHHMM(e.date) })),
       ...googleEvents
         .filter((e) => toISODate(e.start) === today)
-        .map((e) => ({ title: e.summary, date: e.start })),
+        .map((e) => ({ title: e.summary, time: toHHMM(e.start) })),
     ];
 
     // Emails non lus + urgents
@@ -84,10 +84,13 @@ export async function generateDailyBrief(): Promise<string | null> {
     }
 
     // Construction du prompt
-    let prompt = "Résume la journée en 3-4 phrases en français :\n";
+    let prompt = "Voici les données de la journée :\n";
 
     if (todayAgenda.length > 0) {
-      prompt += "\nAgenda :\n" + todayAgenda.map((e) => `- ${e.title}`).join("\n") + "\n";
+      prompt +=
+        "\nAgenda :\n" +
+        todayAgenda.map((e) => `- ${e.title}${e.time ? ` (${e.time})` : ""}`).join("\n") +
+        "\n";
     }
     if (todayCourses.length > 0) {
       prompt += "\nCours du jour (emploi du temps CESAR) :\n" + todayCourses.map(formatCourse).join("\n") + "\n";
@@ -101,8 +104,12 @@ export async function generateDailyBrief(): Promise<string | null> {
     if (urgentEmails.length > 0) {
       prompt += "\nEmails urgents :\n" + urgentEmails.map((e) => `- ${e.from} : ${e.subject}`).join("\n") + "\n";
     }
-    if (unreadEmails.length > 0 && urgentEmails.length === 0) {
-      prompt += `\n${unreadEmails.length} email(s) non lu(s).\n`;
+    const otherUnread = unreadEmails.filter((e) => !urgentEmails.includes(e)).slice(0, 8);
+    if (otherUnread.length > 0) {
+      prompt +=
+        `\nEmails non lus (${unreadEmails.length} au total) :\n` +
+        otherUnread.map((e) => `- ${e.from} : ${e.subject}`).join("\n") +
+        "\n";
     }
     if (leetcodeDaily) {
       prompt += `\nDernier exercice LeetCode : ${leetcodeDaily.title} (${leetcodeDaily.difficulty})\n`;
@@ -122,7 +129,7 @@ export async function generateDailyBrief(): Promise<string | null> {
         {
           role: "system",
           content:
-            "Tu es Backstage, l'assistant personnel de Mattia. Résume sa journée en 3-4 phrases naturelles en français, sans listes, en t'adressant directement à lui à la deuxième personne du singulier (« tu »). N'utilise jamais son prénom ni la troisième personne. Sois utile et concis. Si des cours sont prévus, donne l'heure et la salle du prochain cours.",
+            "Tu es Backstage, l'assistant personnel de Mattia. Rédige le résumé de sa journée en un seul paragraphe fluide en français, sans listes ni titres, en t'adressant directement à lui à la deuxième personne du singulier (« tu »). N'utilise jamais son prénom ni la troisième personne. Objectif : le maximum d'informations utiles dans 6 à 10 phrases — cite systématiquement les heures, les salles et les lieux, nomme les concerts, les rappels (avec leur heure), la météo et les emails qui méritent son attention. N'omets aucun élément fourni, mais reste factuel : n'invente rien et ne mentionne pas les rubriques qui n'ont aucune donnée. Si des cours sont prévus, commence par l'heure et la salle du prochain cours. Si la journée est vide, dis-le en une phrase sans t'étendre.",
         },
         { role: "user", content: prompt },
       ],
@@ -135,6 +142,17 @@ export async function generateDailyBrief(): Promise<string | null> {
       date: today,
       summary,
       events: [
+        ...todayCourses.map((c) => ({
+          title: c.subject,
+          type: "course" as const,
+          time: new Date(c.start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+          location: c.room || undefined,
+        })),
+        ...todayAgenda.map((e) => ({
+          title: `${e.title}${e.time ? ` — ${e.time}` : ""}`,
+          type: "event" as const,
+          time: e.time || undefined,
+        })),
         ...todayConcerts.map((c) => ({
           title: `Concert : ${c.artist} @ ${c.venue}`,
           type: "concert" as const,
@@ -142,12 +160,6 @@ export async function generateDailyBrief(): Promise<string | null> {
         ...todayReminders.map((r) => ({
           title: r.title,
           type: "reminder" as const,
-        })),
-        ...todayCourses.map((c) => ({
-          title: c.subject,
-          type: "course" as const,
-          time: new Date(c.start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
-          location: c.room || undefined,
         })),
       ],
       reminders: todayReminders.map((r) => ({ title: r.title, dueAt: r.dueAt })),

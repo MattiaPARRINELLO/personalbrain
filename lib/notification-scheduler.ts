@@ -277,7 +277,7 @@ export async function triggerDailyBrief(
 
     const payload = JSON.stringify({
       title: "Brief du jour",
-      body: todayBrief.summary.slice(0, 120) + (todayBrief.summary.length > 120 ? "…" : ""),
+      body: todayBrief.summary.slice(0, 180) + (todayBrief.summary.length > 180 ? "…" : ""),
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
       tag: "daily-brief",
