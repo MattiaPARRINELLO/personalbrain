@@ -3,32 +3,60 @@
 import { requireSession } from "@/lib/session";
 
 import { getLeetcode, saveLeetcode, addLeetcodeExercise, logActivity, getCalendar } from "@/lib/storage";
-import { fetchLeetCodeProfile } from "@/lib/leetcode-api";
+import { fetchLeetCodeProfile, type LeetCodeSyncData } from "@/lib/leetcode-api";
 import type { LeetcodeData, LeetcodeExercise } from "@/lib/types";
 import { findFreeSlots } from "@/lib/leetcode-utils";
+
+/**
+ * Durée de validité d'un sync. Remplace l'ancien déclencheur `streak === 0`,
+ * qui figeait définitivement des chiffres périmés dès le premier succès.
+ */
+const SYNC_TTL_MS = 30 * 60 * 1000;
+
+function withSync(data: LeetcodeData, synced: LeetCodeSyncData): LeetcodeData {
+  return {
+    ...data,
+    streak: synced.streak,
+    totalSolved: synced.totalSolved,
+    easySolved: synced.easySolved,
+    mediumSolved: synced.mediumSolved,
+    hardSolved: synced.hardSolved,
+    ranking: synced.ranking,
+    totalSubmissions: synced.totalSubmissions,
+    submissions: synced.submissions,
+    contest: synced.contest,
+    syncedAt: new Date().toISOString(),
+    syncError: undefined,
+  };
+}
+
+function isStale(data: LeetcodeData): boolean {
+  if (!data.syncedAt) return true;
+  const at = new Date(data.syncedAt).getTime();
+  return !Number.isFinite(at) || Date.now() - at > SYNC_TTL_MS;
+}
 
 export async function loadLeetcode(): Promise<LeetcodeData> {
   await requireSession();
   const data = await getLeetcode();
-  // Si un username est configuré mais que les données sont vides, tenter un sync auto
-  if (data.leetcodeUsername && data.streak === 0) {
-    try {
-      const synced = await fetchLeetCodeProfile(data.leetcodeUsername);
-      await saveLeetcode({
-        ...data,
-        streak: synced.streak,
-        totalSolved: synced.totalSolved,
-        easySolved: synced.easySolved,
-        mediumSolved: synced.mediumSolved,
-        hardSolved: synced.hardSolved,
-        ranking: synced.ranking,
-      });
-      return { ...data, ...synced, leetcodeUsername: data.leetcodeUsername };
-    } catch {
-      return data;
-    }
+
+  // Sans pseudo, rien à synchroniser : on renvoie l'état local tel quel.
+  if (!data.leetcodeUsername || !isStale(data)) {
+    return { ...data, syncError: undefined };
   }
-  return data;
+
+  try {
+    const synced = await fetchLeetCodeProfile(data.leetcodeUsername);
+    const updated = withSync(data, synced);
+    await saveLeetcode(updated);
+    return { ...updated, syncError: undefined };
+  } catch (error) {
+    // Un échec de sync ne doit pas casser l'affichage, mais il doit se voir :
+    // l'ancien `catch {}` vide masquait la panne depuis des mois.
+    const message = error instanceof Error ? error.message : "Synchronisation LeetCode impossible";
+    console.warn(`[leetcode] sync echouee : ${message}`);
+    return { ...data, syncError: message };
+  }
 }
 
 export async function saveLeetcodeData(data: LeetcodeData): Promise<void> {
@@ -49,15 +77,7 @@ export async function syncLeetcode(): Promise<LeetcodeData> {
   if (!username) throw new Error("Aucun username LeetCode configuré");
 
   const synced = await fetchLeetCodeProfile(username);
-  const updated: LeetcodeData = {
-    ...data,
-    streak: synced.streak,
-    totalSolved: synced.totalSolved,
-    easySolved: synced.easySolved,
-    mediumSolved: synced.mediumSolved,
-    hardSolved: synced.hardSolved,
-    ranking: synced.ranking,
-  };
+  const updated = withSync(data, synced);
   await saveLeetcode(updated);
   return updated;
 }
@@ -97,10 +117,11 @@ export async function setLeetcodeUsername(username: string): Promise<LeetcodeDat
   const cleaned = username.trim();
   if (!cleaned) throw new Error("Username requis");
 
+  // Le pseudo est vérifié auprès de l'API **avant** d'être enregistré : un
+  // pseudo inexistant ne doit pas laisser la config dans un état inutilisable.
+  const synced = await fetchLeetCodeProfile(cleaned);
   const data = await getLeetcode();
-  data.leetcodeUsername = cleaned;
-  await saveLeetcode(data);
-
-  // Sync immediately
-  return syncLeetcode();
+  const updated = { ...withSync(data, synced), leetcodeUsername: synced.username };
+  await saveLeetcode(updated);
+  return updated;
 }

@@ -1,5 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { findFreeSlots } from "@/lib/leetcode-utils";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  activityLevel,
+  buildActivityGrid,
+  computeStreak,
+  dayKey,
+  findFreeSlots,
+  parseSubmissionCalendar,
+} from "@/lib/leetcode-utils";
 
 function ev(start: string) {
   return { id: "e1", title: "t", date: start, type: "meeting" as const };
@@ -76,5 +83,93 @@ describe("findFreeSlots", () => {
     expect(slots[0].duration).toBe(120); // 10h -> 12h (avant event 12h)
     expect(slots[1].duration).toBe(60);  // 13h -> 14h (event1 12-13h, event2 14-15h)
     expect(slots[2].duration).toBeGreaterThan(0); // 15h -> 23h
+  });
+});
+
+describe("parseSubmissionCalendar", () => {
+  it("convertit les epochs (secondes) en jours UTC", () => {
+    expect(parseSubmissionCalendar('{"1787356800": 5}')).toEqual({ "2026-08-22": 5 });
+  });
+
+  it("renvoie un objet vide si la chaîne est absente ou invalide", () => {
+    expect(parseSubmissionCalendar("")).toEqual({});
+    expect(parseSubmissionCalendar("pas du json")).toEqual({});
+    expect(parseSubmissionCalendar("[]")).toEqual({});
+  });
+
+  it("ignore les jours à zéro et les clés non numériques", () => {
+    expect(parseSubmissionCalendar('{"1787356800": 0, "x": 3, "1787443200": 2}')).toEqual({
+      "2026-08-23": 2,
+    });
+  });
+});
+
+describe("computeStreak", () => {
+  // 2026-09-22 est un mardi : la grille d'activité s'aligne sur le lundi.
+  const NOW = new Date("2026-09-22T10:00:00Z");
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const activeDays = (...offsets: number[]) =>
+    Object.fromEntries(offsets.map((o) => [dayKey(Date.now() - o * 86_400_000), 1]));
+
+  it("compte la journée en cours", () => {
+    expect(computeStreak(activeDays(0, 1, 2))).toBe(3);
+  });
+
+  it("reste vivante tant que la veille est active", () => {
+    expect(computeStreak(activeDays(1, 2))).toBe(2);
+  });
+
+  it("vaut 0 quand hier et aujourd'hui sont creux", () => {
+    expect(computeStreak(activeDays(2, 3))).toBe(0);
+  });
+
+  it("s'arrête au premier jour manquant", () => {
+    expect(computeStreak(activeDays(0, 1, 3, 4))).toBe(2);
+  });
+
+  it("vaut 0 sans aucun jour actif", () => {
+    expect(computeStreak({})).toBe(0);
+  });
+});
+
+describe("buildActivityGrid", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-22T10:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("aligne les semaines sur le lundi et finit sur la semaine en cours", () => {
+    const grid = buildActivityGrid({}, 2);
+    expect(grid).toHaveLength(2);
+    expect(grid[1].map((d) => d.key)).toEqual([
+      "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24",
+      "2026-09-25", "2026-09-26", "2026-09-27",
+    ]);
+    expect(grid[0][0].key).toBe("2026-09-14");
+  });
+
+  it("remplit les jours creux à zéro et lit les jours actifs", () => {
+    const grid = buildActivityGrid({ "2026-09-22": 4 }, 1);
+    expect(grid[0][1]).toEqual({ key: "2026-09-22", count: 4 });
+    expect(grid[0][0]).toEqual({ key: "2026-09-21", count: 0 });
+  });
+});
+
+describe("activityLevel", () => {
+  it("échelonne sur 5 niveaux à seuils fixes", () => {
+    expect([0, 1, 2, 3, 4, 7, 20].map(activityLevel)).toEqual([0, 1, 2, 2, 3, 4, 4]);
   });
 });

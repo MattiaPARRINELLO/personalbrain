@@ -71,6 +71,7 @@ describe("getHomeOverview", () => {
       pendingFollowups: 0,
       leetcodeStreak: 0,
       leetcodeSolvedToday: false,
+      leetcodeConfigured: false,
     });
   });
 
@@ -194,5 +195,10 @@ describe("getHomeOverview", () => {
     });
 
     expect((await getHomeOverview()).leetcodeSolvedToday).toBe(false);
+  });
+
+  it("signale un compte LeetCode configuré même sans série", async () => {
+    mockStorage.getLeetcode.mockResolvedValue({ streak: 0, history: [], leetcodeUsername: "someone" });
+    expect((await getHomeOverview()).leetcodeConfigured).toBe(true);
   });
 });

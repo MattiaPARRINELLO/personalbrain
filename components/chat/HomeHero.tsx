@@ -128,7 +128,7 @@ function buildShortcuts(
   if (overview && overview.pendingFollowups > 0) {
     candidates.push({ label: "Où en sont mes relances en attente ?", icon: Globe });
   }
-  if (overview && overview.leetcodeStreak > 0 && !overview.leetcodeSolvedToday) {
+  if (overview && overview.leetcodeConfigured && !overview.leetcodeSolvedToday) {
     candidates.push({ label: "Aide-moi sur un algo LeetCode", icon: Brain });
   }
 
@@ -192,10 +192,16 @@ function buildChips(overview: HomeOverview | undefined, unreadMail: number): Chi
     });
   }
 
-  if (overview.leetcodeStreak > 0) {
+  // La puce dépend du compte configuré, pas de la série : à série 0 elle doit
+  // rester visible, sinon un compte fraîchement branché disparaît de l'accueil.
+  if (overview.leetcodeConfigured) {
     chips.push({
       icon: Flame,
-      label: `série ${overview.leetcodeStreak} j`,
+      label: overview.leetcodeSolvedToday
+        ? "résolu aujourd'hui"
+        : overview.leetcodeStreak > 0
+          ? `série ${overview.leetcodeStreak} j`
+          : "LeetCode",
       href: "/leetcode",
       tone: overview.leetcodeSolvedToday ? "cool" : "warm",
     });
@@ -304,8 +310,10 @@ export function HomeHero({
     if (overview && overview.remindersToday.length > 0) {
       return "Rien au programme côté agenda, juste tes rappels du jour.";
     }
-    if (overview && overview.leetcodeStreak > 0) {
-      return `Agenda libre — parfait pour tenir ta série de ${overview.leetcodeStreak} jours.`;
+    if (overview && overview.leetcodeConfigured) {
+      return overview.leetcodeStreak > 0
+        ? `Agenda libre — parfait pour tenir ta série de ${overview.leetcodeStreak} jours.`
+        : "Agenda libre — le bon moment pour relancer ta série LeetCode.";
     }
     if (overview) return "Aucun rendez-vous aujourd'hui. Demande-moi ce que tu veux.";
     return "Je m'occupe du reste : Gmail, agenda, rappels, mémoire, recherche.";

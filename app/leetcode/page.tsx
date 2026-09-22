@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader, EmptyState } from "@/components/layout/Chrome";
 import { Button } from "@/components/ui/Button";
@@ -9,14 +10,21 @@ import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { IconBadge } from "@/components/ui/IconBadge";
 import { loadLeetcode, syncLeetcode, getSmartSuggestion } from "@/app/actions/leetcode";
+import { LEETCODE_CACHE_KEY } from "@/components/widgets/LeetCodeWidget";
+import { invalidateCache } from "@/lib/cache";
+import { UNRANKED_RANKING } from "@/lib/leetcode-api";
+import { activityLevel, buildActivityGrid } from "@/lib/leetcode-utils";
 import type { LeetcodeData } from "@/lib/types";
-import { Loader2, Flame, CheckCircle2, TrendingUp, Clock, Zap } from "lucide-react";
+import { Loader2, Flame, CheckCircle2, TrendingUp, Zap, RefreshCw, CalendarRange } from "lucide-react";
 
-const STATS = [
-  { key: "streak", icon: Flame, tone: "warm" as const, label: "Streak (jours)" },
-  { key: "solved", icon: CheckCircle2, tone: "success" as const, label: "Résolus" },
-  { key: "top", icon: TrendingUp, tone: "accent" as const, label: "Top" },
-  { key: "time", icon: Clock, tone: "neutral" as const, label: "Temps total" },
+const WEEKS = 17;
+
+const LEVEL_CLASS = [
+  "bg-[var(--surface-3)]",
+  "bg-[var(--accent)]/25",
+  "bg-[var(--accent)]/45",
+  "bg-[var(--accent)]/70",
+  "bg-[var(--accent)]",
 ];
 
 export default function LeetcodePage() {
@@ -28,13 +36,20 @@ export default function LeetcodePage() {
   const [smartLoading, setSmartLoading] = useState(false);
 
   useEffect(() => {
-    loadLeetcode().then(setData).catch(() => setError("Impossible de charger les données")).finally(() => setLoading(false));
+    loadLeetcode()
+      .then(setData)
+      .catch(() => setError("Impossible de charger les données"))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleSync = async () => {
     setSyncing(true);
+    setError("");
     try {
       const updated = await syncLeetcode();
+      // Le cache partagé du widget doit voir la nouvelle valeur, sinon la carte
+      // du panneau de droite garderait l'ancienne pendant 30 min.
+      invalidateCache(LEETCODE_CACHE_KEY);
       setData(updated);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur de synchronisation");
@@ -55,33 +70,14 @@ export default function LeetcodePage() {
     }
   };
 
-  const totalSolved = data?.totalSolved ?? 0;
-  const ranking = data?.ranking ?? 0;
-  const streak = data?.streak ?? 0;
-  const totalTime = (data?.exercises ?? []).reduce((acc, e) => acc + (e.duration ?? 0), 0);
-  const hours = Math.floor(totalTime / 60);
-  const mins = totalTime % 60;
-  const recentExercises = (data?.exercises ?? []).slice(0, 10);
-  const topPercent = ranking > 0 ? Math.max(0.1, Math.round((ranking / 3000000) * 10000) / 100) : 0;
-
-  const radarSkills = useMemo(() => {
-    const counts: Record<string, { solved: number; total: number }> = {
-      Arrays: { solved: Math.round(totalSolved * 0.25), total: 200 },
-      "Hash Table": { solved: Math.round(totalSolved * 0.15), total: 150 },
-      "Linked List": { solved: Math.round(totalSolved * 0.08), total: 80 },
-      Trees: { solved: Math.round(totalSolved * 0.12), total: 120 },
-      DP: { solved: Math.round(totalSolved * 0.1), total: 150 },
-      Graphs: { solved: Math.round(totalSolved * 0.05), total: 100 },
-      "Two Pointers": { solved: Math.round(totalSolved * 0.08), total: 60 },
-      "Sliding Window": { solved: Math.round(totalSolved * 0.05), total: 40 },
-    };
-    return Object.entries(counts).map(([name, c]) => ({
-      name,
-      solved: c.solved,
-      total: c.total,
-      value: c.total > 0 ? Math.round((c.solved / c.total) * 100) : 0,
-    }));
-  }, [totalSolved]);
+  const grid = useMemo(
+    () => buildActivityGrid(data?.submissions?.calendar ?? {}, WEEKS),
+    [data]
+  );
+  const windowSubmissions = useMemo(
+    () => grid.flat().reduce((sum, day) => sum + day.count, 0),
+    [grid]
+  );
 
   if (loading) {
     return (
@@ -100,29 +96,50 @@ export default function LeetcodePage() {
     return (
       <AppShell>
         <div className="p-6">
-            <EmptyState
-              title="LeetCode"
-              description={error || "Connecte ton compte LeetCode pour commencer."}
-            />
+          <EmptyState
+            title="LeetCode"
+            description={error || "Connecte ton compte LeetCode pour commencer."}
+          />
         </div>
       </AppShell>
     );
   }
 
-  const statValues = [streak, totalSolved, `${topPercent}%`, `${hours}h${mins}`];
+  if (!data.leetcodeUsername) {
+    return (
+      <AppShell>
+        <div className="p-6 space-y-4">
+          <PageHeader
+            eyebrow="Série de code"
+            title="LeetCode"
+            description="Suis ta progression et trouve le bon exercice au bon moment."
+          />
+          <Card className="p-6">
+            <p className="text-sm text-[var(--text-2)] leading-relaxed">
+              Aucun pseudo LeetCode n&apos;est enregistré, donc rien ne peut être
+              synchronisé. Renseigne-le dans les{" "}
+              <Link href="/settings" className="text-[var(--accent)] hover:underline">
+                réglages
+              </Link>{" "}
+              : le pseudo est vérifié auprès de l&apos;API avant d&apos;être enregistré.
+            </p>
+          </Card>
+        </div>
+      </AppShell>
+    );
+  }
 
-  const cx = 80, cy = 80, r = 60;
-  const angleStep = (2 * Math.PI) / radarSkills.length;
-  const points = radarSkills.map((_, i) => {
-    const a = -Math.PI / 2 + i * angleStep;
-    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
-  });
-  const dataPoints = radarSkills.map((skill, i) => {
-    const a = -Math.PI / 2 + i * angleStep;
-    const vr = (skill.value / 100) * r;
-    return { x: cx + vr * Math.cos(a), y: cy + vr * Math.sin(a) };
-  });
-  const dataPolygonPoints = dataPoints.map((p) => `${p.x},${p.y}`).join(" ");
+  const ranking = data.ranking ?? 0;
+  const ranked = ranking > 0 && ranking < UNRANKED_RANKING;
+  const contest = data.contest;
+  const exercises = data.exercises ?? [];
+
+  const stats = [
+    { key: "streak", icon: Flame, tone: "warm" as const, label: "Série (jours)", value: data.streak },
+    { key: "solved", icon: CheckCircle2, tone: "success" as const, label: "Résolus", value: data.totalSolved ?? 0 },
+    { key: "subs", icon: Zap, tone: "accent" as const, label: "Soumissions acceptées", value: data.totalSubmissions ?? 0 },
+    { key: "rank", icon: TrendingUp, tone: "neutral" as const, label: "Rang", value: ranked ? `#${ranking.toLocaleString("fr-FR")}` : "non classé" },
+  ];
 
   return (
     <AppShell>
@@ -130,29 +147,33 @@ export default function LeetcodePage() {
         <PageHeader
           eyebrow="Série de code"
           title="LeetCode"
-          description="Suis ta progression et trouve le bon exercice au bon moment."
+          description={`Compte ${data.leetcodeUsername} — suivi réel de ta progression.`}
           actions={
             <Button onClick={handleSync} disabled={syncing} variant="secondary">
-              {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+              {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               {syncing ? "Synchro..." : "Synchroniser"}
             </Button>
           }
         />
 
-        {error && (
-          <div className="p-3 rounded-lg bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] text-sm">{error}</div>
+        {(error || data.syncError) && (
+          <div className="p-3 rounded-lg bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] text-sm">
+            {error || data.syncError}
+          </div>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {STATS.map((stat, i) => {
+          {stats.map((stat) => {
             const Icon = stat.icon;
             return (
               <Card key={stat.key} className="p-4 flex items-center gap-3">
                 <IconBadge tone={stat.tone} className="w-10 h-10">
                   <Icon className="w-5 h-5" />
                 </IconBadge>
-                <div>
-                  <div className="text-2xl font-bold font-mono text-[var(--text-1)] tabular-nums">{statValues[i]}</div>
+                <div className="min-w-0">
+                  <div className="text-2xl font-bold font-mono text-[var(--text-1)] tabular-nums truncate">
+                    {stat.value}
+                  </div>
                   <div className="text-xs text-[var(--text-3)]">{stat.label}</div>
                 </div>
               </Card>
@@ -160,85 +181,127 @@ export default function LeetcodePage() {
           })}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-5">
-            <h3 className="text-[11px] font-mono uppercase tracking-[0.16em] text-[var(--text-3)] mb-4">
-              Radar Compétences
-            </h3>
-            {radarSkills.length > 0 ? (
-              <div className="flex justify-center">
-                <svg viewBox="0 0 160 160" className="w-64 h-64">
-                  <g transform="translate(0,0)">
-                    {[0.2, 0.4, 0.6, 0.8, 1].map((level, li) => (
-                      <polygon
-                        key={li}
-                        points={points.map((p) => {
-                          const lx = cx + (p.x - cx) * level;
-                          const ly = cy + (p.y - cy) * level;
-                          return `${lx},${ly}`;
-                        }).join(" ")}
-                        fill="none"
-                        stroke="var(--border-2)"
-                        strokeWidth="0.5"
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="p-5 lg:col-span-2">
+            <div className="flex items-baseline justify-between mb-4 gap-3">
+              <h3 className="text-[11px] font-mono uppercase tracking-[0.16em] text-[var(--text-3)]">
+                Activité — {WEEKS} dernières semaines
+              </h3>
+              <span className="text-[11px] font-mono text-[var(--text-3)] tabular-nums shrink-0">
+                {windowSubmissions} soumission{windowSubmissions > 1 ? "s" : ""} déposée
+                {windowSubmissions > 1 ? "s" : ""}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <div className="flex gap-[3px] w-max">
+                {grid.map((week, wi) => (
+                  <div key={wi} className="flex flex-col gap-[3px]">
+                    {week.map((day) => (
+                      <div
+                        key={day.key}
+                        title={`${day.key} — ${day.count} soumission${day.count > 1 ? "s" : ""}`}
+                        className={`w-3 h-3 rounded-[3px] ${LEVEL_CLASS[activityLevel(day.count)]}`}
                       />
                     ))}
-                    {points.map((p, i) => (
-                      <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="var(--border-2)" strokeWidth="0.5" />
-                    ))}
-                    <polygon points={dataPolygonPoints} fill="var(--accent)" fillOpacity="0.15" stroke="var(--accent)" strokeWidth="1.5" />
-                    {dataPoints.map((p, i) => (
-                      <circle key={i} cx={p.x} cy={p.y} r="3" fill="var(--accent)" />
-                    ))}
-                    {radarSkills.map((skill, i) => {
-                      const a = -Math.PI / 2 + i * angleStep;
-                      const lx = cx + (r + 14) * Math.cos(a);
-                      const ly = cy + (r + 14) * Math.sin(a);
-                      return (
-                        <text key={i} x={lx} y={ly} textAnchor="middle" dominantBaseline="middle"
-                          fontSize="6" fill="var(--text-3)" fontFamily="var(--font-sans)">
-                          {skill.name}
-                        </text>
-                      );
-                    })}
-                  </g>
-                </svg>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <p className="text-sm text-[var(--text-3)] text-center py-8">Pas assez de données</p>
-            )}
+            </div>
+
+            <p className="mt-4 text-[11px] text-[var(--text-3)]">
+              {data.submissions?.totalActiveDays ?? 0} jour
+              {(data.submissions?.totalActiveDays ?? 0) > 1 ? "s" : ""} d&apos;activité au total
+              {data.syncedAt && (
+                <> · dernière synchro {new Date(data.syncedAt).toLocaleString("fr-FR")}</>
+              )}
+            </p>
           </Card>
 
           <Card className="p-5">
             <h3 className="text-[11px] font-mono uppercase tracking-[0.16em] text-[var(--text-3)] mb-4">
-              Problème du jour
+              Contest
             </h3>
-            {recentExercises.length > 0 ? (
+            {contest ? (
               <div className="space-y-3">
-                <div className="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border-2)]">
-                  <div className="text-sm font-medium text-[var(--text-1)]">{recentExercises[0].title}</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Pill tone={recentExercises[0].difficulty === "Easy" ? "success" : recentExercises[0].difficulty === "Medium" ? "warm" : "danger"}>
-                      {recentExercises[0].difficulty || "?"}
-                    </Pill>
-                    {recentExercises[0].duration && (
-                      <span className="text-xs text-[var(--text-3)]">{recentExercises[0].duration} min</span>
-                    )}
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl font-bold font-mono text-[var(--text-1)] tabular-nums">
+                    {contest.rating}
                   </div>
-                  <p className="text-xs text-[var(--text-3)] mt-2">Dernier exercice résolu</p>
+                  {contest.badge && <Pill tone="warm">{contest.badge}</Pill>}
+                </div>
+                <div className="space-y-2 text-[11px]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--text-3)] font-mono uppercase tracking-wider text-[10px]">
+                      Participations
+                    </span>
+                    <span className="font-mono tabular-nums text-[var(--text-1)]">{contest.attended}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--text-3)] font-mono uppercase tracking-wider text-[10px]">
+                      Top
+                    </span>
+                    <span className="font-mono tabular-nums text-[var(--text-1)]">{contest.topPercentage}%</span>
+                  </div>
+                  {contest.globalRanking > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[var(--text-3)] font-mono uppercase tracking-wider text-[10px]">
+                        Rang global
+                      </span>
+                      <span className="font-mono tabular-nums text-[var(--text-1)]">
+                        #{contest.globalRanking.toLocaleString("fr-FR")}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8">
-                <p className="text-sm text-[var(--text-3)] mb-3">Aucun exercice enregistré</p>
-                <Button onClick={handleSmartSchedule} disabled={smartLoading} variant="secondary" size="sm">
-                  {smartLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                  Smart Scheduler
-                </Button>
-              </div>
+              <p className="text-sm text-[var(--text-3)] leading-relaxed">
+                Aucun contest enregistré sur ce compte — le rating apparaîtra après
+                ta première participation.
+              </p>
             )}
-            <Button onClick={handleSmartSchedule} disabled={smartLoading} variant="secondary" size="sm" className="mt-3 w-full">
-              {smartLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-              {smartLoading ? "Analyse..." : "Smart Scheduler — Trouver un créneau"}
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="p-5">
+            <h3 className="text-[11px] font-mono uppercase tracking-[0.16em] text-[var(--text-3)] mb-4">
+              Répartition par difficulté
+            </h3>
+            <div className="space-y-3">
+              <DifficultyBar
+                label="Easy"
+                solved={data.easySolved ?? 0}
+                total={data.totalSolved ?? 0}
+                tone="var(--success)"
+              />
+              <DifficultyBar
+                label="Medium"
+                solved={data.mediumSolved ?? 0}
+                total={data.totalSolved ?? 0}
+                tone="var(--warm)"
+              />
+              <DifficultyBar
+                label="Hard"
+                solved={data.hardSolved ?? 0}
+                total={data.totalSolved ?? 0}
+                tone="var(--danger)"
+              />
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <h3 className="text-[11px] font-mono uppercase tracking-[0.16em] text-[var(--text-3)] mb-4">
+              Créneau du jour
+            </h3>
+            <p className="text-sm text-[var(--text-3)] leading-relaxed mb-3">
+              Croise ton agenda du jour avec ta progression pour proposer une
+              difficulté adaptée au temps libre réel.
+            </p>
+            <Button onClick={handleSmartSchedule} disabled={smartLoading} variant="secondary" size="sm" className="w-full">
+              {smartLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarRange className="w-4 h-4" />}
+              {smartLoading ? "Analyse..." : "Analyser mon agenda"}
             </Button>
             {smartSuggestion && (
               <div className="mt-3 p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border-2)] text-sm whitespace-pre-wrap">
@@ -248,35 +311,68 @@ export default function LeetcodePage() {
           </Card>
         </div>
 
-        <Card className="p-5">
-          <h3 className="text-[11px] font-mono uppercase tracking-[0.16em] text-[var(--text-3)] mb-4">
-            Derniers exercices
-          </h3>
-          {recentExercises.length === 0 ? (
-            <p className="text-sm text-[var(--text-3)] text-center py-4">Aucun exercice résolu pour le moment.</p>
-          ) : (
+        {exercises.length > 0 && (
+          <Card className="p-5">
+            <h3 className="text-[11px] font-mono uppercase tracking-[0.16em] text-[var(--text-3)] mb-4">
+              Exercices enregistrés
+            </h3>
             <div className="space-y-2">
-              {recentExercises.map((ex) => (
+              {exercises.slice(0, 10).map((ex) => (
                 <div key={ex.id} className="flex items-center justify-between p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border-2)]">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <CheckCircle2 className="w-4 h-4 text-[var(--success)] shrink-0" />
-                    <div>
-                      <div className="text-sm font-medium text-[var(--text-1)]">{ex.title}</div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-[var(--text-1)] truncate">{ex.title}</div>
                       <div className="text-xs text-[var(--text-3)]">{new Date(ex.createdAt).toLocaleDateString("fr-FR")}</div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     {ex.difficulty && (
-                      <Pill tone={ex.difficulty === "Easy" ? "success" : ex.difficulty === "Medium" ? "warm" : "danger"}>{ex.difficulty}</Pill>
+                      <Pill tone={ex.difficulty === "Easy" ? "success" : ex.difficulty === "Medium" ? "warm" : "danger"}>
+                        {ex.difficulty}
+                      </Pill>
                     )}
                     {ex.duration && <span className="text-xs text-[var(--text-3)]">{ex.duration} min</span>}
                   </div>
                 </div>
               ))}
             </div>
-          )}
-        </Card>
+          </Card>
+        )}
       </div>
     </AppShell>
+  );
+}
+
+function DifficultyBar({
+  label,
+  solved,
+  total,
+  tone,
+}: {
+  label: string;
+  solved: number;
+  total: number;
+  tone: string;
+}) {
+  const share = total > 0 ? (solved / total) * 100 : 0;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-[11px] mb-1.5">
+        <span className="text-[var(--text-3)] font-mono uppercase tracking-wider text-[10px]">
+          {label}
+        </span>
+        <span className="font-mono tabular-nums text-[var(--text-1)]">
+          {solved}
+          <span className="text-[var(--text-4)]"> · {Math.round(share)}%</span>
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-[var(--surface-3)] overflow-hidden">
+        <div
+          className="h-full rounded-full transition-[width] duration-500"
+          style={{ width: `${share}%`, background: tone }}
+        />
+      </div>
+    </div>
   );
 }

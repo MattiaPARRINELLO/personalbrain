@@ -107,5 +107,6 @@ export async function getHomeOverview(): Promise<HomeOverview> {
     leetcodeSolvedToday: (leetcode.history ?? []).some(
       (h) => h.date.slice(0, 10) === todayIso && h.solved
     ),
+    leetcodeConfigured: Boolean(leetcode.leetcodeUsername),
   };
 }

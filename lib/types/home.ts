@@ -43,4 +43,6 @@ export interface HomeOverview {
   pendingFollowups: number;
   leetcodeStreak: number;
   leetcodeSolvedToday: boolean;
+  /** Un pseudo LeetCode est enregistré : la puce doit exister même à série 0. */
+  leetcodeConfigured: boolean;
 }

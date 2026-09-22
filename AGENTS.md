@@ -367,6 +367,28 @@ Nouveau domaine → nouveau fichier dans `lib/types/` + ajout au barrel.
 `reconcileRemindersWithMicrosoft()` ; create/update/delete poussent vers MS.
 Toute modification du CRUD rappels doit préserver ces appels.
 
+⚠️ **API LeetCode — pièges vérifiés** (`alfa-leetcode-api.onrender.com`, tier
+gratuit : démarrage à froid possible) :
+
+- Les compteurs ne sont **pas** sur `/{pseudo}` (qui ne renvoie que le profil)
+  mais sur `/{pseudo}/solved` (`solvedProblem`, `easySolved`…). Les lire sur le
+  profil donne quatre zéros silencieux.
+- Un pseudo inconnu répond **HTTP 200** avec un tableau `errors` : le code HTTP
+  ne suffit pas, il faut inspecter le corps.
+- `/{pseudo}/calendar` renvoie `submissionCalendar`, une **chaîne JSON**
+  `{ "<epoch secondes>": n }` (minuit UTC, jours actifs seulement) et un champ
+  `streak` de sémantique non documentée : la série est **recalculée** par
+  `computeStreak()` (`lib/leetcode-utils.ts`), jamais lue depuis l'API.
+- `/{pseudo}/contest` est facultatif : un compte sans concours renvoie
+  `contestParticipation: []` et son échec ne doit pas priver du reste.
+- `ranking` vaut 5 000 001 tant que le compte n'est pas classé → afficher
+  « non classé » (`UNRANKED_RANKING`), jamais le nombre brut.
+
+La synchro est pilotée par un TTL de 30 min (`SYNC_TTL_MS` dans
+`app/actions/leetcode.ts`) et non plus par `streak === 0`, qui figeait les
+chiffres à vie. L'échec d'un sync est remonté via `syncError` (jamais persisté) :
+ne pas réintroduire de `catch {}` vide, c'est ce qui a masqué la panne.
+
 ---
 
 ## instrumentation.ts — piège documenté
