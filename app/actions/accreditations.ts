@@ -16,7 +16,10 @@ import type { Accreditation } from "@/lib/types";
 const createAccreditationSchema = z.object({
   artist: z.string().trim().min(1, "Artiste requis"),
   venue: z.string().trim().min(1, "Lieu requis"),
-  concertDate: z.string().trim().min(1, "Date du concert requise"),
+  concertDate: z.string().trim().min(1, "Date du concert requise").refine(
+    (v) => !Number.isNaN(new Date(v).getTime()),
+    "Date du concert invalide"
+  ),
   contactEmail: z.string().email("Email invalide").optional().or(z.literal("")),
   notes: z.string().trim().optional(),
 });
@@ -156,11 +159,6 @@ export async function scanAccreditationsAction(): Promise<{ message: string; cre
       created++;
       existingKeys.add(key);
     }
-  }
-
-  if (updated > 0) {
-    const { saveAccreditations } = await import("@/lib/storage");
-    await saveAccreditations(existing);
   }
 
   revalidatePath("/photos");

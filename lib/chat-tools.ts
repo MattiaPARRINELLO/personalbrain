@@ -9,7 +9,6 @@ import {
   getAccreditations,
   getReminders,
   addAccreditation,
-  saveAccreditations,
   prepareConcert,
   getWeather,
   getPhotoShoots,
@@ -438,11 +437,16 @@ export async function executeTool(
     case "update_reminder": {
       const id = String(args.id ?? "");
       if (!id) return "Erreur : id requis. Utilise list_reminders pour trouver l'ID.";
+      const validStatuses = ["pending", "done", "snoozed"];
       const updates: Record<string, unknown> = {};
       if (args.title !== undefined) updates.title = String(args.title);
       if (args.notes !== undefined) updates.notes = String(args.notes);
       if (args.due_at !== undefined) updates.dueAt = String(args.due_at);
-      if (args.status !== undefined) updates.status = String(args.status);
+      if (args.status !== undefined) {
+        const s = String(args.status);
+        if (!validStatuses.includes(s)) return `Erreur : status invalide (${s}). Valeurs acceptees : ${validStatuses.join(", ")}`;
+        updates.status = s;
+      }
       const r = await updateReminder(id, updates as Parameters<typeof updateReminder>[1]);
       if (!r) return "Rappel introuvable.";
       return `Rappel modifie : "${r.title}" → ${new Date(r.dueAt).toLocaleString("fr-FR")} (${r.status}).`;
@@ -543,10 +547,6 @@ export async function executeTool(
           }
         }
 
-        if (updated > 0) {
-          await saveAccreditations(existing);
-        }
-
         return `Scan termine : ${created} nouvelle(s) accreditation(s) creee(s), ${updated} mise(s) a jour.`;
       } catch (err) {
         return `Erreur lors du scan des accreditations : ${err instanceof Error ? err.message : String(err)}`;
@@ -579,7 +579,13 @@ export async function executeTool(
       const date = String(args.date ?? "").trim();
       const client = String(args.client ?? "").trim();
       const notes = String(args.notes ?? "").trim() || undefined;
-      const status = args.status as PhotoShootStatus | undefined;
+      const validStatuses: PhotoShootStatus[] = ["upcoming", "done", "on_pc", "sorted", "edited", "exported", "sent"];
+      let status: PhotoShootStatus | undefined;
+      if (args.status !== undefined) {
+        const s = String(args.status);
+        if (!validStatuses.includes(s as PhotoShootStatus)) return `Erreur : status invalide (${s}). Valeurs acceptees : ${validStatuses.join(", ")}`;
+        status = s as PhotoShootStatus;
+      }
       if (!title || !date || !client) return "Erreur : titre, date et client requis.";
       const shoot = await addPhotoShoot({ title, date, client, notes, status });
       return `Shooting ajouté : ${shoot.title} (${shoot.client}) le ${new Date(shoot.date).toLocaleDateString("fr-FR")} [${shoot.status}]`;

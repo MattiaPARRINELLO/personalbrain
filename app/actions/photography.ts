@@ -15,7 +15,10 @@ import type { PhotoShootStatus } from "@/lib/types";
 
 const createPhotoShootSchema = z.object({
   title: z.string().trim().min(1, "Titre requis"),
-  date: z.string().trim().min(1, "Date requise"),
+  date: z.string().trim().min(1, "Date requise").refine(
+    (v) => !Number.isNaN(new Date(v).getTime()),
+    "Date invalide"
+  ),
   client: z.string().trim().min(1, "Client requis"),
   notes: z.string().trim().optional(),
 });

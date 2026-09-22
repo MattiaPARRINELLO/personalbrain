@@ -105,6 +105,15 @@ export async function checkReminders() {
 
     const notifiedReminders = await getNotifiedReminders();
 
+    // Purge les IDs de rappels qui n'existent plus (supprimés ou terminés)
+    const allReminderIds = new Set(data.reminders.map((r) => r.id));
+    const purged = [...notifiedReminders].filter((id) => !allReminderIds.has(id));
+    if (purged.length > 0) {
+      for (const id of purged) notifiedReminders.delete(id);
+      const { writeJsonAtomic } = await import("./storage");
+      await writeJsonAtomic(NOTIFIED_FILE, { ids: [...notifiedReminders] });
+    }
+
     for (const r of pending) {
       if (notifiedReminders.has(r.id)) continue;
 

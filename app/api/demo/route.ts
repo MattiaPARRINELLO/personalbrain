@@ -35,7 +35,7 @@ function clientIp(request: NextRequest): string {
 export async function POST(request: NextRequest) {
   const ip = clientIp(request);
 
-  if (!checkRateLimit(`demo:${ip}`, RATE_LIMIT)) {
+  if (!checkRateLimit("demo:global", RATE_LIMIT)) {
     return NextResponse.json(
       { error: "Trop de demandes. Réessayez dans un instant." },
       { status: 429 }

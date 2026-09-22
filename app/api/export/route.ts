@@ -15,6 +15,7 @@ const EXCLUDED = new Set([
   "users.json", // passkeys (identité d'authentification)
   "gmail-token.json",
   "calendar-token.json",
+  "microsoft-todo-token.json",
   "firebase-service-account.json",
   "server-cache.json",
   "notified-reminders.json",

@@ -158,3 +158,11 @@ export async function generateDailyBrief(): Promise<string | null> {
     return null;
   }
 }
+
+// Lecture seule du brief du jour — ne déclenche jamais de génération.
+export async function getTodayBrief(): Promise<string | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  const data = await readJsonSafe<DailyBriefsData>(BRIEF_FILENAME, { briefs: [] });
+  const brief = data.briefs.find((b) => b.date === today);
+  return brief?.summary ?? null;
+}

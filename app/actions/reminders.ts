@@ -24,7 +24,10 @@ const recurrenceSchema = z.enum(["daily", "weekly", "monthly"]);
 const createReminderSchema = z.object({
   title: z.string().trim().min(1, "Titre requis"),
   notes: z.string().trim().optional(),
-  dueAt: z.string().min(1, "Date d'echeance requise"),
+  dueAt: z.string().min(1, "Date d'echeance requise").refine(
+    (v) => !Number.isNaN(new Date(v).getTime()),
+    "Date d'echeance invalide"
+  ),
   recurrence: recurrenceSchema.optional(),
 });
 

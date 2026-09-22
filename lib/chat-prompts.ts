@@ -166,8 +166,8 @@ ${factsBlock || "- Aucun fait memorise"}`;
     const { getConfig } = await import("./config");
     const config = await getConfig();
     if (config.features.dailyBrief) {
-      const { generateDailyBrief } = await import("./daily-brief");
-      const brief = await generateDailyBrief();
+      const { getTodayBrief } = await import("./daily-brief");
+      const brief = await getTodayBrief();
       if (brief) briefBlock = `\n\nBrief du jour : ${brief}`;
     }
   } catch {}
