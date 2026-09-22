@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, RefreshCw, MapPin, User } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, MapPin, RefreshCw, User } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader, EmptyState } from "@/components/layout/Chrome";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api, type ScheduleCourse } from "@/lib/api-client";
 import { useCachedFetch } from "@/lib/cache";
+import { cn } from "@/lib/utils";
 
 const DAY_LABELS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 const SCHEDULE_CACHE_KEY = "schedule:all";
@@ -17,8 +17,7 @@ const TTL = 10 * 60 * 1000;
 function mondayOf(date: Date): Date {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  const day = (d.getDay() + 6) % 7; // lundi = 0
-  d.setDate(d.getDate() - day);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // lundi = 0
   return d;
 }
 
@@ -31,8 +30,19 @@ function hhmm(ms: number): string {
   return new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Tronque une salle longue ("Salle 13, Bâtiment principal" → "Salle 13") sans perdre l'info au survol. */
+function shortRoom(room: string): string {
+  return room.split(",")[0]?.trim() || room;
+}
+
+/** Nombre de semaines (lundi à lundi) entre deux dates. */
+function weeksBetween(fromMonday: Date, target: Date): number {
+  const a = mondayOf(fromMonday).getTime();
+  const b = mondayOf(target).getTime();
+  return Math.round((b - a) / (7 * 86_400_000));
+}
+
 export default function SchedulePage() {
-  const [weekOffset, setWeekOffset] = useState(0);
   const { data, loading, error, refetch } = useCachedFetch<ScheduleCourse[]>(
     SCHEDULE_CACHE_KEY,
     useCallback(async () => {
@@ -44,6 +54,28 @@ export default function SchedulePage() {
   );
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  // null = navigation automatique (voir autoOffset) ; un nombre = choix de l'utilisateur.
+  const [userOffset, setUserOffset] = useState<number | null>(null);
+
+  const [today] = useState(() => new Date());
+  const todayKey = dayKey(today.getTime());
+
+  // Sans choix explicite : si la semaine courante est vide (vacances, avant la
+  // rentrée…), on ouvre directement la semaine du prochain cours.
+  const autoOffset = useMemo(() => {
+    const courses = data ?? [];
+    const monday = mondayOf(today);
+    const nowMs = today.getTime();
+    const weekEnd = monday.getTime() + 7 * 86_400_000;
+    const hasCurrentWeek = courses.some((c) => c.start >= monday.getTime() && c.start < weekEnd);
+    if (hasCurrentWeek) return 0;
+    const next = courses
+      .filter((c) => c.end > nowMs)
+      .sort((a, b) => a.start - b.start)[0];
+    return next ? weeksBetween(monday, new Date(next.start)) : 0;
+  }, [data, today]);
+
+  const weekOffset = userOffset ?? autoOffset;
 
   const weekStart = useMemo(() => {
     const monday = mondayOf(new Date());
@@ -53,14 +85,15 @@ export default function SchedulePage() {
 
   const days = useMemo(() => {
     const courses = data ?? [];
-    return Array.from({ length: 7 }, (_, i) => {
+    return Array.from({ length: 5 }, (_, i) => {
       const date = new Date(weekStart);
       date.setDate(weekStart.getDate() + i);
       const key = dayKey(date.getTime());
-      const list = courses
-        .filter((c) => dayKey(c.start) === key)
-        .sort((a, b) => a.start - b.start);
-      return { date, key, list };
+      return {
+        date,
+        key,
+        list: courses.filter((c) => dayKey(c.start) === key).sort((a, b) => a.start - b.start),
+      };
     });
   }, [data, weekStart]);
 
@@ -80,101 +113,175 @@ export default function SchedulePage() {
     }
   };
 
-  const weekLabel = `${weekStart.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} → ${new Date(
-    weekStart.getTime() + 6 * 86_400_000
-  ).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`;
+  const weekLabel = `${weekStart.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} – ${new Date(
+    weekStart.getTime() + 4 * 86_400_000
+  ).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`;
 
   return (
     <AppShell>
-      <PageHeader
-        eyebrow="Emploi du temps"
-        title="Semaine"
-        description="Cours CESAR synchronisés automatiquement (toutes les 6 h) : horaires, salles et intervenants."
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setWeekOffset((w) => w - 1)} aria-label="Semaine précédente">
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setWeekOffset(0)}>
-              Cette semaine
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => setWeekOffset((w) => w + 1)} aria-label="Semaine suivante">
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-            <Button variant="secondary" size="sm" onClick={handleSync} loading={syncing} leftIcon={<RefreshCw className="w-3.5 h-3.5" />}>
-              Sync
-            </Button>
+      <div className="flex-1 min-w-0 overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+          <PageHeader
+            eyebrow="Emploi du temps"
+            title="Ma semaine"
+            description="Cours CESAR synchronisés automatiquement (toutes les 6 h) — notifications 30 min avant, salle incluse."
+            actions={
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setUserOffset(weekOffset - 1)}
+                  aria-label="Semaine précédente"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={weekOffset === 0 ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setUserOffset(0)}
+                >
+                  Cette semaine
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setUserOffset(weekOffset + 1)}
+                  aria-label="Semaine suivante"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSync}
+                  loading={syncing}
+                  leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+                >
+                  Sync
+                </Button>
+              </div>
+            }
+          />
+
+          {weekOffset !== 0 && (
+            <p className="text-[12px] text-[var(--text-2)] mb-4 px-3 py-2 rounded-lg border border-[var(--border-1)] bg-[var(--surface-1)]">
+              {weekOffset > 0
+                ? "Pas de cours cette semaine — voici la semaine du prochain cours."
+                : "Semaine passée."}{" "}
+              <button
+                onClick={() => setUserOffset(0)}
+                className="underline underline-offset-2 text-[var(--accent)] hover:brightness-110"
+              >
+                Revenir à cette semaine
+              </button>
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
+            <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-[var(--text-3)]">
+              {weekLabel}
+            </p>
+            <p className="text-[12px] text-[var(--text-3)]">
+              {totalWeek === 0 ? "Aucune séance" : `${totalWeek} séance${totalWeek > 1 ? "s" : ""}`}
+            </p>
           </div>
-        }
-      />
 
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-[12px] font-mono uppercase tracking-[0.16em] text-[var(--text-3)]">{weekLabel}</p>
-        <p className="text-[12px] text-[var(--text-3)]">{totalWeek} séance{totalWeek > 1 ? "s" : ""}</p>
-      </div>
+          {syncError && (
+            <p className="text-[12px] text-[var(--danger)] mb-4 px-3 py-2 rounded-lg border border-[var(--danger)]/25 bg-[var(--danger)]/8">
+              {syncError}
+            </p>
+          )}
 
-      {syncError && <p className="text-[12px] text-[var(--danger)] mb-3">{syncError}</p>}
-
-      {loading ? (
-        <div className="grid gap-3 md:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-40" />
-          ))}
-        </div>
-      ) : error ? (
-        <EmptyState title="Emploi du temps indisponible" description={error.message} />
-      ) : totalWeek === 0 ? (
-        <EmptyState title="Aucun cours cette semaine" description="Lance une synchronisation pour récupérer l'EDT depuis CESAR." />
-      ) : (
-        <div className="grid gap-3 md:grid-cols-5">
-          {days.slice(0, 5).map((day) => (
-            <div key={day.key} className="min-w-0">
-              <div className="flex items-baseline justify-between mb-2">
-                <h2 className="text-[11px] font-mono uppercase tracking-[0.18em] text-[var(--text-3)]">
-                  {DAY_LABELS[(day.date.getDay() + 6) % 7]}
-                </h2>
-                <span className="text-[11px] text-[var(--text-3)]">
-                  {day.date.toLocaleDateString("fr-FR", { day: "numeric", month: "numeric" })}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {day.list.length === 0 && (
-                  <div className="rounded-lg border border-dashed border-[var(--border-1)] h-16 flex items-center justify-center text-[11px] text-[var(--text-3)]">
-                    Libre
-                  </div>
-                )}
-                {day.list.map((c) => (
-                  <Card key={`${c.uuid}-${c.start}`} variant="default" className="p-3">
-                    <p className="text-[12px] font-medium text-[var(--text-1)] leading-snug">{c.subject}</p>
-                    <p className="text-[11px] font-mono text-[var(--accent)] mt-1">
-                      {hhmm(c.start)}–{hhmm(c.end)}
-                    </p>
-                    {c.room && (
-                      <p className="flex items-start gap-1 mt-1.5 text-[11px] text-[var(--text-2)]">
-                        <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
-                        <span className="min-w-0">{c.room}</span>
-                      </p>
-                    )}
-                    {c.teacher && (
-                      <p className="flex items-center gap-1 mt-1 text-[11px] text-[var(--text-3)]">
-                        <User className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{c.teacher}</span>
-                      </p>
-                    )}
-                  </Card>
-                ))}
-              </div>
+          {loading ? (
+            <div className="grid gap-3 md:grid-cols-5">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-44" />
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          ) : error ? (
+            <EmptyState title="Emploi du temps indisponible" description={error.message} />
+          ) : (
+            <>
+              <div className="grid gap-3 md:grid-cols-5">
+                {days.map((day) => {
+                  const isToday = day.key === todayKey;
+                  return (
+                    <div
+                      key={day.key}
+                      className={cn(
+                        "rounded-xl border p-3 min-w-0",
+                        isToday
+                          ? "border-[var(--accent)]/35 bg-[var(--accent)]/5"
+                          : "border-[var(--border-1)] bg-[var(--surface-1)]"
+                      )}
+                    >
+                      <div className="flex items-baseline justify-between gap-2 mb-1">
+                        <h2
+                          className={cn(
+                            "text-[11px] font-mono uppercase tracking-[0.16em]",
+                            isToday ? "text-[var(--accent)]" : "text-[var(--text-3)]"
+                          )}
+                        >
+                          {DAY_LABELS[(day.date.getDay() + 6) % 7].slice(0, 3)}
+                        </h2>
+                        <span className="text-[11px] text-[var(--text-3)] tabular-nums">
+                          {day.date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
+                        </span>
+                      </div>
 
-      {days.some((d) => d.list.length > 0) && (
-        <p className="flex items-center gap-1.5 mt-6 text-[11px] text-[var(--text-3)]">
-          <CalendarDays className="w-3.5 h-3.5" />
-          Notifications push 30 min avant chaque cours (salle incluse).
-        </p>
-      )}
+                      {day.list.length === 0 ? (
+                        <p className="text-[11px] text-[var(--text-3)] py-6 text-center">Libre</p>
+                      ) : (
+                        <div className="space-y-2 mt-2">
+                          {day.list.map((c) => (
+                            <div
+                              key={`${c.uuid}-${c.start}`}
+                              className="rounded-lg border border-[var(--border-1)] bg-[var(--surface-2)] px-2.5 py-2"
+                            >
+                              <p className="text-[11px] font-mono text-[var(--accent)] tabular-nums leading-none">
+                                {hhmm(c.start)}–{hhmm(c.end)}
+                              </p>
+                              <p className="text-[12.5px] font-medium text-[var(--text-1)] leading-snug mt-1.5 break-words">
+                                {c.subject.replace(/^E\d+\s+/, "")}
+                              </p>
+                              {c.remote ? (
+                                <p className="text-[10.5px] text-[var(--text-3)] mt-1">Distanciel</p>
+                              ) : (
+                                c.room && (
+                                  <p
+                                    className="flex items-center gap-1 text-[10.5px] text-[var(--text-3)] mt-1 min-w-0"
+                                    title={c.room}
+                                  >
+                                    <MapPin className="w-3 h-3 shrink-0" />
+                                    <span className="truncate">{shortRoom(c.room)}</span>
+                                  </p>
+                                )
+                              )}
+                              {c.teacher && (
+                                <p className="flex items-center gap-1 text-[10.5px] text-[var(--text-3)] mt-0.5 min-w-0">
+                                  <User className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">{c.teacher}</span>
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {totalWeek > 0 && (
+                <p className="flex items-center gap-1.5 mt-6 text-[11px] text-[var(--text-3)]">
+                  <CalendarClock className="w-3.5 h-3.5" />
+                  Notification push 30 min avant chaque cours, avec la salle.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </AppShell>
   );
 }
