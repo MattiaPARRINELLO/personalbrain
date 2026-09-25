@@ -22,6 +22,7 @@ import {
   Search,
   Activity,
   Code2,
+  Terminal,
   Images,
   MoreHorizontal,
 } from "lucide-react";
@@ -49,6 +50,7 @@ const navItems: NavItem[] = [
   { href: "/gmail", label: "Gmail", icon: Mail },
   { href: "/search", label: "Recherche", icon: Search },
   { href: "/activity", label: "Activité", icon: Activity },
+  { href: "/demo-calls", label: "Journal démo", icon: Terminal },
   { href: "/leetcode", label: "LeetCode", icon: Code2 },
   { href: "/gallery", label: "Galerie", icon: Images },
 ];

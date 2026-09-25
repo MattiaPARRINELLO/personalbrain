@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
+const mockRecordDemoCall = vi.fn();
+vi.mock("@/lib/storage", () => ({ recordDemoCall: mockRecordDemoCall }));
+
 const mockCheckRateLimit = vi.fn();
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: mockCheckRateLimit }));
 
@@ -29,6 +32,7 @@ function makeRequest(ip = "203.0.113.1"): NextRequest {
 describe("POST /api/demo", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRecordDemoCall.mockResolvedValue(undefined);
     mockCheckRateLimit.mockReturnValue(true);
     mockGetClientConfig.mockReturnValue({ baseURL: "http://provider.test/v1" });
     mockCreate.mockResolvedValue({
@@ -73,6 +77,25 @@ describe("POST /api/demo", () => {
     expect(mockCheckRateLimit).toHaveBeenCalledWith("demo:203.0.113.1", 8);
     expect(mockCheckRateLimit).not.toHaveBeenCalledWith("demo:global", 60);
     expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockRecordDemoCall).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: "rate_limited",
+      status: 429,
+      input: "{\"message\":\"Que dois-je préparer pour demain ?\"}",
+      ip: "203.0.113.1",
+    }));
+  });
+
+  it("journalise la question, la réponse et les métadonnées", async () => {
+    await POST(makeRequest());
+
+    expect(mockRecordDemoCall).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: "success",
+      status: 200,
+      input: "Que dois-je préparer pour demain ?",
+      response: "Charge tes batteries et tes cartes.",
+      model: "deepseek-v4-flash",
+      ip: "203.0.113.1",
+    }));
   });
 
   it("conserve un plafond global de protection du provider", async () => {

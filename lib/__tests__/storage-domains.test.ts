@@ -619,3 +619,36 @@ describe("storage - autoSummarize", () => {
     expect(result.tags).toEqual([]);
   });
 });
+
+describe("storage - demo calls", () => {
+  it("enregistre et relit un appel de démonstration", async () => {
+    const storage = await getStorage();
+    await storage.recordDemoCall({
+      requestId: "req-test",
+      ip: "203.0.113.10",
+      forwardedFor: "203.0.113.10",
+      realIp: "",
+      userAgent: "test-agent",
+      referer: "https://brain.mprnl.fr/",
+      model: "deepseek-v4-flash",
+      input: "Question de test",
+      response: "Réponse de test",
+      error: null,
+      sources: [{ kind: "Événement", title: "Test" }],
+      status: 200,
+      outcome: "success",
+      durationMs: 42,
+    });
+
+    const calls = await storage.getDemoCalls();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      requestId: "req-test",
+      input: "Question de test",
+      response: "Réponse de test",
+      outcome: "success",
+    });
+    expect(calls[0].id).toBeTruthy();
+    expect(calls[0].createdAt).toBeTruthy();
+  });
+});

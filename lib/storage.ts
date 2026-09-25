@@ -11,6 +11,7 @@ export * from "./storage/calendar";
 export * from "./storage/reminders";
 export * from "./storage/watch-later";
 export * from "./storage/activity";
+export * from "./storage/demo-calls";
 export * from "./storage/accreditations";
 export * from "./storage/chat-history";
 export * from "./storage/photo-shoots";

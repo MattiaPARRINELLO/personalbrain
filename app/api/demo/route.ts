@@ -3,18 +3,21 @@ import { z } from "zod";
 import OpenAI from "openai";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientConfig } from "@/lib/ai-providers/config";
+import { getRequestId, serverLog } from "@/lib/logger";
+import { recordDemoCall as appendDemoCall } from "@/lib/storage";
 import {
   DEMO_SYSTEM_PROMPT,
   buildDemoContext,
   selectSources,
 } from "@/lib/landing/demo-context";
+import type { DemoCallOutcome } from "@/lib/types";
 
 // ============================================================
 // MINI-DÉMO PUBLIQUE — endpoint strictement limité.
 // - DeepSeek appelé UNIQUEMENT côté serveur (clé jamais exposée)
 // - contexte 100 % fictif, aucune donnée utilisateur réelle
-// - aucun outil, aucun storage, aucune session privée
-// - rate limiting par IP, timeout court, entrée bornée
+// - aucun outil, aucune donnée de l'application privée
+// - journal d'audit local protégé, rate limiting par IP, timeout court, entrée bornée
 // ============================================================
 
 const bodySchema = z.object({
@@ -27,6 +30,8 @@ const DEMO_TIMEOUT_MS = 20_000;
 const RATE_LIMIT = 8; // demandes / minute / IP
 const GLOBAL_RATE_LIMIT = 60; // garde-fou provider, toutes IP confondues
 const MAX_CONTEXT_CHARS = 2_000;
+const LOG_INPUT_MAX_CHARS = 400;
+const LOG_RESPONSE_MAX_CHARS = 10_000;
 
 function clientIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -34,13 +39,78 @@ function clientIp(request: NextRequest): string {
   return forwarded?.split(",")[0]?.trim() || realIp?.trim() || "inconnu";
 }
 
+async function persistDemoCall(
+  request: NextRequest,
+  ip: string,
+  startedAt: number,
+  status: number,
+  outcome: DemoCallOutcome,
+  input: string | null,
+  response: string | null,
+  sources: { kind: string; title: string }[],
+  error: string | null
+): Promise<void> {
+  const entry = {
+    requestId: await getRequestId(),
+    ip: ip.slice(0, 64),
+    forwardedFor: (request.headers.get("x-forwarded-for") ?? "").slice(0, 512),
+    realIp: (request.headers.get("x-real-ip") ?? "").slice(0, 64),
+    userAgent: (request.headers.get("user-agent") ?? "inconnu").slice(0, 256),
+    referer: (request.headers.get("referer") ?? "inconnu").slice(0, 512),
+    model: DEMO_MODEL,
+    input: input?.slice(0, LOG_INPUT_MAX_CHARS) ?? null,
+    response: response?.slice(0, LOG_RESPONSE_MAX_CHARS) ?? null,
+    error: error?.slice(0, 500) ?? null,
+    sources: sources.map(({ kind, title }) => ({ kind, title })),
+    status,
+    outcome,
+    durationMs: Date.now() - startedAt,
+  };
+
+  try {
+    await appendDemoCall(entry);
+  } catch (err) {
+    void serverLog("demo", "error", "Échec de la journalisation d'un appel", err);
+  }
+}
+
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
   const ip = clientIp(request);
+
+  let rawBody = "";
+  try {
+    rawBody = await request.text();
+  } catch {
+    await persistDemoCall(
+      request,
+      ip,
+      startedAt,
+      400,
+      "invalid_json",
+      null,
+      null,
+      [],
+      "Corps de requête illisible"
+    );
+    return NextResponse.json({ error: "Requête invalide" }, { status: 400 });
+  }
 
   if (
     !checkRateLimit(`demo:${ip}`, RATE_LIMIT) ||
     !checkRateLimit("demo:global", GLOBAL_RATE_LIMIT)
   ) {
+    await persistDemoCall(
+      request,
+      ip,
+      startedAt,
+      429,
+      "rate_limited",
+      rawBody || null,
+      null,
+      [],
+      "Quota de requêtes dépassé"
+    );
     return NextResponse.json(
       { error: "Trop de demandes. Réessayez dans un instant." },
       { status: 429 }
@@ -49,17 +119,27 @@ export async function POST(request: NextRequest) {
 
   let body: unknown;
   try {
-    body = await request.json();
+    body = JSON.parse(rawBody) as unknown;
   } catch {
+    await persistDemoCall(
+      request,
+      ip,
+      startedAt,
+      400,
+      "invalid_json",
+      rawBody || null,
+      null,
+      [],
+      "Requête JSON invalide"
+    );
     return NextResponse.json({ error: "Requête invalide" }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Requête invalide" },
-      { status: 400 }
-    );
+    const message = parsed.error.issues[0]?.message ?? "Requête invalide";
+    await persistDemoCall(request, ip, startedAt, 400, "invalid_input", rawBody, null, [], message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   const message = parsed.data.message;
@@ -69,7 +149,17 @@ export async function POST(request: NextRequest) {
   try {
     client = new OpenAI(getClientConfig());
   } catch {
-    console.error("[demo] Configuration IA absente");
+    await persistDemoCall(
+      request,
+      ip,
+      startedAt,
+      503,
+      "configuration_error",
+      message,
+      null,
+      sources.map(({ kind, title }) => ({ kind, title })),
+      "Configuration IA absente"
+    );
     return NextResponse.json(
       { error: "Démonstration indisponible" },
       { status: 503 }
@@ -96,24 +186,43 @@ export async function POST(request: NextRequest) {
 
     const reply = completion.choices[0]?.message?.content?.trim() ?? "";
     if (!reply) {
+      await persistDemoCall(
+        request,
+        ip,
+        startedAt,
+        502,
+        "empty_response",
+        message,
+        null,
+        sources.map(({ kind, title }) => ({ kind, title })),
+        "Réponse vide du modèle"
+      );
       return NextResponse.json(
         { error: "Réponse vide du modèle. Réessayez." },
         { status: 502 }
       );
     }
 
-    // Journalisation sans contenu utilisateur (ni question, ni réponse).
-    console.log(`[demo] ok ip=${ip.slice(0, 8)} chars=${reply.length}`);
+    await persistDemoCall(request, ip, startedAt, 200, "success", message, reply, sources.map(({ kind, title }) => ({ kind, title })), null);
     return NextResponse.json({ reply, sources });
   } catch (err) {
     const aborted = err instanceof Error && err.name === "AbortError";
-    console.error(`[demo] échec ip=${ip.slice(0, 8)} ${aborted ? "timeout" : "erreur provider"}`);
-    return NextResponse.json(
-      { error: aborted
-        ? "La démonstration a mis trop de temps à répondre. Réessayez."
-        : "La démonstration est momentanément indisponible. Réessayez." },
-      { status: aborted ? 504 : 502 }
+    const errorMessage = aborted
+      ? "La démonstration a mis trop de temps à répondre. Réessayez."
+      : "La démonstration est momentanément indisponible. Réessayez.";
+    await persistDemoCall(
+      request,
+      ip,
+      startedAt,
+      aborted ? 504 : 502,
+      aborted ? "timeout" : "provider_error",
+      message,
+      null,
+      sources.map(({ kind, title }) => ({ kind, title })),
+      errorMessage
     );
+    void serverLog("demo", "error", aborted ? "Délai provider dépassé" : "Erreur provider", err, true);
+    return NextResponse.json({ error: errorMessage }, { status: aborted ? 504 : 502 });
   } finally {
     clearTimeout(timeout);
   }

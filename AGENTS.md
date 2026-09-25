@@ -87,7 +87,7 @@ pas l'app Next.
 
 ```
 app/
-  actions/          19 Server Actions ("use server") + __tests__/
+  actions/          20 Server Actions ("use server") + __tests__/
   api/              Route Handlers
   <page>/           page.tsx + composants LOCAUX à cette page
 components/
@@ -99,8 +99,8 @@ components/
   brain/            KnowledgeGraph
 lib/
   cesar-client.ts   client CESAR (emploi du temps) — fetch HTTP pur, SANS navigateur
-  storage/          CRUD par domaine (14 fichiers)
-  types/            définitions par domaine (16 fichiers)
+  storage/          CRUD par domaine (15 fichiers)
+  types/            définitions par domaine (17 fichiers)
   ai-providers/     openai, anthropic, config, types
   __tests__/        tests unitaires
 e2e/                specs Playwright (helpers, global-setup, projets no-auth/chromium)
@@ -140,6 +140,8 @@ scripts/            cron-scheduler, reset-passkey, cesar-smoke, scripts de QA/sc
 - `/today` — page d'agrégat « Aujourd'hui » (rappels du jour, agenda, relances), 2e destination du rail.
 - `/gallery` — redirige vers `/photos` (la galerie de livraison est la vue « Livraison » de Photos, `app/photos/GalleryKanban.tsx`).
 - `/photos` — kanban shootings + toggle de vue « Shootings / Livraison ».
+- `/demo-calls` — console privée authentifiée des appels IA de la démo publique
+  (`/api/demo`) : question/réponse, IP, user-agent, statut, durée et sources.
 - `/schedule` — emploi du temps CESAR (vue semaine + bouton Sync). Nourrit aussi
   la section « Cours » de `/today`, le daily brief et les notifications −30 min.
 
@@ -321,7 +323,7 @@ ne suffit pas. Et si tu modifies la logique d'un côté, **répercute de l'autre
 
 ### lib/storage.ts — barrel PARTIEL
 
-Ré-exporte `export *` des 13 domaines + `./web`, mais de `storage-core` seulement
+Ré-exporte `export *` des 14 domaines + `./web`, mais de `storage-core` seulement
 **`readJsonSafe`** et **`writeJsonAtomic`**.
 
 ➡️ Pour `mutateJson`, `readOrCreate`, `maybeBackup` : importer directement
@@ -330,7 +332,7 @@ Ré-exporte `export *` des 13 domaines + `./web`, mais de `storage-core` seuleme
 ### Fichiers data/
 
 `accreditations` · `activity` · `chat-history` · `concerts` · `config` ·
-`consent` · `emails` · `gallery` · `intentions` · `leetcode` · `memory` ·
+`consent` · `demo-calls` · `emails` · `gallery` · `intentions` · `leetcode` · `memory` ·
 `notified-courses` · `notified-reminders` · `photo-shoots` · `push-subscriptions` ·
 `reminders` · `schedule` · `server-cache` · `users` · `watch-later`
 
@@ -504,7 +506,12 @@ l'URL complète (`/v1/chat/completions`), le SDK **Anthropic** ajoute lui-même
   **ASCII uniquement**.
 - **Logging** : `console.error` / `console.warn` avec préfixe module
   (`[watch-later]`, `[storage]`). Pas de lib dédiée.
-- **Directives** : `"use server"` en tête des 18 fichiers `app/actions/*`,
+- **Journal démo** : les appels `/api/demo` sont persistés dans
+  `data/demo-calls.json` (1000 entrées maximum) et consultables uniquement via
+  `/demo-calls` après `requireSession()`. Le contenu envoyé et la réponse sont
+  conservés pour l'audit abuse ; aucune clé ou donnée de l'application privée
+  n'est journalisée.
+- **Directives** : `"use server"` en tête des 20 fichiers `app/actions/*`,
   `"use client"` sur les composants interactifs. Systématique.
 - **Langue** : messages utilisateur et commits en français, code et
   identifiants en anglais.
