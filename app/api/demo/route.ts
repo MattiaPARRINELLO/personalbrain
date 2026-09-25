@@ -25,17 +25,22 @@ const DEMO_MODEL = "deepseek-v4-flash"; // modèle le plus léger du provider
 const DEMO_MAX_TOKENS = 350;
 const DEMO_TIMEOUT_MS = 20_000;
 const RATE_LIMIT = 8; // demandes / minute / IP
+const GLOBAL_RATE_LIMIT = 60; // garde-fou provider, toutes IP confondues
 const MAX_CONTEXT_CHARS = 2_000;
 
 function clientIp(request: NextRequest): string {
-  const fwd = request.headers.get("x-forwarded-for");
-  return fwd?.split(",")[0]?.trim() || "inconnu";
+  const forwarded = request.headers.get("x-forwarded-for");
+  const realIp = request.headers.get("x-real-ip");
+  return forwarded?.split(",")[0]?.trim() || realIp?.trim() || "inconnu";
 }
 
 export async function POST(request: NextRequest) {
   const ip = clientIp(request);
 
-  if (!checkRateLimit("demo:global", RATE_LIMIT)) {
+  if (
+    !checkRateLimit(`demo:${ip}`, RATE_LIMIT) ||
+    !checkRateLimit("demo:global", GLOBAL_RATE_LIMIT)
+  ) {
     return NextResponse.json(
       { error: "Trop de demandes. Réessayez dans un instant." },
       { status: 429 }
